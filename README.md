@@ -2,6 +2,8 @@
 
 Painel para gerenciar o espelhamento e a gravação de vários aparelhos Android ao mesmo tempo, usando [scrcpy](https://github.com/Genymobile/scrcpy) e o ADB por baixo dos panos — sem precisar mexer em linha de comando.
 
+[![Baixar MirrorPanel](https://img.shields.io/badge/Baixar-MirrorPanel--Setup.exe-1f6feb?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/syhhw/MirrorPanel/releases/latest/download/MirrorPanel-Setup.exe)
+
 > **O MirrorPanel não espelha nada sozinho.** Todo o trabalho pesado — captura de tela, decodificação de vídeo, controle do aparelho — é feito pelo [scrcpy](https://github.com/Genymobile/scrcpy), criado por **Romain Vimont ([rom1v](https://github.com/rom1v))** e mantido pela [Genymobile](https://github.com/Genymobile). Este projeto é só uma interface gráfica por cima dele (e do ADB), pra deixar o uso com vários aparelhos mais simples e visual. Sem o scrcpy, o MirrorPanel não existiria — todo o crédito técnico é deles.
 
 ## O que ele faz
