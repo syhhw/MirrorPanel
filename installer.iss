@@ -22,7 +22,7 @@ AllowNoIcons=yes
 ; "so pra mim" (sem UAC) ou "para todos os usuarios" (com UAC) na instalacao.
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=commandline dialog
-LicenseFile=LICENSE.txt
+LicenseFile=TERMOS_INSTALADOR.txt
 OutputDir=installer_output
 OutputBaseFilename=MirrorPanel-Setup
 SetupIconFile=mirrorpanel.ico
