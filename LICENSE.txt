@@ -1,0 +1,19 @@
+MirrorPanel - Termos de Uso
+
+Este programa e fornecido "como esta", sem garantias de qualquer tipo,
+para uso pessoal de espelhamento e gravacao de tela de dispositivos
+Android conectados por USB ou Wi-Fi.
+
+O MirrorPanel utiliza e distribui os seguintes componentes de terceiros:
+
+  - scrcpy (Genymobile) - licenciado sob a licenca Apache License 2.0
+    https://github.com/Genymobile/scrcpy
+
+  - Android Debug Bridge (adb) - Android Open Source Project,
+    licenciado sob a licenca Apache License 2.0
+
+Ao clicar em "Eu aceito", voce concorda com estes termos e confirma que
+usara o programa apenas em dispositivos que voce possui ou tem
+autorizacao para acessar.
+
+Copyright (c) 2026

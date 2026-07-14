@@ -1,0 +1,35 @@
+# Builds e saidas geradas (recriaveis a partir do codigo-fonte)
+/build/
+/dist/
+/installer_output/
+*.spec
+
+# Dados locais de uso (nao fazem parte do codigo)
+/logs/
+/recordings/
+/screenshots/
+settings.json
+
+# Python
+__pycache__/
+*.pyc
+
+# Editor/SO
+.vscode/
+Thumbs.db
+
+# Binarios de terceiros (scrcpy/adb) - baixe do repositorio oficial de cada um,
+# nao faz sentido re-hospedar aqui (e sao dezenas de MB de DLLs)
+adb.exe
+AdbWinApi.dll
+AdbWinUsbApi.dll
+scrcpy.exe
+scrcpy-server
+SDL3.dll
+avcodec-62.dll
+avformat-62.dll
+avutil-60.dll
+swresample-6.dll
+libusb-1.0.dll
+scrcpy.png
+disconnected.png

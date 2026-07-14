@@ -1,0 +1,37 @@
+# MirrorPanel
+
+Painel para gerenciar o espelhamento e a gravação de vários aparelhos Android ao mesmo tempo, usando [scrcpy](https://github.com/Genymobile/scrcpy) e o ADB por baixo dos panos — sem precisar mexer em linha de comando.
+
+## O que ele faz
+
+- Detecta automaticamente os celulares conectados por USB e lista todos, parados, até você decidir o que espelhar.
+- Espelha a tela de qualquer aparelho com um clique em **Iniciar** — cada um numa janela própria, do tamanho certo (sem esticar nem cortar).
+- Ativa Wi-Fi num aparelho conectado por cabo com um botão. Reconhece que é o mesmo aparelho físico (mesmo depois de tirar o cabo) e nunca abre duas janelas pro mesmo celular.
+- Grava a tela, deixando escolher a pasta de destino e um modo leve (bitrate/fps/resolução reduzidos) pra aparelhos mais antigos não travarem.
+- Tira um print rápido do celular sem precisar gravar vídeo.
+- Ajusta qualidade (codec, bitrate, taxa de quadros, áudio) individualmente por aparelho, direto pela interface.
+- Mantém a tela do celular sempre ligada enquanto está espelhando.
+- Minimiza para a bandeja do Windows; fechar o painel encerra tudo de forma organizada, sem deixar processo solto.
+- Verifica atualizações automaticamente ao abrir (e tem um botão pra checar na hora que quiser).
+
+## Como instalar
+
+Baixe o instalador mais recente na aba [Releases](https://github.com/syhhw/MirrorPanel/releases) deste repositório e rode o `MirrorPanel-Setup.exe`. O instalador deixa escolher o idioma (português ou inglês), a pasta de instalação, e se quer atalho na área de trabalho e no Menu Iniciar.
+
+## Como usar
+
+1. Conecte o celular ao PC por USB, com a depuração USB ativada (Configurações → Opções do desenvolvedor).
+2. Abra o MirrorPanel — os aparelhos detectados aparecem na lista, prontos pra usar.
+3. Clique em **Iniciar** no aparelho que quiser espelhar.
+4. Use os botões ao lado de cada aparelho pra ativar Wi-Fi, gravar, tirar print ou ajustar a qualidade daquele aparelho especificamente.
+
+## Baseado em
+
+Este projeto usa e distribui os seguintes componentes de terceiros:
+
+- [scrcpy](https://github.com/Genymobile/scrcpy) (Genymobile) — Apache License 2.0
+- [Android Debug Bridge (adb)](https://developer.android.com/tools/adb) (Android Open Source Project) — Apache License 2.0
+
+## Licença
+
+Distribuído sob a Apache License 2.0 — veja o arquivo [LICENSE](LICENSE).
