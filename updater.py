@@ -9,11 +9,12 @@ import os
 import re
 import subprocess
 import tempfile
+import time
 from pathlib import Path
 
 import requests
 
-APP_VERSION = "1.0.0-1"  # mantenha igual ao MyAppVersion do installer.iss ao lancar uma nova versao
+APP_VERSION = "1.0.0-2"  # mantenha igual ao MyAppVersion do installer.iss ao lancar uma nova versao
 GITHUB_REPO = "syhhw/MirrorPanel"
 API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
 REQUEST_HEADERS = {"Accept": "application/vnd.github+json", "User-Agent": "MirrorPanel-updater"}
@@ -99,16 +100,40 @@ def download_update(url: str, dest_path: str, on_progress=None, chunk_size: int 
         return False
 
 
-def apply_update_and_restart(installer_path: str):
-    """Roda o novo instalador e encerra o processo atual JA, liberando os
-    arquivos a tempo do instalador substituir sem erro de 'arquivo em uso'.
+def apply_update_and_restart(installer_path: str) -> str | None:
+    """Roda o novo instalador e encerra o processo atual, liberando os arquivos
+    a tempo do instalador substituir sem erro de "arquivo em uso".
+
+    Devolve uma mensagem de erro (SEM encerrar o processo) se algo falhar de
+    forma detectavel na hora - assim o programa avisa o usuario em vez de so
+    sumir e deixar ele preso pedindo a mesma atualizacao pra sempre. Se tudo
+    correr bem, esta funcao nunca retorna (o processo e encerrado).
+
+    /CURRENTUSER forca a instalacao sem pedir elevacao (UAC) - a instalacao
+    original ja e por usuario, sem admin; sem isso, o instalador as vezes fica
+    esperando um clique de "Sim" na elevacao que ninguem ve, porque o programa
+    ja fechou sozinho logo em seguida.
 
     /CLOSEAPPLICATIONS e /RESTARTAPPLICATIONS sao uma rede de seguranca do
     proprio Inno Setup: se o nosso processo demorar um instante pra sumir de
     verdade, o instalador detecta e fecha via Restart Manager do Windows, e
     reabre o MirrorPanel (ja atualizado) no final sozinho.
     """
-    args = [installer_path, "/SILENT", "/SUPPRESSMSGBOXES", "/NORESTART",
+    p = Path(installer_path)
+    if not p.exists() or p.stat().st_size < 1_000_000:  # instalador real tem varios MB
+        return f"Arquivo do instalador nao encontrado ou incompleto: {installer_path}"
+
+    args = [installer_path, "/SILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/CURRENTUSER",
             "/CLOSEAPPLICATIONS", "/RESTARTAPPLICATIONS"]
-    subprocess.Popen(args, close_fds=True, cwd=str(Path(installer_path).parent))
+    try:
+        proc = subprocess.Popen(args, close_fds=True, cwd=str(p.parent))
+    except OSError as exc:
+        logging.exception("Falha ao iniciar o instalador da atualizacao")
+        return f"Nao foi possivel iniciar o instalador: {exc}"
+
+    time.sleep(1.5)  # da tempo de pegar uma falha IMEDIATA (instalador corrompido, etc)
+    if proc.poll() is not None and proc.returncode != 0:
+        return f"O instalador encerrou sozinho com erro (codigo {proc.returncode})."
+
     os._exit(0)  # sai AGORA - nao deixa nada (atexit, cleanup) atrasar a liberacao dos arquivos
+    return None  # nunca chega aqui

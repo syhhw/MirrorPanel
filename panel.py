@@ -58,11 +58,17 @@ def get_icon(name: str, size: int, color: str):
 
 
 def _center_on_parent(win: tk.Toplevel, parent: tk.Misc):
-    """Centraliza uma janela de dialogo sobre a janela principal (nao no canto padrao do Windows)."""
+    """Centraliza uma janela de dialogo sobre a janela principal (nao no canto padrao do Windows).
+
+    Usa winfo_reqwidth/reqheight (tamanho PEDIDO pelos widgets), nao winfo_width/height
+    (tamanho REAL na tela) - logo apos criar a janela, antes dela ser mapeada pelo
+    gerenciador de janelas, winfo_width/height ainda devolvem 1x1, o que jogava o
+    dialogo pro canto superior esquerdo em vez do meio da tela.
+    """
     win.update_idletasks()
     pw, ph = parent.winfo_width(), parent.winfo_height()
     px, py = parent.winfo_rootx(), parent.winfo_rooty()
-    w, h = win.winfo_width(), win.winfo_height()
+    w, h = win.winfo_reqwidth(), win.winfo_reqheight()
     x = max(0, px + (pw - w) // 2)
     y = max(0, py + (ph - h) // 2)
     win.geometry(f"+{x}+{y}")
@@ -305,6 +311,37 @@ class ScreenshotConfirmDialog(tk.Toplevel):
 
     def _accept(self):
         self.on_copy()
+        self.destroy()
+
+
+class MirroringDisconnectedDialog(tk.Toplevel):
+    """Quando o scrcpy cai sozinho (cabo com mau contato, erro de stream, etc)
+    com o aparelho ainda dado como conectado - pergunta se quer tentar de novo
+    em vez de so sumir e deixar o aparelho parado sem explicar o motivo."""
+
+    def __init__(self, parent, serial: str, model: str, on_retry):
+        super().__init__(parent)
+        self.title("Espelhamento desconectado")
+        self.resizable(False, False)
+        self.transient(parent)
+        self.attributes("-topmost", True)
+
+        ttk.Label(self, text="Espelhamento desconectado", font=FONT_BOLD).pack(padx=22, pady=(16, 4))
+        ttk.Label(
+            self, text=f"A conexao com {model} foi interrompida inesperadamente.\nDeseja tentar reconectar?",
+            foreground="#57606a", justify="center", wraplength=280,
+        ).pack(padx=22, pady=(0, 14))
+
+        btns = ttk.Frame(self)
+        btns.pack(pady=(0, 16))
+        ttk.Button(btns, text="Cancelar", command=self.destroy, width=10).pack(side="left", padx=6)
+        ttk.Button(btns, text="Tentar novamente", command=self._retry, width=15).pack(side="left", padx=6)
+
+        self.on_retry = on_retry
+        _center_on_parent(self, parent)
+
+    def _retry(self):
+        self.on_retry()
         self.destroy()
 
 
@@ -788,6 +825,8 @@ class App:
                 self._log(f"[-] {ev['model']} desconectado")
             elif t == "crashed":
                 self._log(f"[!] {ev['model']} encerrou sozinho (tentativa {ev['attempt']})")
+                MirroringDisconnectedDialog(self.root, ev["serial"], ev["model"],
+                                             on_retry=lambda s=ev["serial"]: self._retry_after_crash(s))
             elif t == "blocked":
                 self._log(f"[!] {ev['model']} falhou varias vezes - veja logs/scrcpy_{ev['serial']}.log")
             elif t == "problem":
@@ -820,6 +859,12 @@ class App:
     def _on_toggle(self, serial: str, status: str):
         kind = "stop" if status == "mirroring" else "start"
         self.action_queue.put({"type": kind, "serial": serial})
+        self.wake_event.set()
+
+    def _retry_after_crash(self, serial: str):
+        model = self.manager.model_cache.get(serial, serial)
+        self._log(f"[+] Tentando reconectar {model}...")
+        self.action_queue.put({"type": "start", "serial": serial})
         self.wake_event.set()
 
     def _on_wifi(self, serial: str):
@@ -886,7 +931,21 @@ class App:
                 self.tray_icon.stop()
             except Exception:
                 pass
-        updater.apply_update_and_restart(installer_path)  # isso encerra o processo (os._exit)
+        try:
+            # o servidor do adb fica rodando em segundo plano por design (pra ficar
+            # "quente" entre uma abertura e outra do programa) - isso segura o
+            # arquivo adb.exe e faz o instalador abortar a atualizacao inteira
+            # (Restart Manager nao consegue fechar, e o instalador desiste).
+            engine.run_adb("kill-server", timeout=10)
+        except Exception:
+            logging.exception("Falha ao encerrar o servidor adb antes de atualizar")
+        # se tudo der certo, apply_update_and_restart encerra o processo (os._exit)
+        # e o codigo abaixo nunca roda. So chega aqui se algo falhar de forma
+        # detectavel - antes, isso sumia silenciosamente e a atualizacao "nao fazia nada".
+        error = updater.apply_update_and_restart(installer_path)
+        if error:
+            self._log(f"[update] {error}")
+            messagebox.showerror("MirrorPanel", f"Falha ao aplicar a atualizacao:\n{error}")
 
     def _on_record(self, serial: str, currently_recording: bool):
         if currently_recording:
