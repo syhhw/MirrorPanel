@@ -204,6 +204,28 @@ def _close_windows_of_pid(pid: int) -> int:
     return len(found)
 
 
+def get_window_rect_of_pid(pid: int):
+    """Posicao/tamanho REAL (atual) da janela de video do scrcpy desse processo -
+    usado pro flash da tela de print aparecer exatamente em cima dela, mesmo que
+    o usuario tenha movido/redimensionado a janela manualmente."""
+    user32 = ctypes.windll.user32
+    found = []
+
+    @ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)
+    def _callback(hwnd, _lparam):
+        owner_pid = ctypes.wintypes.DWORD()
+        user32.GetWindowThreadProcessId(hwnd, ctypes.byref(owner_pid))
+        if owner_pid.value == pid and user32.IsWindowVisible(hwnd):
+            rect = ctypes.wintypes.RECT()
+            user32.GetWindowRect(hwnd, ctypes.byref(rect))
+            found.append((rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top))
+            return False
+        return True
+
+    user32.EnumWindows(_callback, 0)
+    return found[0] if found else None
+
+
 def graceful_stop(proc: subprocess.Popen, timeout: float = 3.0):
     """Fecha a janela do scrcpy (equivalente a clicar no X) pra ele finalizar sozinho
     qualquer gravacao em andamento, antes de partir pra um kill bruto como ultimo recurso."""
@@ -540,10 +562,11 @@ class MirrorManager:
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         path = SCREENSHOTS_DIR / f"{safe_model}_{timestamp}.png"
         try:
-            # exec-out precisa de bytes crus (sem text=True), senao o Windows corrompe o PNG
+            # exec-out precisa de bytes crus (sem text=True), senao o Windows corrompe o PNG.
+            # timeout generoso (18s) porque aparelhos antigos podem demorar pra capturar/enviar.
             result = subprocess.run(
                 [str(ADB), "-s", serial, "exec-out", "screencap", "-p"],
-                capture_output=True, timeout=10, creationflags=CREATE_NO_WINDOW,
+                capture_output=True, timeout=18, creationflags=CREATE_NO_WINDOW,
             )
         except (subprocess.TimeoutExpired, OSError):
             logging.exception("Falha ao tirar screenshot de %s", serial)
@@ -558,6 +581,38 @@ class MirrorManager:
             logging.exception("Falha ao salvar screenshot em %s", path)
             return None
         return str(path)
+
+    def copy_image_to_clipboard(self, path: str) -> bool:
+        """Copia o PNG do print pra area de transferencia do Windows (Win+V mostra ele).
+        Trata qualquer falha (arquivo sumiu, aparelho lento que ainda esta escrevendo, etc)
+        sem levantar excecao - so devolve True/False."""
+        try:
+            import win32clipboard
+            from PIL import Image
+            import io
+
+            p = Path(path)
+            if not p.exists() or p.stat().st_size == 0:
+                logging.warning("Print nao encontrado (ou vazio) pra copiar: %s", path)
+                return False
+
+            img = Image.open(p)
+            img.load()  # forca leitura completa agora, com o arquivo ainda garantido no disco
+            buf = io.BytesIO()
+            img.convert("RGB").save(buf, "BMP")
+            dib = buf.getvalue()[14:]  # CF_DIB quer o bitmap sem o cabecalho de arquivo (14 bytes)
+            buf.close()
+
+            win32clipboard.OpenClipboard()
+            try:
+                win32clipboard.EmptyClipboard()
+                win32clipboard.SetClipboardData(win32clipboard.CF_DIB, dib)
+            finally:
+                win32clipboard.CloseClipboard()
+            return True
+        except Exception:
+            logging.exception("Falha ao copiar print para a area de transferencia")
+            return False
 
     def enable_wifi(self, serial: str) -> str | None:
         """Liga o modo Wi-Fi num aparelho conectado por cabo. Devolve 'ip:porta' se der certo."""
