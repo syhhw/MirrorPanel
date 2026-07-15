@@ -3,7 +3,7 @@
 ; depois de rodar o PyInstaller em modo --onedir (pasta dist\MirrorPanel).
 
 #define MyAppName "MirrorPanel"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "1.0.0-1"
 #define MyAppPublisher "MirrorPanel"
 #define MyAppExeName "MirrorPanel.exe"
 ; Pasta gerada pelo PyInstaller --onedir (troque se o seu caminho for diferente)

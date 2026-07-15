@@ -5,6 +5,7 @@ ate o usuario clicar "Abrir" em algum. Tambem da pra ativar Wi-Fi, gravar e
 ajustar qualidade por aparelho - tudo por botao, sem editar arquivo nenhum.
 Roda numa thread separada da UI pra nunca travar a janela.
 """
+import ctypes
 import logging
 import queue
 import threading
@@ -18,6 +19,13 @@ from PIL import ImageTk
 import icons
 import mirror_engine as engine
 import updater
+
+# Fonte padrao do app inteiro - Segoe UI e a fonte de sistema do Windows 10/11
+# (limpa, sans-serif, ja instalada em qualquer maquina - sem depender de nada externo)
+FONT_FAMILY = "Segoe UI"
+FONT_DEFAULT = (FONT_FAMILY, 9)
+FONT_BOLD = (FONT_FAMILY, 9, "bold")
+FONT_MUTED = (FONT_FAMILY, 8)
 
 STATUS_LABELS = {
     "mirroring": ("Espelhando", "#1a7f37"),
@@ -225,6 +233,81 @@ class DownloadProgressDialog(tk.Toplevel):
             self.pct_label.config(text=f"{downloaded // 1024} KB baixados")
 
 
+class ScreenshotFlash(tk.Toplevel):
+    """Janela sem borda, transparente a cliques, que pisca em cima da janela de
+    video do scrcpy - simula o flash de camera no exato lugar onde o print foi
+    tirado (nao da pra desenhar 'dentro' do scrcpy, e um processo separado, entao
+    a gente sobrepoe uma janela por cima dele no momento certo)."""
+
+    def __init__(self, root: tk.Tk, rect):
+        super().__init__(root)
+        x, y, w, h = rect
+        self.overrideredirect(True)
+        self.attributes("-topmost", True)
+        self.configure(bg="white")
+        self.geometry(f"{w}x{h}+{x}+{y}")
+        self._alpha = 0.55
+        try:
+            self.attributes("-alpha", self._alpha)
+        except tk.TclError:
+            pass
+        self.after(1, self._make_clickthrough)  # so depois que o HWND real existir
+        self.after(60, self._fade)
+
+    def _make_clickthrough(self):
+        """Deixa cliques atravessarem a janela - e so um flash visual, nao deve
+        atrapalhar quem estiver mexendo no celular durante os poucos ms que ela existe."""
+        try:
+            GWL_EXSTYLE = -20
+            WS_EX_LAYERED, WS_EX_TRANSPARENT, WS_EX_NOACTIVATE = 0x80000, 0x20, 0x8000000
+            hwnd = self.winfo_id()
+            user32 = ctypes.windll.user32
+            styles = user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
+            user32.SetWindowLongW(hwnd, GWL_EXSTYLE, styles | WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_NOACTIVATE)
+        except Exception:
+            pass
+
+    def _fade(self):
+        self._alpha -= 0.09
+        if self._alpha <= 0:
+            self.destroy()
+            return
+        try:
+            self.attributes("-alpha", self._alpha)
+        except tk.TclError:
+            self.destroy()
+            return
+        self.after(25, self._fade)
+
+
+class ScreenshotConfirmDialog(tk.Toplevel):
+    """Pop-up NAO-modal (sem grab_set) - o usuario pode seguir usando o painel
+    com essa janela aberta, ela so pergunta se quer copiar o print."""
+
+    def __init__(self, parent, on_copy):
+        super().__init__(parent)
+        self.title("Print capturado")
+        self.resizable(False, False)
+        self.transient(parent)
+        self.attributes("-topmost", True)
+
+        ttk.Label(self, text="Print capturado!", font=FONT_BOLD).pack(padx=22, pady=(16, 4))
+        ttk.Label(self, text="Deseja copiar para a area de transferencia do Windows?",
+                  foreground="#57606a").pack(padx=22, pady=(0, 14))
+
+        btns = ttk.Frame(self)
+        btns.pack(pady=(0, 16))
+        ttk.Button(btns, text="Nao", command=self.destroy, width=10).pack(side="left", padx=6)
+        ttk.Button(btns, text="Sim", command=self._accept, width=10).pack(side="left", padx=6)
+
+        self.on_copy = on_copy
+        _center_on_parent(self, parent)
+
+    def _accept(self):
+        self.on_copy()
+        self.destroy()
+
+
 class DeviceRow:
     def __init__(self, parent, serial: str, callbacks: dict):
         self.serial = serial
@@ -348,6 +431,21 @@ class DeviceRow:
             self.record_btn.config(image=get_icon("record", 13, "#cf222e"),
                                     state="normal" if self.status == "mirroring" else "disabled")
 
+    def flash(self):
+        """Pisca a borda do cartao (fallback de feedback quando nao ha janela de
+        video pra sobrepor - aparelho nao esta espelhando no momento)."""
+        original = self.border.cget("bg")
+
+        def step(n):
+            if n <= 0 or not self.border.winfo_exists():
+                if self.border.winfo_exists():
+                    self.border.config(bg=original)
+                return
+            self.border.config(bg="#1f6feb" if n % 2 else original)
+            self.border.after(90, lambda: step(n - 1))
+
+        step(4)
+
     def destroy(self):
         self.border.destroy()
 
@@ -357,7 +455,7 @@ class App:
 
     def __init__(self, root: tk.Tk):
         self.root = root
-        root.title(f"MirrorPanel {updater.APP_VERSION}")
+        root.title("MirrorPanel")
         root.geometry("640x580")
         root.minsize(520, 380)
         root.configure(bg="#f6f8fa")
@@ -394,11 +492,18 @@ class App:
         self.root.after(1000, self._tick_timers)
 
     def _setup_styles(self):
+        # Fonte padrao pra TUDO (inclusive widgets tk.* que nao herdam do ttk.Style,
+        # como Label/Text avulsos): "*Font" e um wildcard do Tk que cobre qualquer
+        # widget sem fonte propria explicita. Widgets com font=(...) definido no
+        # proprio construtor continuam mandando (isso aqui e so o padrao/fallback).
+        self.root.option_add("*Font", FONT_DEFAULT)
+
         style = ttk.Style(self.root)
         try:
             style.theme_use("vista")
         except tk.TclError:
             pass
+        style.configure(".", font=FONT_DEFAULT)  # padrao pra todos os widgets ttk
         style.configure("Card.TFrame", background="#ffffff")
         style.configure("Card.TLabel", background="#ffffff", font=("Segoe UI", 10, "bold"))
         style.configure("CardMuted.TLabel", background="#ffffff", foreground="#57606a")
@@ -473,8 +578,12 @@ class App:
                                  bg="#f6f8fa", relief="flat", padx=8, pady=6)
         self.log_text.pack(fill="x", padx=1, pady=1)
 
-        ttk.Label(self.root, text="Minimizar manda para a bandeja. Fechar encerra os espelhamentos abertos.",
-                  foreground="#57606a", font=("Segoe UI", 8)).pack(anchor="w", padx=14, pady=(0, 10))
+        footer = ttk.Frame(self.root, padding=(14, 0, 14, 10))
+        footer.pack(fill="x")
+        ttk.Label(footer, text="Minimizar manda para a bandeja. Fechar encerra os espelhamentos abertos.",
+                  foreground="#57606a", font=FONT_MUTED).pack(side="left")
+        ttk.Label(footer, text=f"v{updater.APP_VERSION}",
+                  foreground="#8c959f", font=FONT_MUTED).pack(side="right")
 
     def _toggle_stay_awake(self):
         self.action_queue.put({"type": "set_stay_awake", "value": self.stay_awake_var.get()})
@@ -580,6 +689,9 @@ class App:
         elif kind == "screenshot":
             path = self.manager.take_screenshot(serial)
             self.event_queue.put(("screenshot_result", serial, path))
+        elif kind == "copy_screenshot":
+            ok = self.manager.copy_image_to_clipboard(action["path"])
+            self.event_queue.put(("clipboard_result", ok))
 
     # ------------------------------------------------------- thread da UI --
     def _drain_queue(self):
@@ -612,8 +724,16 @@ class App:
                     model = self.manager.model_cache.get(serial, serial)
                     if path:
                         self._log(f"[print] Screenshot de {model} salvo em {path}")
+                        ScreenshotConfirmDialog(self.root, on_copy=lambda p=path: self._on_copy_screenshot(p))
                     else:
                         self._log(f"[print] Falha ao tirar screenshot de {model}.")
+                    continue
+                if item[0] == "clipboard_result":
+                    _, ok = item
+                    if ok:
+                        self._log("[print] Copiado para a area de transferencia (Win+V pra ver).")
+                    else:
+                        self._log("[print] Nao foi possivel copiar para a area de transferencia.")
                     continue
                 if item[0] == "update_check_result":
                     result = item[1]
@@ -709,7 +829,26 @@ class App:
         self.wake_event.set()
 
     def _on_screenshot(self, serial: str):
+        self._flash_screenshot_feedback(serial)
         self.action_queue.put({"type": "screenshot", "serial": serial})
+        self.wake_event.set()
+
+    def _flash_screenshot_feedback(self, serial: str):
+        """Feedback visual imediato (nao espera o print terminar de verdade).
+        Se o aparelho esta espelhando, pisca em cima da janela de video dele;
+        senao (print sem estar espelhando), pisca a propria linha no painel."""
+        dev = self.manager.active.get(serial)
+        if dev:
+            rect = engine.get_window_rect_of_pid(dev.proc.pid)
+            if rect:
+                ScreenshotFlash(self.root, rect)
+                return
+        row = self.rows.get(serial)
+        if row:
+            row.flash()
+
+    def _on_copy_screenshot(self, path: str):
+        self.action_queue.put({"type": "copy_screenshot", "path": path})
         self.wake_event.set()
 
     def _run_update_check(self):
