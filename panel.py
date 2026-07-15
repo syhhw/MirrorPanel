@@ -315,20 +315,21 @@ class ScreenshotConfirmDialog(tk.Toplevel):
 
 
 class MirroringDisconnectedDialog(tk.Toplevel):
-    """Quando o scrcpy cai sozinho (cabo com mau contato, erro de stream, etc)
-    com o aparelho ainda dado como conectado - pergunta se quer tentar de novo
-    em vez de so sumir e deixar o aparelho parado sem explicar o motivo."""
+    """Quando o espelhamento de um aparelho para - cabo desplugado ou o scrcpy
+    caiu sozinho - pergunta se quer tentar reconectar, em vez de so sumir e
+    deixar o aparelho parado sem explicar o motivo."""
 
-    def __init__(self, parent, serial: str, model: str, on_retry):
+    def __init__(self, parent, serial: str, model: str, on_retry, on_close=None):
         super().__init__(parent)
         self.title("Espelhamento desconectado")
         self.resizable(False, False)
         self.transient(parent)
         self.attributes("-topmost", True)
+        self.protocol("WM_DELETE_WINDOW", self.destroy)
 
         ttk.Label(self, text="Espelhamento desconectado", font=FONT_BOLD).pack(padx=22, pady=(16, 4))
         ttk.Label(
-            self, text=f"A conexao com {model} foi interrompida inesperadamente.\nDeseja tentar reconectar?",
+            self, text=f"A conexao com {model} foi interrompida.\nDeseja tentar reconectar?",
             foreground="#57606a", justify="center", wraplength=280,
         ).pack(padx=22, pady=(0, 14))
 
@@ -338,11 +339,18 @@ class MirroringDisconnectedDialog(tk.Toplevel):
         ttk.Button(btns, text="Tentar novamente", command=self._retry, width=15).pack(side="left", padx=6)
 
         self.on_retry = on_retry
+        self.on_close = on_close
         _center_on_parent(self, parent)
 
     def _retry(self):
         self.on_retry()
         self.destroy()
+
+    def destroy(self):
+        if self.on_close:
+            self.on_close()
+            self.on_close = None
+        super().destroy()
 
 
 class DeviceRow:
@@ -507,6 +515,7 @@ class App:
         self.action_queue: "queue.Queue" = queue.Queue()
         self.wake_event = threading.Event()
         self.stop_event = threading.Event()
+        self.disconnect_dialogs: dict = {}
         self.rows: dict[str, DeviceRow] = {}
         self.first_tick_done = False
         self.tray_icon = None
@@ -823,10 +832,10 @@ class App:
                 self._log(f"[+] {ev['model']} conectado (porta {ev['port']})")
             elif t == "departed":
                 self._log(f"[-] {ev['model']} desconectado")
+                self._show_disconnect_dialog(ev["serial"], ev["model"])
             elif t == "crashed":
                 self._log(f"[!] {ev['model']} encerrou sozinho (tentativa {ev['attempt']})")
-                MirroringDisconnectedDialog(self.root, ev["serial"], ev["model"],
-                                             on_retry=lambda s=ev["serial"]: self._retry_after_crash(s))
+                self._show_disconnect_dialog(ev["serial"], ev["model"])
             elif t == "blocked":
                 self._log(f"[!] {ev['model']} falhou varias vezes - veja logs/scrcpy_{ev['serial']}.log")
             elif t == "problem":
@@ -861,7 +870,18 @@ class App:
         self.action_queue.put({"type": kind, "serial": serial})
         self.wake_event.set()
 
-    def _retry_after_crash(self, serial: str):
+    def _show_disconnect_dialog(self, serial: str, model: str):
+        existing = self.disconnect_dialogs.get(serial)
+        if existing:
+            existing.destroy()
+        dlg = MirroringDisconnectedDialog(
+            self.root, serial, model,
+            on_retry=lambda s=serial: self._retry_after_disconnect(s),
+            on_close=lambda s=serial: self.disconnect_dialogs.pop(s, None),
+        )
+        self.disconnect_dialogs[serial] = dlg
+
+    def _retry_after_disconnect(self, serial: str):
         model = self.manager.model_cache.get(serial, serial)
         self._log(f"[+] Tentando reconectar {model}...")
         self.action_queue.put({"type": "start", "serial": serial})

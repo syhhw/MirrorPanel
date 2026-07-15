@@ -3,7 +3,7 @@
 ; depois de rodar o PyInstaller em modo --onedir (pasta dist\MirrorPanel).
 
 #define MyAppName "MirrorPanel"
-#define MyAppVersion "1.0.0-2"
+#define MyAppVersion "1.0.0-3"
 #define MyAppPublisher "MirrorPanel"
 #define MyAppExeName "MirrorPanel.exe"
 ; Pasta gerada pelo PyInstaller --onedir (troque se o seu caminho for diferente)
@@ -56,5 +56,10 @@ Name: "{group}\Desinstalar {#MyAppName}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
 [Run]
-; Caixa de selecao "Abrir o MirrorPanel" ao final da instalacao
-Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#MyAppName}}"; Flags: nowait postinstall skipifsilent
+; Abre o MirrorPanel ao final da instalacao. Numa instalacao normal isso vira
+; uma caixa de selecao marcada por padrao na tela final; numa instalacao
+; silenciosa (usada pela propria atualizacao automatica do programa) roda
+; direto, sem tela nenhuma - SEM "skipifsilent" de proposito, porque e
+; justamente na atualizacao silenciosa que precisamos reabrir o programa
+; sozinho (sem isso, o usuario tinha que abrir manualmente depois de atualizar).
+Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#MyAppName}}"; Flags: nowait postinstall
