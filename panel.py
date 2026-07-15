@@ -48,6 +48,13 @@ FPS_OPTIONS = [
 
 _icon_cache: dict = {}
 
+# Espacamentos e regras padrao de TODAS as janelas de dialogo (pop-ups) - os
+# mesmos valores em todo lugar da um ar desenhado, nao remendado.
+DIALOG_OUTER_PAD = 20                        # margem externa ao redor do conteudo do dialogo
+DIALOG_FORM_PAD = {"padx": 14, "pady": 6}    # espaco entre linhas de formulario (rotulo + campo)
+DIALOG_MESSAGE_WRAPLENGTH = 300              # quebra de linha automatica de textos de aviso/mensagem
+DIALOG_BUTTON_WIDTH = 12                     # largura minima dos botoes de acao, pra ficarem parelhos
+
 
 def get_icon(name: str, size: int, color: str):
     key = (name, size, color)
@@ -60,18 +67,32 @@ def get_icon(name: str, size: int, color: str):
 def _center_on_parent(win: tk.Toplevel, parent: tk.Misc):
     """Centraliza uma janela de dialogo sobre a janela principal (nao no canto padrao do Windows).
 
-    Usa winfo_reqwidth/reqheight (tamanho PEDIDO pelos widgets), nao winfo_width/height
-    (tamanho REAL na tela) - logo apos criar a janela, antes dela ser mapeada pelo
-    gerenciador de janelas, winfo_width/height ainda devolvem 1x1, o que jogava o
-    dialogo pro canto superior esquerdo em vez do meio da tela.
+    Cada dialogo comeca escondido (self.withdraw() logo no __init__, antes de
+    montar qualquer widget) e so aparece aqui no final, ja na posicao certa -
+    sem isso, a janela nasce visivel no canto padrao do SO por uma fracao de
+    segundo antes de ser movida, o que da um "pulo" perceptivel na tela.
+
+    Atualiza update_idletasks() tanto do dialogo quanto do PAI antes de ler
+    qualquer geometria: winfo_reqwidth/reqheight do dialogo so ficam corretos
+    depois que os widgets foram desenhados, e winfo_rootx/rooty do PAI podem
+    devolver posicao desatualizada (as vezes ate 0,0) se a janela principal
+    ainda nao tiver acabado de se posicionar na tela - foi exatamente isso
+    que fazia os dialogos nascerem grudados no canto superior esquerdo em vez
+    do meio da janela.
     """
+    parent.update_idletasks()
     win.update_idletasks()
     pw, ph = parent.winfo_width(), parent.winfo_height()
     px, py = parent.winfo_rootx(), parent.winfo_rooty()
     w, h = win.winfo_reqwidth(), win.winfo_reqheight()
-    x = max(0, px + (pw - w) // 2)
-    y = max(0, py + (ph - h) // 2)
+    x = px + (pw - w) // 2
+    y = py + (ph - h) // 2
+    # nunca deixa nascer fora da tela (janela principal perto da borda, monitor pequeno etc.)
+    sw, sh = win.winfo_screenwidth(), win.winfo_screenheight()
+    x = max(0, min(x, sw - w))
+    y = max(0, min(y, sh - h))
     win.geometry(f"+{x}+{y}")
+    win.deiconify()
 
 
 class SettingsDialog(tk.Toplevel):
@@ -79,11 +100,12 @@ class SettingsDialog(tk.Toplevel):
 
     def __init__(self, parent, serial, model, current, on_save):
         super().__init__(parent)
+        self.withdraw()
         self.title(f"Ajustes - {model}")
         self.resizable(False, False)
         self.transient(parent)
         self.on_save = on_save
-        pad = {"padx": 14, "pady": 6}
+        pad = DIALOG_FORM_PAD
 
         ttk.Label(self, text="Codec de video:").grid(row=0, column=0, sticky="w", **pad)
         self.codec_var = tk.StringVar(value=current.get("video_codec", "h264"))
@@ -111,8 +133,8 @@ class SettingsDialog(tk.Toplevel):
 
         btns = ttk.Frame(self)
         btns.grid(row=4, column=0, columnspan=2, pady=(0, 14))
-        ttk.Button(btns, text="Cancelar", command=self.destroy).pack(side="left", padx=6)
-        ttk.Button(btns, text="Salvar", command=self._save).pack(side="left", padx=6)
+        ttk.Button(btns, text="Cancelar", command=self.destroy, width=DIALOG_BUTTON_WIDTH).pack(side="left", padx=6)
+        ttk.Button(btns, text="Salvar", command=self._save, width=DIALOG_BUTTON_WIDTH).pack(side="left", padx=6)
 
         _center_on_parent(self, parent)
         self.grab_set()
@@ -135,11 +157,12 @@ class RecordingDialog(tk.Toplevel):
 
     def __init__(self, parent, model, default_folder, on_start):
         super().__init__(parent)
+        self.withdraw()
         self.title(f"Gravar - {model}")
         self.resizable(False, False)
         self.transient(parent)
         self.on_start = on_start
-        pad = {"padx": 14, "pady": 6}
+        pad = DIALOG_FORM_PAD
 
         ttk.Label(self, text="Salvar em:").grid(row=0, column=0, sticky="w", **pad)
         self.folder_var = tk.StringVar(value=default_folder)
@@ -153,14 +176,15 @@ class RecordingDialog(tk.Toplevel):
             variable=self.light_var,
         ).grid(row=1, column=0, columnspan=3, sticky="w", padx=14, pady=(0, 4))
         ttk.Label(
-            self, text="Reduz qualidade (bitrate/fps/resolucao) so durante a gravacao,\npara nao travar celulares mais fracos.",
-            foreground="#57606a", font=("Segoe UI", 8),
+            self, text="Reduz qualidade (bitrate/fps/resolucao) so durante a gravacao, "
+                       "para nao travar celulares mais fracos.",
+            foreground="#57606a", font=("Segoe UI", 8), justify="left", wraplength=380,
         ).grid(row=2, column=0, columnspan=3, sticky="w", padx=14, pady=(0, 10))
 
         btns = ttk.Frame(self)
         btns.grid(row=3, column=0, columnspan=3, pady=(0, 14))
-        ttk.Button(btns, text="Cancelar", command=self.destroy).pack(side="left", padx=6)
-        ttk.Button(btns, text="Gravar", command=self._start).pack(side="left", padx=6)
+        ttk.Button(btns, text="Cancelar", command=self.destroy, width=DIALOG_BUTTON_WIDTH).pack(side="left", padx=6)
+        ttk.Button(btns, text="Gravar", command=self._start, width=DIALOG_BUTTON_WIDTH).pack(side="left", padx=6)
 
         _center_on_parent(self, parent)
         self.grab_set()
@@ -180,25 +204,27 @@ class UpdateDialog(tk.Toplevel):
 
     def __init__(self, parent, info: dict, on_accept):
         super().__init__(parent)
+        self.withdraw()
         self.title("Atualizacao disponivel")
         self.resizable(False, False)
         self.transient(parent)
         self.on_accept = on_accept
 
         ttk.Label(self, text=f"MirrorPanel {info['version']} disponivel",
-                  font=("Segoe UI", 10, "bold")).pack(padx=20, pady=(16, 4), anchor="w")
-        ttk.Label(self, text="Novidades desta versao:", foreground="#57606a").pack(padx=20, anchor="w")
+                  font=("Segoe UI", 10, "bold")).pack(padx=DIALOG_OUTER_PAD, pady=(16, 4), anchor="w")
+        ttk.Label(self, text="Novidades desta versao:",
+                  foreground="#57606a").pack(padx=DIALOG_OUTER_PAD, anchor="w")
 
         notes = tk.Text(self, width=52, height=10, wrap="word", font=("Segoe UI", 9),
                          relief="solid", borderwidth=1)
         notes.insert("1.0", info["notes"] or "(sem notas de versao)")
         notes.config(state="disabled")
-        notes.pack(padx=20, pady=(6, 12))
+        notes.pack(padx=DIALOG_OUTER_PAD, pady=(6, 12))
 
         btns = ttk.Frame(self)
         btns.pack(pady=(0, 16))
-        ttk.Button(btns, text="Mais tarde", command=self.destroy).pack(side="left", padx=6)
-        ttk.Button(btns, text="Atualizar agora", command=self._accept).pack(side="left", padx=6)
+        ttk.Button(btns, text="Mais tarde", command=self.destroy, width=DIALOG_BUTTON_WIDTH).pack(side="left", padx=6)
+        ttk.Button(btns, text="Atualizar", command=self._accept, width=DIALOG_BUTTON_WIDTH).pack(side="left", padx=6)
 
         _center_on_parent(self, parent)
         self.grab_set()
@@ -213,14 +239,15 @@ class DownloadProgressDialog(tk.Toplevel):
 
     def __init__(self, parent):
         super().__init__(parent)
+        self.withdraw()
         self.title("Atualizando MirrorPanel")
         self.resizable(False, False)
         self.transient(parent)
         self.protocol("WM_DELETE_WINDOW", lambda: None)
 
-        ttk.Label(self, text="Baixando atualizacao...").pack(padx=24, pady=(18, 8))
+        ttk.Label(self, text="Baixando atualizacao...").pack(padx=DIALOG_OUTER_PAD, pady=(18, 8))
         self.bar = ttk.Progressbar(self, mode="determinate", length=280, maximum=100)
-        self.bar.pack(padx=24, pady=(0, 6))
+        self.bar.pack(padx=DIALOG_OUTER_PAD, pady=(0, 6))
         self.pct_label = ttk.Label(self, text="0%", foreground="#57606a")
         self.pct_label.pack(pady=(0, 18))
 
@@ -292,19 +319,22 @@ class ScreenshotConfirmDialog(tk.Toplevel):
 
     def __init__(self, parent, on_copy):
         super().__init__(parent)
+        self.withdraw()
         self.title("Print capturado")
         self.resizable(False, False)
         self.transient(parent)
         self.attributes("-topmost", True)
 
-        ttk.Label(self, text="Print capturado!", font=FONT_BOLD).pack(padx=22, pady=(16, 4))
-        ttk.Label(self, text="Deseja copiar para a area de transferencia do Windows?",
-                  foreground="#57606a").pack(padx=22, pady=(0, 14))
+        ttk.Label(self, text="Print capturado!", font=FONT_BOLD).pack(padx=DIALOG_OUTER_PAD, pady=(16, 4))
+        ttk.Label(
+            self, text="Deseja copiar para a area de transferencia do Windows?",
+            foreground="#57606a", justify="center", wraplength=DIALOG_MESSAGE_WRAPLENGTH,
+        ).pack(padx=DIALOG_OUTER_PAD, pady=(0, 14))
 
         btns = ttk.Frame(self)
         btns.pack(pady=(0, 16))
-        ttk.Button(btns, text="Nao", command=self.destroy, width=10).pack(side="left", padx=6)
-        ttk.Button(btns, text="Sim", command=self._accept, width=10).pack(side="left", padx=6)
+        ttk.Button(btns, text="Nao", command=self.destroy, width=DIALOG_BUTTON_WIDTH).pack(side="left", padx=6)
+        ttk.Button(btns, text="Sim", command=self._accept, width=DIALOG_BUTTON_WIDTH).pack(side="left", padx=6)
 
         self.on_copy = on_copy
         _center_on_parent(self, parent)
@@ -321,22 +351,23 @@ class MirroringDisconnectedDialog(tk.Toplevel):
 
     def __init__(self, parent, serial: str, model: str, on_retry, on_close=None):
         super().__init__(parent)
+        self.withdraw()
         self.title("Espelhamento desconectado")
         self.resizable(False, False)
         self.transient(parent)
         self.attributes("-topmost", True)
         self.protocol("WM_DELETE_WINDOW", self.destroy)
 
-        ttk.Label(self, text="Espelhamento desconectado", font=FONT_BOLD).pack(padx=22, pady=(16, 4))
+        ttk.Label(self, text="Espelhamento desconectado", font=FONT_BOLD).pack(padx=DIALOG_OUTER_PAD, pady=(16, 4))
         ttk.Label(
-            self, text=f"A conexao com {model} foi interrompida.\nDeseja tentar reconectar?",
-            foreground="#57606a", justify="center", wraplength=280,
-        ).pack(padx=22, pady=(0, 14))
+            self, text=f"A conexao com {model} foi interrompida.",
+            foreground="#57606a", justify="center", wraplength=DIALOG_MESSAGE_WRAPLENGTH,
+        ).pack(padx=DIALOG_OUTER_PAD, pady=(0, 14))
 
         btns = ttk.Frame(self)
         btns.pack(pady=(0, 16))
-        ttk.Button(btns, text="Cancelar", command=self.destroy, width=10).pack(side="left", padx=6)
-        ttk.Button(btns, text="Tentar novamente", command=self._retry, width=15).pack(side="left", padx=6)
+        ttk.Button(btns, text="Sair", command=self.destroy, width=DIALOG_BUTTON_WIDTH).pack(side="left", padx=6)
+        ttk.Button(btns, text="Reconectar", command=self._retry, width=DIALOG_BUTTON_WIDTH).pack(side="left", padx=6)
 
         self.on_retry = on_retry
         self.on_close = on_close
@@ -659,6 +690,14 @@ class App:
         self.root.lift()
         self.root.focus_force()
 
+    def _ensure_window_visible(self):
+        """Traz o painel de volta da bandeja antes de abrir um dialogo disparado
+        por um evento em segundo plano (queda de conexao, atualizacao disponivel).
+        Sem isso, o dialogo seria centralizado sobre uma janela escondida - o
+        que faz ele nascer fora do lugar (ou nem aparecer de verdade)."""
+        if self.root.state() in ("withdrawn", "iconic"):
+            self._restore_window()
+
     def _tray_exit(self, icon=None, item=None):
         self.root.after(0, self._on_close)
 
@@ -786,6 +825,7 @@ class App:
                     if result["status"] == "update":
                         info = result["info"]
                         self._log(f"[update] Nova versao disponivel: {info['version']}")
+                        self._ensure_window_visible()
                         UpdateDialog(self.root, info, on_accept=lambda: self._start_update_download(info))
                     elif result["status"] == "current":
                         self._log(f"[update] Voce esta atualizado (versao {updater.APP_VERSION}).")
@@ -874,6 +914,7 @@ class App:
         existing = self.disconnect_dialogs.get(serial)
         if existing:
             existing.destroy()
+        self._ensure_window_visible()
         dlg = MirroringDisconnectedDialog(
             self.root, serial, model,
             on_retry=lambda s=serial: self._retry_after_disconnect(s),
