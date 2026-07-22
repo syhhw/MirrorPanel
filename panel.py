@@ -695,10 +695,19 @@ class App:
 
         log_border = tk.Frame(self.root, bg=BORDER)
         log_border.pack(fill="x", padx=14, pady=(0, 8))
-        self.log_text = tk.Text(log_border, height=6, state="disabled", font=("Consolas", 8),
+        self.log_text = tk.Text(log_border, height=6, state="disabled", font=("Consolas", 9),
                                  bg=SURFACE, fg=FG_MUTED, insertbackground=FG,
-                                 selectbackground=ACCENT, relief="flat", padx=8, pady=6)
+                                 selectbackground=ACCENT, relief="flat", padx=10, pady=8,
+                                 spacing1=1, spacing3=1)
         self.log_text.pack(fill="x", padx=1, pady=1)
+        # Uma cor por gravidade - da pra bater o olho e achar um erro no meio do
+        # historico sem ler linha por linha. O timestamp fica sempre discreto,
+        # so a mensagem em si muda de cor.
+        self.log_text.tag_configure("timestamp", foreground=FG_SUBTLE)
+        self.log_text.tag_configure("info", foreground=FG_MUTED)
+        self.log_text.tag_configure("success", foreground=GREEN)
+        self.log_text.tag_configure("warning", foreground=AMBER)
+        self.log_text.tag_configure("error", foreground=RED)
 
         footer = ttk.Frame(self.root, padding=(14, 0, 14, 10))
         footer.pack(fill="x")
@@ -711,9 +720,14 @@ class App:
         self.action_queue.put({"type": "set_stay_awake", "value": self.stay_awake_var.get()})
         self.wake_event.set()
 
-    def _log(self, msg: str):
+    def _log(self, msg: str, level: str = "info"):
+        """Adiciona uma linha na Atividade recente, com hora e cor por gravidade
+        (info/success/warning/error) - level decide so a cor, a mensagem em si
+        continua descrevendo o que aconteceu por extenso."""
+        timestamp = time.strftime("%H:%M:%S")
         self.log_text.config(state="normal")
-        self.log_text.insert("end", f"{msg}\n")
+        self.log_text.insert("end", f"{timestamp}  ", "timestamp")
+        self.log_text.insert("end", f"{msg}\n", level)
         self.log_text.see("end")
         self.log_text.config(state="disabled")
 
@@ -843,47 +857,47 @@ class App:
                     _, serial, target = item
                     model = self.manager.model_cache.get(serial, serial)
                     if target:
-                        self._log(f"[wifi] {model} conectado sem fio em {target}. Pode tirar o cabo.")
+                        self._log(f"Wi-Fi ativado em {model} ({target}). Pode tirar o cabo.", "success")
                     else:
-                        self._log(f"[wifi] Nao foi possivel ativar Wi-Fi em {model}. "
-                                   f"Confira se o celular esta na mesma rede.")
+                        self._log(f"Nao foi possivel ativar Wi-Fi em {model}. "
+                                   f"Confira se o celular esta na mesma rede.", "error")
                     continue
                 if item[0] == "record_result":
                     _, serial, started, path = item
                     model = self.manager.model_cache.get(serial, serial)
                     if started:
-                        self._log(f"[gravar] Gravando {model} em {path}")
+                        self._log(f"Gravando {model} em {path}", "success")
                     else:
-                        self._log(f"[gravar] Gravacao de {model} salva.")
+                        self._log(f"Gravacao de {model} salva.", "success")
                     continue
                 if item[0] == "screenshot_result":
                     _, serial, path = item
                     model = self.manager.model_cache.get(serial, serial)
                     if path:
-                        self._log(f"[print] Screenshot de {model} salvo em {path}")
+                        self._log(f"Print de {model} salvo em {path}", "success")
                         ScreenshotConfirmDialog(self.root, on_copy=lambda p=path: self._on_copy_screenshot(p))
                     else:
-                        self._log(f"[print] Falha ao tirar screenshot de {model}.")
+                        self._log(f"Falha ao tirar print de {model}.", "error")
                     continue
                 if item[0] == "clipboard_result":
                     _, ok = item
                     if ok:
-                        self._log("[print] Copiado para a area de transferencia (Win+V pra ver).")
+                        self._log("Print copiado para a area de transferencia (Win+V pra ver).", "success")
                     else:
-                        self._log("[print] Nao foi possivel copiar para a area de transferencia.")
+                        self._log("Nao foi possivel copiar o print para a area de transferencia.", "error")
                     continue
                 if item[0] == "update_check_result":
                     result = item[1]
                     if result["status"] == "update":
                         info = result["info"]
-                        self._log(f"[update] Nova versao disponivel: {info['version']}")
+                        self._log(f"Nova versao disponivel: {info['version']}", "success")
                         self._ensure_window_visible()
                         UpdateDialog(self.root, info, on_accept=lambda: self._start_update_download(info))
                     elif result["status"] == "current":
-                        self._log(f"[update] Voce esta atualizado (versao {updater.APP_VERSION}).")
+                        self._log(f"Voce esta atualizado (versao {updater.APP_VERSION}).", "info")
                     else:
-                        self._log("[update] Nao foi possivel verificar atualizacoes agora "
-                                   "(sem internet ou GitHub indisponivel).")
+                        self._log("Nao foi possivel verificar atualizacoes agora "
+                                   "(sem internet ou GitHub indisponivel).", "warning")
                     continue
                 if item[0] == "download_progress":
                     _, downloaded, total = item
@@ -896,7 +910,7 @@ class App:
                         self.download_dialog.destroy()
                         self.download_dialog = None
                     if success:
-                        self._log("[update] Download concluido. Aplicando atualizacao...")
+                        self._log("Download concluido. Aplicando atualizacao...", "success")
                         self._apply_update(path)
                     else:
                         messagebox.showerror(
@@ -921,21 +935,21 @@ class App:
         for ev in events:
             t = ev.get("type")
             if t == "arrived":
-                self._log(f"[+] {ev['model']} conectado (porta {ev['port']})")
+                self._log(f"{ev['model']} conectado (porta {ev['port']})", "success")
             elif t == "reconnected":
-                self._log(f"[+] {ev['model']} reconectado automaticamente.")
+                self._log(f"{ev['model']} reconectado automaticamente.", "success")
             elif t == "departed":
-                self._log(f"[-] {ev['model']} desconectado")
+                self._log(f"{ev['model']} desconectado", "warning")
                 self._show_disconnect_dialog(ev["serial"], ev["model"])
             elif t == "crashed":
-                self._log(f"[!] {ev['model']} encerrou sozinho (tentativa {ev['attempt']})")
+                self._log(f"{ev['model']} encerrou sozinho (tentativa {ev['attempt']})", "error")
                 self._show_disconnect_dialog(ev["serial"], ev["model"])
             elif t == "blocked":
-                self._log(f"[!] {ev['model']} falhou varias vezes - veja logs/scrcpy_{ev['serial']}.log")
+                self._log(f"{ev['model']} falhou varias vezes - veja logs/scrcpy_{ev['serial']}.log", "error")
             elif t == "problem":
-                self._log(f"[aviso] {ev['serial']}: {ev['hint']}")
+                self._log(f"{ev['serial']}: {ev['hint']}", "warning")
             elif t == "error":
-                self._log(f"[!] Falha ao iniciar {ev['serial']}")
+                self._log(f"Falha ao iniciar {ev['serial']}", "error")
 
     def _render(self, snapshot: dict):
         self.summary_label.config(text=f"{len(snapshot)} dispositivo(s)")
@@ -978,13 +992,13 @@ class App:
 
     def _retry_after_disconnect(self, serial: str):
         model = self.manager.model_cache.get(serial, serial)
-        self._log(f"[+] Tentando reconectar {model}...")
+        self._log(f"Tentando reconectar {model}...", "info")
         self.action_queue.put({"type": "start", "serial": serial})
         self.wake_event.set()
 
     def _on_wifi(self, serial: str):
         model = self.manager.model_cache.get(serial, serial)
-        self._log(f"[wifi] Ativando Wi-Fi em {model}...")
+        self._log(f"Ativando Wi-Fi em {model}...", "info")
         self.action_queue.put({"type": "wifi", "serial": serial})
         self.wake_event.set()
 
@@ -1022,7 +1036,7 @@ class App:
         self.event_queue.put(("update_check_result", result))
 
     def _on_check_update(self):
-        self._log("[update] Verificando atualizacoes...")
+        self._log("Verificando atualizacoes...", "info")
         threading.Thread(target=self._run_update_check, daemon=True).start()
 
     def _start_update_download(self, info: dict):
@@ -1053,7 +1067,7 @@ class App:
         # detectavel - antes, isso sumia silenciosamente e a atualizacao "nao fazia nada".
         error = updater.apply_update_and_restart(installer_path)
         if error:
-            self._log(f"[update] {error}")
+            self._log(error, "error")
             messagebox.showerror("MirrorPanel", f"Falha ao aplicar a atualizacao:\n{error}")
 
     def _on_record(self, serial: str, currently_recording: bool):
@@ -1077,7 +1091,7 @@ class App:
         def on_save(settings):
             self.action_queue.put({"type": "save_settings", "serial": serial, "settings": settings})
             self.wake_event.set()
-            self._log(f"[config] Ajustes salvos para {model}.")
+            self._log(f"Ajustes salvos para {model}.", "success")
 
         SettingsDialog(self.root, serial, model, current, on_save)
 
