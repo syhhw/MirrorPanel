@@ -11,9 +11,10 @@ import queue
 import threading
 import time
 import tkinter as tk
-from tkinter import ttk, messagebox, filedialog
+from tkinter import ttk, messagebox
 
 import pystray
+import sv_ttk
 from PIL import ImageTk
 
 import icons
@@ -27,11 +28,27 @@ FONT_DEFAULT = (FONT_FAMILY, 9)
 FONT_BOLD = (FONT_FAMILY, 9, "bold")
 FONT_MUTED = (FONT_FAMILY, 8)
 
+# Paleta Dark Mode. BG/FG/ACCENT usam os mesmos tons do tema sv_ttk "sun-valley-dark"
+# (pra nao ter nenhuma costura visivel entre widgets ttk padrao e os estilos custom
+# abaixo); os tons de status (verde/ambar/vermelho) vem da paleta Primer Dark do
+# GitHub - testada e pensada especificamente pra contraste/acessibilidade em fundo
+# escuro, e ja e a mesma familia de cores que o app usava no modo claro antes.
+BG = "#1c1c1c"          # fundo da janela
+SURFACE = "#282828"     # cartoes de aparelho, barra de log - uma camada acima do fundo
+BORDER = "#3a3a3a"      # bordas sutis de cartoes/divisores
+FG = "#fafafa"          # texto principal
+FG_MUTED = "#9a9a9a"    # texto secundario/detalhes
+FG_SUBTLE = "#6e7681"   # texto ainda mais discreto (rodape, estados desativados)
+ACCENT = "#57c8ff"      # cor de destaque - mesma do tema, mantem tudo consistente
+GREEN = "#3fb950"       # espelhando / sucesso
+AMBER = "#d29922"       # atencao
+RED = "#f85149"         # bloqueado / erro / gravando
+
 STATUS_LABELS = {
-    "mirroring": ("Espelhando", "#1a7f37"),
-    "ready": ("Pronto para espelhar", "#57606a"),
-    "problem": ("Atencao", "#9a6700"),
-    "blocked": ("Falhou varias vezes", "#cf222e"),
+    "mirroring": ("Espelhando", GREEN),
+    "ready": ("Pronto para espelhar", FG_MUTED),
+    "problem": ("Atencao", AMBER),
+    "blocked": ("Falhou varias vezes", RED),
 }
 
 BITRATE_OPTIONS = [
@@ -153,9 +170,11 @@ class SettingsDialog(tk.Toplevel):
 
 
 class RecordingDialog(tk.Toplevel):
-    """Confirma pasta de destino e qualidade antes de comecar a gravar."""
+    """Confirma qualidade antes de comecar a gravar. O destino e sempre a mesma
+    pasta dedicada (MirrorPanel Media, dentro de Videos) - so informa onde vai
+    ficar, sem perguntar (uma decisao a menos, organizacao sempre previsivel)."""
 
-    def __init__(self, parent, model, default_folder, on_start):
+    def __init__(self, parent, model, recordings_dir, on_start):
         super().__init__(parent)
         self.withdraw()
         self.title(f"Gravar - {model}")
@@ -164,38 +183,31 @@ class RecordingDialog(tk.Toplevel):
         self.on_start = on_start
         pad = DIALOG_FORM_PAD
 
-        ttk.Label(self, text="Salvar em:").grid(row=0, column=0, sticky="w", **pad)
-        self.folder_var = tk.StringVar(value=default_folder)
-        entry = ttk.Entry(self, textvariable=self.folder_var, width=38, state="readonly")
-        entry.grid(row=0, column=1, sticky="w", padx=(0, 6), pady=6)
-        ttk.Button(self, text="Escolher...", command=self._choose_folder).grid(row=0, column=2, padx=(0, 14))
+        ttk.Label(self, text="Sera salvo em:").grid(row=0, column=0, sticky="w", **pad)
+        ttk.Label(self, text=str(recordings_dir), foreground=FG_MUTED).grid(
+            row=0, column=1, sticky="w", padx=(0, 14), pady=6)
 
         self.light_var = tk.BooleanVar(value=False)
         ttk.Checkbutton(
             self, text="Gravacao leve (recomendado para aparelhos antigos)",
             variable=self.light_var,
-        ).grid(row=1, column=0, columnspan=3, sticky="w", padx=14, pady=(0, 4))
+        ).grid(row=1, column=0, columnspan=2, sticky="w", padx=14, pady=(0, 4))
         ttk.Label(
             self, text="Reduz qualidade (bitrate/fps/resolucao) so durante a gravacao, "
                        "para nao travar celulares mais fracos.",
-            foreground="#57606a", font=("Segoe UI", 8), justify="left", wraplength=380,
-        ).grid(row=2, column=0, columnspan=3, sticky="w", padx=14, pady=(0, 10))
+            foreground=FG_MUTED, font=("Segoe UI", 8), justify="left", wraplength=380,
+        ).grid(row=2, column=0, columnspan=2, sticky="w", padx=14, pady=(0, 10))
 
         btns = ttk.Frame(self)
-        btns.grid(row=3, column=0, columnspan=3, pady=(0, 14))
+        btns.grid(row=3, column=0, columnspan=2, pady=(0, 14))
         ttk.Button(btns, text="Cancelar", command=self.destroy, width=DIALOG_BUTTON_WIDTH).pack(side="left", padx=6)
         ttk.Button(btns, text="Gravar", command=self._start, width=DIALOG_BUTTON_WIDTH).pack(side="left", padx=6)
 
         _center_on_parent(self, parent)
         self.grab_set()
 
-    def _choose_folder(self):
-        chosen = filedialog.askdirectory(parent=self, initialdir=self.folder_var.get() or None)
-        if chosen:
-            self.folder_var.set(chosen)
-
     def _start(self):
-        self.on_start(self.folder_var.get(), self.light_var.get())
+        self.on_start(self.light_var.get())
         self.destroy()
 
 
@@ -213,10 +225,12 @@ class UpdateDialog(tk.Toplevel):
         ttk.Label(self, text=f"MirrorPanel {info['version']} disponivel",
                   font=("Segoe UI", 10, "bold")).pack(padx=DIALOG_OUTER_PAD, pady=(16, 4), anchor="w")
         ttk.Label(self, text="Novidades desta versao:",
-                  foreground="#57606a").pack(padx=DIALOG_OUTER_PAD, anchor="w")
+                  foreground=FG_MUTED).pack(padx=DIALOG_OUTER_PAD, anchor="w")
 
         notes = tk.Text(self, width=52, height=10, wrap="word", font=("Segoe UI", 9),
-                         relief="solid", borderwidth=1)
+                         bg=SURFACE, fg=FG, insertbackground=FG, selectbackground=ACCENT,
+                         relief="solid", borderwidth=1, highlightthickness=1,
+                         highlightbackground=BORDER, highlightcolor=BORDER)
         notes.insert("1.0", info["notes"] or "(sem notas de versao)")
         notes.config(state="disabled")
         notes.pack(padx=DIALOG_OUTER_PAD, pady=(6, 12))
@@ -248,7 +262,7 @@ class DownloadProgressDialog(tk.Toplevel):
         ttk.Label(self, text="Baixando atualizacao...").pack(padx=DIALOG_OUTER_PAD, pady=(18, 8))
         self.bar = ttk.Progressbar(self, mode="determinate", length=280, maximum=100)
         self.bar.pack(padx=DIALOG_OUTER_PAD, pady=(0, 6))
-        self.pct_label = ttk.Label(self, text="0%", foreground="#57606a")
+        self.pct_label = ttk.Label(self, text="0%", foreground=FG_MUTED)
         self.pct_label.pack(pady=(0, 18))
 
         _center_on_parent(self, parent)
@@ -328,7 +342,7 @@ class ScreenshotConfirmDialog(tk.Toplevel):
         ttk.Label(self, text="Print capturado!", font=FONT_BOLD).pack(padx=DIALOG_OUTER_PAD, pady=(16, 4))
         ttk.Label(
             self, text="Deseja copiar para a area de transferencia do Windows?",
-            foreground="#57606a", justify="center", wraplength=DIALOG_MESSAGE_WRAPLENGTH,
+            foreground=FG_MUTED, justify="center", wraplength=DIALOG_MESSAGE_WRAPLENGTH,
         ).pack(padx=DIALOG_OUTER_PAD, pady=(0, 14))
 
         btns = ttk.Frame(self)
@@ -361,7 +375,7 @@ class MirroringDisconnectedDialog(tk.Toplevel):
         ttk.Label(self, text="Espelhamento desconectado", font=FONT_BOLD).pack(padx=DIALOG_OUTER_PAD, pady=(16, 4))
         ttk.Label(
             self, text=f"A conexao com {model} foi interrompida.",
-            foreground="#57606a", justify="center", wraplength=DIALOG_MESSAGE_WRAPLENGTH,
+            foreground=FG_MUTED, justify="center", wraplength=DIALOG_MESSAGE_WRAPLENGTH,
         ).pack(padx=DIALOG_OUTER_PAD, pady=(0, 14))
 
         btns = ttk.Frame(self)
@@ -394,20 +408,20 @@ class DeviceRow:
         self.model_name = serial
 
         # borda fina (1px) ao redor de cada linha, pra parecer um "cartao" separado
-        self.border = tk.Frame(parent, bg="#d0d7de")
+        self.border = tk.Frame(parent, bg=BORDER)
         self.frame = ttk.Frame(self.border, padding=(12, 10), style="Card.TFrame")
         self.frame.pack(fill="both", expand=True, padx=1, pady=1)
         self.frame.columnconfigure(1, weight=1)
 
         self.dot = tk.Canvas(self.frame, width=12, height=12, highlightthickness=0,
-                              bg="#ffffff", bd=0)
+                              bg=SURFACE, bd=0)
         self.dot.grid(row=0, column=0, rowspan=2, padx=(0, 12))
-        self.dot_id = self.dot.create_oval(1, 1, 11, 11, fill="#999999", outline="")
+        self.dot_id = self.dot.create_oval(1, 1, 11, 11, fill=FG_MUTED, outline="")
 
         self.model_label = ttk.Label(self.frame, font=("Segoe UI", 10, "bold"), style="Card.TLabel")
         self.model_label.grid(row=0, column=1, sticky="w")
 
-        self.detail_label = ttk.Label(self.frame, foreground="#57606a", font=("Segoe UI", 8),
+        self.detail_label = ttk.Label(self.frame, foreground=FG_MUTED, font=("Segoe UI", 8),
                                        style="CardMuted.TLabel")
         self.detail_label.grid(row=1, column=1, sticky="w", pady=(2, 0))
 
@@ -421,18 +435,18 @@ class DeviceRow:
         icons_box = ttk.Frame(actions, style="Card.TFrame")
         icons_box.pack(side="left")
 
-        self.wifi_btn = ttk.Button(icons_box, image=get_icon("wifi", 15, "#1f6feb"),
+        self.wifi_btn = ttk.Button(icons_box, image=get_icon("wifi", 15, ACCENT),
                                     command=self._wifi, style="Icon.TButton")
         self.wifi_btn.pack(side="left", padx=1)
 
-        self.screenshot_btn = ttk.Button(icons_box, image=get_icon("camera", 15, "#57606a"),
+        self.screenshot_btn = ttk.Button(icons_box, image=get_icon("camera", 15, FG_MUTED),
                                           command=self._screenshot, style="Icon.TButton")
         self.screenshot_btn.pack(side="left", padx=1)
 
         self.record_btn = ttk.Button(icons_box, command=self._record, style="Icon.TButton")
         self.record_btn.pack(side="left", padx=1)
 
-        self.settings_btn = ttk.Button(icons_box, image=get_icon("gear", 15, "#57606a"),
+        self.settings_btn = ttk.Button(icons_box, image=get_icon("gear", 15, FG_MUTED),
                                         command=self._settings, style="Icon.TButton")
         self.settings_btn.pack(side="left", padx=1)
 
@@ -456,7 +470,7 @@ class DeviceRow:
         if self.recording_anchor is not None:
             secs = int(time.monotonic() - self.recording_anchor)
             text += f"   ● Gravando {secs // 60:02d}:{secs % 60:02d}"
-        self.model_label.config(text=text, foreground="#cf222e" if self.recording_anchor is not None else "")
+        self.model_label.config(text=text, foreground=RED if self.recording_anchor is not None else "")
 
     def refresh_timer(self):
         """Chamado a cada 1s pela janela principal - atualiza so o cronometro, sem
@@ -468,7 +482,7 @@ class DeviceRow:
         self.status = info["status"]
         self.recording = info.get("recording", False)
         self.model_name = info["model"]
-        label, color = STATUS_LABELS.get(self.status, (self.status, "#000000"))
+        label, color = STATUS_LABELS.get(self.status, (self.status, FG))
         self.dot.itemconfig(self.dot_id, fill=color)
 
         if self.recording:
@@ -488,11 +502,11 @@ class DeviceRow:
         self.detail_label.config(text=detail)
 
         if self.status == "mirroring":
-            self.toggle_btn.config(text="Parar", image=get_icon("stop", 13, "#cf222e"), state="normal")
+            self.toggle_btn.config(text="Parar", image=get_icon("stop", 13, RED), state="normal")
         elif self.status in ("ready", "blocked"):
-            self.toggle_btn.config(text="Iniciar", image=get_icon("play", 13, "#1a7f37"), state="normal")
+            self.toggle_btn.config(text="Iniciar", image=get_icon("play", 13, GREEN), state="normal")
         else:
-            self.toggle_btn.config(text="Iniciar", image=get_icon("play", 13, "#1a7f37"), state="disabled")
+            self.toggle_btn.config(text="Iniciar", image=get_icon("play", 13, GREEN), state="disabled")
 
         is_wireless = ":" in self.serial
         can_touch = self.status in ("mirroring", "ready", "blocked")
@@ -501,10 +515,10 @@ class DeviceRow:
         self.screenshot_btn.config(state="normal" if can_touch else "disabled")
 
         if self.recording:
-            self.record_btn.config(image=get_icon("stop", 13, "#cf222e"),
+            self.record_btn.config(image=get_icon("stop", 13, RED),
                                     state="normal" if self.status == "mirroring" else "disabled")
         else:
-            self.record_btn.config(image=get_icon("record", 13, "#cf222e"),
+            self.record_btn.config(image=get_icon("record", 13, RED),
                                     state="normal" if self.status == "mirroring" else "disabled")
 
     def flash(self):
@@ -517,7 +531,7 @@ class DeviceRow:
                 if self.border.winfo_exists():
                     self.border.config(bg=original)
                 return
-            self.border.config(bg="#1f6feb" if n % 2 else original)
+            self.border.config(bg=ACCENT if n % 2 else original)
             self.border.after(90, lambda: step(n - 1))
 
         step(4)
@@ -527,14 +541,12 @@ class DeviceRow:
 
 
 class App:
-    BLUE = "#1f6feb"  # cor de identidade do app (icone/bandeja/topo), estilo Vysor
-
     def __init__(self, root: tk.Tk):
         self.root = root
         root.title("MirrorPanel")
         root.geometry("640x580")
         root.minsize(520, 380)
-        root.configure(bg="#f6f8fa")
+        root.configure(bg=BG)
 
         self._window_icon_img = ImageTk.PhotoImage(icons.app_icon(64))
         root.iconphoto(True, self._window_icon_img)
@@ -575,51 +587,52 @@ class App:
         # proprio construtor continuam mandando (isso aqui e so o padrao/fallback).
         self.root.option_add("*Font", FONT_DEFAULT)
 
+        # Tema Sun Valley (sv_ttk) - da o visual Windows 11 moderno (cantos
+        # arredondados, hover, cores) a QUALQUER widget ttk existente, sem precisar
+        # trocar nenhum widget de lugar. Os estilos customizados abaixo (Card.*,
+        # Header.*, etc.) so ajustam cor/fonte especificos por cima dele.
+        sv_ttk.set_theme("dark", self.root)
         style = ttk.Style(self.root)
-        try:
-            style.theme_use("vista")
-        except tk.TclError:
-            pass
         style.configure(".", font=FONT_DEFAULT)  # padrao pra todos os widgets ttk
-        style.configure("Card.TFrame", background="#ffffff")
-        style.configure("Card.TLabel", background="#ffffff", font=("Segoe UI", 10, "bold"))
-        style.configure("CardMuted.TLabel", background="#ffffff", foreground="#57606a")
+        style.configure("Card.TFrame", background=SURFACE)
+        style.configure("Card.TLabel", background=SURFACE, foreground=FG, font=("Segoe UI", 10, "bold"))
+        style.configure("CardMuted.TLabel", background=SURFACE, foreground=FG_MUTED)
         style.configure("Icon.TButton", padding=3)
         style.configure("Toggle.TButton", font=("Segoe UI", 9, "bold"))
-        style.configure("Summary.TLabel", font=("Segoe UI", 9, "bold"), foreground="#24292f")
-        style.configure("Header.TLabel", font=("Segoe UI", 9, "bold"), foreground="#24292f")
+        style.configure("Summary.TLabel", font=("Segoe UI", 9, "bold"), foreground=FG)
+        style.configure("Header.TLabel", font=("Segoe UI", 9, "bold"), foreground=FG)
+        style.configure("Title.TLabel", font=("Segoe UI", 13, "bold"), foreground=FG)
 
-        style.configure("Blue.TCheckbutton", background=self.BLUE, foreground="white",
-                         font=("Segoe UI", 9))
-        style.map("Blue.TCheckbutton", background=[("active", self.BLUE)])
-
-        style.configure("Update.TButton", font=("Segoe UI", 8), foreground=self.BLUE, padding=(8, 3))
-        style.map("Update.TButton", foreground=[("disabled", "#8c959f")])
+        style.configure("Update.TButton", font=("Segoe UI", 8), foreground=ACCENT, padding=(8, 3))
+        style.map("Update.TButton", foreground=[("disabled", FG_SUBTLE)])
 
     # ---------------------------------------------------------------- UI --
     def _build_ui(self):
-        top = tk.Frame(self.root, bg=self.BLUE, padx=14, pady=12)
+        # Cabecalho: chrome escuro unificado com o resto da janela (nada de bloco
+        # solido colorido) - a identidade azul do app fica so no icone e nos
+        # destaques (nome do app, botao de atualizar, icones de acao).
+        top = ttk.Frame(self.root, padding=(16, 14, 16, 12))
         top.pack(fill="x")
 
-        row1 = tk.Frame(top, bg=self.BLUE)
+        row1 = ttk.Frame(top)
         row1.pack(fill="x")
-        tk.Label(row1, text="MirrorPanel", bg=self.BLUE, fg="white",
-                 font=("Segoe UI", 11, "bold")).pack(side="left")
-        self.summary_label = tk.Label(row1, text="Carregando...", bg=self.BLUE, fg="white",
-                                       font=("Segoe UI", 9, "bold"))
+        ttk.Label(row1, text="MirrorPanel", style="Title.TLabel").pack(side="left")
+        self.summary_label = ttk.Label(row1, text="Carregando...", style="Summary.TLabel")
         self.summary_label.pack(side="right")
 
-        tk.Label(top, text="Clique Abrir para espelhar um aparelho especifico.",
-                 bg=self.BLUE, fg="#dbe9ff", font=("Segoe UI", 8)).pack(anchor="w", pady=(2, 0))
+        ttk.Label(top, text="Clique Abrir para espelhar um aparelho especifico.",
+                  foreground=FG_MUTED, font=("Segoe UI", 8)).pack(anchor="w", pady=(2, 0))
 
-        row2 = tk.Frame(top, bg=self.BLUE)
-        row2.pack(fill="x", pady=(8, 0))
+        row2 = ttk.Frame(top)
+        row2.pack(fill="x", pady=(10, 0))
         self.stay_awake_var = tk.BooleanVar(value=self.manager.stay_awake)
         ttk.Checkbutton(
             row2, text="Manter tela do celular sempre ligada",
             variable=self.stay_awake_var, command=self._toggle_stay_awake,
-            style="Blue.TCheckbutton",
         ).pack(side="left")
+
+        divider = tk.Frame(self.root, bg=BORDER, height=1)
+        divider.pack(fill="x")
 
         self.content = ttk.Frame(self.root)
         self.content.pack(fill="both", expand=True)
@@ -637,7 +650,7 @@ class App:
         self.list_frame = ttk.Frame(self.content, padding=(14, 10))
         self.empty_label = ttk.Label(
             self.list_frame, text="Nenhum dispositivo detectado ainda.\nConecte um celular por USB.",
-            foreground="#57606a", justify="center",
+            foreground=FG_MUTED, justify="center",
         )
         self.empty_label.pack(pady=40)
 
@@ -645,22 +658,23 @@ class App:
         bottom.pack(fill="x")
         ttk.Label(bottom, text="Atividade recente", style="Header.TLabel").pack(side="left")
         ttk.Button(
-            bottom, text=" Verificar atualizacoes", image=get_icon("refresh", 13, "#1f6feb"),
+            bottom, text=" Verificar atualizacoes", image=get_icon("refresh", 13, ACCENT),
             compound="left", style="Update.TButton", command=self._on_check_update,
         ).pack(side="right")
 
-        log_border = tk.Frame(self.root, bg="#d0d7de")
+        log_border = tk.Frame(self.root, bg=BORDER)
         log_border.pack(fill="x", padx=14, pady=(0, 8))
         self.log_text = tk.Text(log_border, height=6, state="disabled", font=("Consolas", 8),
-                                 bg="#f6f8fa", relief="flat", padx=8, pady=6)
+                                 bg=SURFACE, fg=FG_MUTED, insertbackground=FG,
+                                 selectbackground=ACCENT, relief="flat", padx=8, pady=6)
         self.log_text.pack(fill="x", padx=1, pady=1)
 
         footer = ttk.Frame(self.root, padding=(14, 0, 14, 10))
         footer.pack(fill="x")
         ttk.Label(footer, text="Minimizar manda para a bandeja. Fechar encerra os espelhamentos abertos.",
-                  foreground="#57606a", font=FONT_MUTED).pack(side="left")
+                  foreground=FG_MUTED, font=FONT_MUTED).pack(side="left")
         ttk.Label(footer, text=f"v{updater.APP_VERSION}",
-                  foreground="#8c959f", font=FONT_MUTED).pack(side="right")
+                  foreground=FG_SUBTLE, font=FONT_MUTED).pack(side="right")
 
     def _toggle_stay_awake(self):
         self.action_queue.put({"type": "set_stay_awake", "value": self.stay_awake_var.get()})
@@ -734,7 +748,14 @@ class App:
                 # a UI "viva" mas parada pra sempre, sem nenhum aviso ao usuario.
                 logging.exception("Erro no ciclo de verificacao - continuando")
 
-            self.wake_event.wait(engine.POLL_INTERVAL_SECONDS)
+            # enquanto ha uma reconexao silenciosa em andamento, verifica bem mais
+            # rapido (perto do intervalo combinado entre as tentativas) em vez de
+            # esperar o ciclo normal inteiro - assim a reconexao acontece no ritmo
+            # pedido, sem esperar o poll normal (mais espacado) entre uma tentativa
+            # e outra.
+            wait_time = (engine.SILENT_RECONNECT_INTERVAL if self.manager.has_pending_reconnects()
+                         else engine.POLL_INTERVAL_SECONDS)
+            self.wake_event.wait(wait_time)
             self.wake_event.clear()
 
     def _handle_action(self, action: dict):
@@ -766,7 +787,7 @@ class App:
         elif kind == "set_stay_awake":
             self.manager.set_stay_awake(action["value"])
         elif kind == "start_recording":
-            path = self.manager.start_recording(serial, action.get("folder"), action.get("light", False))
+            path = self.manager.start_recording(serial, action.get("light", False))
             self.event_queue.put(("record_result", serial, True, path))
         elif kind == "stop_recording":
             self.manager.stop_recording(serial)
@@ -870,6 +891,8 @@ class App:
             t = ev.get("type")
             if t == "arrived":
                 self._log(f"[+] {ev['model']} conectado (porta {ev['port']})")
+            elif t == "reconnected":
+                self._log(f"[+] {ev['model']} reconectado automaticamente.")
             elif t == "departed":
                 self._log(f"[-] {ev['model']} desconectado")
                 self._show_disconnect_dialog(ev["serial"], ev["model"])
@@ -984,22 +1007,16 @@ class App:
         threading.Thread(target=worker, daemon=True).start()
 
     def _apply_update(self, installer_path: str):
-        # encerra os espelhamentos/gravacoes com calma antes de atualizar, pra
-        # nao corromper um arquivo de gravacao em andamento
+        # encerra os espelhamentos/gravacoes com calma antes de atualizar (pra nao
+        # corromper um arquivo de gravacao em andamento) e mata o servidor do adb -
+        # esse mesmo shutdown() e usado ao fechar o painel normalmente, e e o que
+        # evita o instalador travar com "arquivo em uso" no adb.exe.
         self.manager.shutdown()
         if self.tray_icon:
             try:
                 self.tray_icon.stop()
             except Exception:
                 pass
-        try:
-            # o servidor do adb fica rodando em segundo plano por design (pra ficar
-            # "quente" entre uma abertura e outra do programa) - isso segura o
-            # arquivo adb.exe e faz o instalador abortar a atualizacao inteira
-            # (Restart Manager nao consegue fechar, e o instalador desiste).
-            engine.run_adb("kill-server", timeout=10)
-        except Exception:
-            logging.exception("Falha ao encerrar o servidor adb antes de atualizar")
         # se tudo der certo, apply_update_and_restart encerra o processo (os._exit)
         # e o codigo abaixo nunca roda. So chega aqui se algo falhar de forma
         # detectavel - antes, isso sumia silenciosamente e a atualizacao "nao fazia nada".
@@ -1016,13 +1033,11 @@ class App:
 
         model = self.manager.model_cache.get(serial, serial)
 
-        def on_start(folder, light):
-            self.action_queue.put({
-                "type": "start_recording", "serial": serial, "folder": folder, "light": light,
-            })
+        def on_start(light):
+            self.action_queue.put({"type": "start_recording", "serial": serial, "light": light})
             self.wake_event.set()
 
-        RecordingDialog(self.root, model, self.manager.last_recording_folder, on_start)
+        RecordingDialog(self.root, model, engine.RECORDINGS_DIR, on_start)
 
     def _on_settings(self, serial: str):
         model = self.manager.model_cache.get(serial, serial)

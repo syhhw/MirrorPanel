@@ -8,11 +8,13 @@ import ctypes
 import ctypes.wintypes
 import json
 import logging
+import os
 import re
 import socket
 import subprocess
 import sys
 import time
+import winreg
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -48,6 +50,9 @@ WINDOW_FILL_RATIO = 0.75     # % do espaco disponivel que a janela ocupa (deixa 
 POLL_INTERVAL_SECONDS = 3    # intervalo entre verificacoes de dispositivos
 WIFI_RETRY_EVERY = 10        # a cada N verificacoes, tenta reconectar Wi-Fi
 MAX_CRASH_RETRIES = 3        # tentativas seguidas se o scrcpy cair sozinho (conectado)
+SILENT_RECONNECT_ATTEMPTS = 3    # tentativas silenciosas em segundo plano antes de avisar
+SILENT_RECONNECT_INTERVAL = 2.0  # segundos entre elas - filtra cabo com mau contato (oscilando)
+                                   # sem incomodar o usuario com um pop-up a cada soluco
 BASE_PORT = 27183
 
 # ================================================================
@@ -69,14 +74,35 @@ def bin_dir() -> Path:
     return Path(__file__).resolve().parent
 
 
+def _videos_dir() -> Path:
+    """Pasta 'Videos' de verdade do usuario, direto do registro do Windows - assim
+    respeita se o usuario redirecionou a pasta pra outro lugar (outro disco, OneDrive
+    etc.), em vez de simplesmente assumir que e "~\\Videos"."""
+    try:
+        with winreg.OpenKey(
+            winreg.HKEY_CURRENT_USER,
+            r"Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders",
+        ) as key:
+            raw, _ = winreg.QueryValueEx(key, "My Video")
+            return Path(os.path.expandvars(raw))
+    except OSError:
+        return Path.home() / "Videos"
+
+
 SCRIPT_DIR = app_dir()
 BIN_DIR = bin_dir()
 ADB = BIN_DIR / "adb.exe"
 SCRCPY = BIN_DIR / "scrcpy.exe"
 LOG_DIR = SCRIPT_DIR / "logs"
 SETTINGS_PATH = SCRIPT_DIR / "settings.json"
-RECORDINGS_DIR = SCRIPT_DIR / "recordings"
-SCREENSHOTS_DIR = SCRIPT_DIR / "screenshots"
+
+# Midia do usuario (prints/gravacoes) fica na biblioteca de Videos do Windows, nao
+# dentro da pasta de instalacao do programa - assim sobra organizada e acessivel
+# mesmo se o app for instalado em Program Files (sem precisar de admin pra gravar
+# nela) ou reinstalado/desinstalado depois.
+MEDIA_DIR = _videos_dir() / "MirrorPanel Media"
+RECORDINGS_DIR = MEDIA_DIR / "Gravacoes"
+SCREENSHOTS_DIR = MEDIA_DIR / "Capturas de tela"
 
 SPI_GETWORKAREA = 0x0030
 CREATE_NO_WINDOW = 0x08000000  # evita que cada chamada ao adb/tasklist abra um console visivel
@@ -91,14 +117,10 @@ def load_settings() -> dict:
             data.setdefault("wifi_devices", [])
             data.setdefault("device_overrides", {})
             data.setdefault("stay_awake", DEFAULT_STAY_AWAKE)
-            data.setdefault("last_recording_folder", str(RECORDINGS_DIR))
             return data
         except Exception:
             logging.exception("Falha ao ler settings.json - usando padrao")
-    return {
-        "wifi_devices": [], "device_overrides": {}, "stay_awake": DEFAULT_STAY_AWAKE,
-        "last_recording_folder": str(RECORDINGS_DIR),
-    }
+    return {"wifi_devices": [], "device_overrides": {}, "stay_awake": DEFAULT_STAY_AWAKE}
 
 
 def save_settings(data: dict):
@@ -417,6 +439,7 @@ class MirrorManager:
         self.active: dict[str, ActiveDevice] = {}
         self.crash_counts: dict[str, int] = {}
         self.blocked: set[str] = set()  # falhou varias vezes seguidas - so volta ao desplugar/replugar
+        self.pending_reconnect: dict[str, dict] = {}  # serial -> tentativas silenciosas em andamento
         self.recording: dict[str, str] = {}  # serial -> caminho do arquivo .mp4 sendo gravado
         self.recording_light: dict[str, bool] = {}  # serial -> gravacao leve (aparelhos antigos)
         self.recording_started_at: dict[str, float] = {}  # serial -> monotonic() de quando comecou
@@ -433,7 +456,6 @@ class MirrorManager:
         self.stay_awake: bool = self.settings["stay_awake"]
         self.wifi_devices: list[str] = list(self.settings["wifi_devices"])
         self.device_overrides: dict[str, dict] = dict(self.settings["device_overrides"])
-        self.last_recording_folder: str = self.settings["last_recording_folder"]
 
     def _cache_model(self, serial: str) -> str:
         if serial not in self.model_cache:
@@ -504,34 +526,24 @@ class MirrorManager:
         self.settings["stay_awake"] = value
         save_settings(self.settings)
 
-    def start_recording(self, serial: str, folder: str | None = None, light: bool = False) -> str:
+    def start_recording(self, serial: str, light: bool = False) -> str:
         """Botao de gravar. Reinicia o espelhamento desse aparelho incluindo o arquivo.
+        Sempre salva em RECORDINGS_DIR (pasta fixa e dedicada) - sem pedir pra
+        escolher, pra manter tudo sempre organizado no mesmo lugar.
 
-        folder: pasta escolhida na tela de gravacao (lembrada para a proxima vez).
         light: usa flags leves (bitrate/fps/resolucao reduzidos) para nao travar
         aparelhos antigos enquanto gravam.
         """
         model = self.model_cache.get(serial, serial)
         safe_model = "".join(c if c.isalnum() or c in "-_" else "_" for c in model)
 
-        target_dir = Path(folder) if folder else RECORDINGS_DIR
-        try:
-            target_dir.mkdir(parents=True, exist_ok=True)
-        except Exception:
-            logging.exception("Nao foi possivel criar a pasta de gravacao %s - usando padrao", target_dir)
-            target_dir = RECORDINGS_DIR
-            target_dir.mkdir(exist_ok=True)
-
+        RECORDINGS_DIR.mkdir(parents=True, exist_ok=True)
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        path = str(target_dir / f"{safe_model}_{timestamp}.mp4")
+        path = str(RECORDINGS_DIR / f"{safe_model}_{timestamp}.mp4")
 
         self.recording[serial] = path
         self.recording_light[serial] = light
         self.recording_started_at[serial] = time.monotonic()
-
-        self.last_recording_folder = str(target_dir)
-        self.settings["last_recording_folder"] = self.last_recording_folder
-        save_settings(self.settings)
 
         if serial in self.active:
             self.stop_device(serial)
@@ -554,7 +566,7 @@ class MirrorManager:
         model = self.model_cache.get(serial, serial)
         safe_model = "".join(c if c.isalnum() or c in "-_" else "_" for c in model)
         try:
-            SCREENSHOTS_DIR.mkdir(exist_ok=True)
+            SCREENSHOTS_DIR.mkdir(parents=True, exist_ok=True)
         except Exception:
             logging.exception("Nao foi possivel criar a pasta de screenshots")
             return None
@@ -724,23 +736,55 @@ class MirrorManager:
             del self.active[serial]
 
             if unplugged:
-                events.append({"type": "departed", "serial": serial, "model": dev.model})
                 logging.info("Desconectado: %s (%s)", dev.model, serial)
                 self.crash_counts.pop(serial, None)
                 self.blocked.discard(serial)
             else:
-                returncode = dev.proc.poll()
-                uptime = time.monotonic() - dev.started_at
-                if uptime > 10:
+                logging.warning("scrcpy caiu: %s (%s) codigo=%s", dev.model, serial, dev.proc.poll())
+
+            # nao avisa na hora - guarda pra tentar reconectar sozinho, em silencio,
+            # algumas vezes primeiro (ver bloco logo abaixo). Cabo com mau contato
+            # nao deveria assustar o usuario com um pop-up a cada oscilacao.
+            self.pending_reconnect[serial] = {
+                "attempts": 0, "next_attempt_at": time.monotonic(),
+                "model": dev.model, "kind": "departed" if unplugged else "crashed",
+                # sessao que rodou de boa por um tempo antes de cair conta menos
+                # contra o aparelho do que uma que morre logo de cara toda vez
+                "long_uptime": (time.monotonic() - dev.started_at) > 10,
+            }
+
+        # --- tentativas silenciosas de reconexao, antes de avisar o usuario ---
+        for serial, entry in list(self.pending_reconnect.items()):
+            if serial in self.active:  # reconectou por outro caminho (ex: clique manual)
+                self.pending_reconnect.pop(serial, None)
+                continue
+            if time.monotonic() < entry["next_attempt_at"]:
+                continue
+
+            if serial in ready and self.start_device(serial):
+                logging.info("Reconectado sozinho: %s (%s)", entry["model"], serial)
+                events.append({"type": "reconnected", "serial": serial, "model": entry["model"]})
+                self.pending_reconnect.pop(serial)
+                continue
+
+            entry["attempts"] += 1
+            if entry["attempts"] < SILENT_RECONNECT_ATTEMPTS:
+                entry["next_attempt_at"] = time.monotonic() + SILENT_RECONNECT_INTERVAL
+                continue
+
+            # esgotou as tentativas silenciosas - agora sim avisa o usuario
+            self.pending_reconnect.pop(serial)
+            if entry["kind"] == "crashed":
+                if entry["long_uptime"]:
                     self.crash_counts[serial] = 0
                 self.crash_counts[serial] = self.crash_counts.get(serial, 0) + 1
-                events.append({"type": "crashed", "serial": serial, "model": dev.model,
-                                "code": returncode, "attempt": self.crash_counts[serial]})
-                logging.warning("scrcpy caiu: %s (%s) codigo=%s tentativa=%s",
-                                 dev.model, serial, returncode, self.crash_counts[serial])
+                events.append({"type": "crashed", "serial": serial, "model": entry["model"],
+                                "attempt": self.crash_counts[serial]})
                 if self.crash_counts[serial] >= MAX_CRASH_RETRIES:
                     self.blocked.add(serial)
-                    events.append({"type": "blocked", "serial": serial, "model": dev.model})
+                    events.append({"type": "blocked", "serial": serial, "model": entry["model"]})
+            else:
+                events.append({"type": "departed", "serial": serial, "model": entry["model"]})
 
         # --- reconexao periodica dos dispositivos Wi-Fi salvos (ativados pelo painel) ---
         if self.wifi_devices and self.poll_count % WIFI_RETRY_EVERY == 0:
@@ -752,6 +796,13 @@ class MirrorManager:
                         pass
 
         return events
+
+    def has_pending_reconnects(self) -> bool:
+        """Usado pelo painel pra saber se deve verificar de novo mais rapido (perto
+        do intervalo entre as tentativas silenciosas) em vez de esperar o ciclo
+        normal inteiro - senao a reconexao "a cada 2s" na pratica vira bem mais
+        lenta, no ritmo do POLL_INTERVAL_SECONDS."""
+        return bool(self.pending_reconnect)
 
     def snapshot(self) -> dict[str, dict]:
         """Estado atual de todo aparelho conhecido nesta rodada, pra desenhar a UI."""
@@ -778,8 +829,18 @@ class MirrorManager:
         return rows
 
     def shutdown(self):
-        """Fecha o painel E encerra todos os espelhamentos que ele abriu (dando
-        chance de qualquer gravacao em andamento terminar o arquivo direito)."""
+        """Fecha o painel E encerra tudo que ele abriu ou deixou rodando em segundo
+        plano - scrcpy (dando chance de qualquer gravacao em andamento terminar o
+        arquivo direito) e o servidor do adb.
+
+        O servidor do adb roda como um processo PROPRIO, independente do processo
+        que o iniciou (e ate sobrevive a ele, se so matarmos o processo em vez de
+        pedir pra ele encerrar via protocolo) - se ele continuar de pe depois que o
+        painel fechar, ele mantem um lock nos arquivos da pasta de instalacao, e o
+        usuario nem consegue apagar/mover essa pasta ("arquivo em uso"). "adb
+        kill-server" e a forma correta de parar esse processo (pede pra ele mesmo
+        se desligar, em vez de so matar um PID que pode nem ser o processo certo).
+        """
         for dev in self.active.values():
             graceful_stop(dev.proc)
             try:
@@ -787,3 +848,15 @@ class MirrorManager:
             except Exception:
                 pass
         self.active.clear()
+
+        # varredura final - garante que nenhum scrcpy orfao sobreviva ao fechamento
+        # (ex: um processo que nao respondeu a tempo ao WM_CLOSE nem ao terminate)
+        try:
+            kill_existing_scrcpy()
+        except Exception:
+            logging.exception("Falha ao varrer processos scrcpy orfaos no fechamento")
+
+        try:
+            run_adb("kill-server", timeout=10)
+        except Exception:
+            logging.exception("Falha ao encerrar o servidor adb no fechamento")
