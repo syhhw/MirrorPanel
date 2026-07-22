@@ -81,6 +81,35 @@ def get_icon(name: str, size: int, color: str):
     return _icon_cache[key]
 
 
+def _apply_dark_titlebar(window: tk.Misc):
+    """Forca a barra de titulo NATIVA do Windows (fechar/minimizar/maximizar) a
+    seguir o tema escuro (DWMWA_USE_IMMERSIVE_DARK_MODE) - sem isso, so o
+    INTERIOR da janela fica escuro e a moldura do Windows continua branca,
+    quebrando a harmonia do dark mode. Isso so pede pro Windows pintar a
+    barra de titulo DELE mesmo de escuro - nao troca a barra por uma customizada,
+    entao snap layout, cantos arredondados e sombra nativos do Windows 11
+    continuam intactos.
+
+    winfo_id() devolve o HWND da area de DESENHO do Tk, que fica DENTRO da
+    janela decorada de verdade (a que tem a barra de titulo) - GetParent() sobe
+    um nivel e pega o HWND certo, que e o que a API do DWM espera receber.
+    """
+    try:
+        window.update_idletasks()
+        hwnd = ctypes.windll.user32.GetParent(window.winfo_id())
+        value = ctypes.c_int(1)
+        # 20 = valor oficial (Windows 10 versao 2004+ e Windows 11); builds do
+        # Windows 10 anteriores a essa usavam o valor (nao documentado) 19 pro
+        # mesmo efeito - tenta os dois, fica no primeiro que o Windows aceitar.
+        for attribute in (20, 19):
+            result = ctypes.windll.dwmapi.DwmSetWindowAttribute(
+                hwnd, attribute, ctypes.byref(value), ctypes.sizeof(value))
+            if result == 0:
+                break
+    except Exception:
+        pass
+
+
 def _center_on_parent(win: tk.Toplevel, parent: tk.Misc):
     """Centraliza uma janela de dialogo sobre a janela principal (nao no canto padrao do Windows).
 
@@ -99,6 +128,7 @@ def _center_on_parent(win: tk.Toplevel, parent: tk.Misc):
     """
     parent.update_idletasks()
     win.update_idletasks()
+    _apply_dark_titlebar(win)  # antes do deiconify() - senao a moldura clara pisca por um instante
     pw, ph = parent.winfo_width(), parent.winfo_height()
     px, py = parent.winfo_rootx(), parent.winfo_rooty()
     w, h = win.winfo_reqwidth(), win.winfo_reqheight()
@@ -547,6 +577,7 @@ class App:
         root.geometry("640x580")
         root.minsize(520, 380)
         root.configure(bg=BG)
+        _apply_dark_titlebar(root)  # antes de qualquer coisa aparecer na tela
 
         self._window_icon_img = ImageTk.PhotoImage(icons.app_icon(64))
         root.iconphoto(True, self._window_icon_img)
