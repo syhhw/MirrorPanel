@@ -3,7 +3,7 @@
 ; depois de rodar o PyInstaller em modo --onedir (pasta dist\MirrorPanel).
 
 #define MyAppName "MirrorPanel"
-#define MyAppVersion "1.0.0-3"
+#define MyAppVersion "1.0.0-4"
 #define MyAppPublisher "MirrorPanel"
 #define MyAppExeName "MirrorPanel.exe"
 ; Pasta gerada pelo PyInstaller --onedir (troque se o seu caminho for diferente)
@@ -17,11 +17,14 @@ AppPublisher={#MyAppPublisher}
 DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 AllowNoIcons=yes
-; Sem exigir admin por padrao (como VS Code/Discord) - {autopf} vira a pasta
-; de programas do proprio usuario quando nao elevado. Dialog deixa escolher
-; "so pra mim" (sem UAC) ou "para todos os usuarios" (com UAC) na instalacao.
+; Sem exigir admin, sem perguntar nada sobre isso (como VS Code/Discord/Chrome) -
+; {autopf} vira a pasta de programas do proprio usuario quando nao elevado.
+; So "commandline" (sem "dialog"): continua dando pra forcar instalacao para
+; todos os usuarios via linha de comando (deploy corporativo), mas nunca mostra
+; aquela tela perguntando "so pra mim ou para todos" - decisao tecnica que a
+; imensa maioria dos usuarios nao sabe (nem precisa) responder.
 PrivilegesRequired=lowest
-PrivilegesRequiredOverridesAllowed=commandline dialog
+PrivilegesRequiredOverridesAllowed=commandline
 LicenseFile=TERMOS_INSTALADOR.txt
 OutputDir=installer_output
 OutputBaseFilename=MirrorPanel-Setup

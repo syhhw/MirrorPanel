@@ -5,6 +5,9 @@
 *.spec
 
 # Dados locais de uso (nao fazem parte do codigo)
+# Gravacoes/capturas de tela novas ficam em "Videos\MirrorPanel Media" do
+# usuario, fora da pasta do projeto - mas ainda ignora os nomes antigos aqui
+# tambem, caso sobre algo de uma instalacao anterior.
 /logs/
 /recordings/
 /screenshots/

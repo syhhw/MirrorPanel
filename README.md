@@ -11,11 +11,12 @@ Painel para gerenciar o espelhamento e a gravação de vários aparelhos Android
 - Detecta automaticamente os celulares conectados por USB e lista todos, parados, até você decidir o que espelhar.
 - Espelha a tela de qualquer aparelho com um clique em **Iniciar** — cada um numa janela própria, do tamanho certo (sem esticar nem cortar).
 - Ativa Wi-Fi num aparelho conectado por cabo com um botão. Reconhece que é o mesmo aparelho físico (mesmo depois de tirar o cabo) e nunca abre duas janelas pro mesmo celular.
-- Grava a tela, deixando escolher a pasta de destino e um modo leve (bitrate/fps/resolução reduzidos) pra aparelhos mais antigos não travarem.
-- Tira um print rápido do celular sem precisar gravar vídeo.
+- Se o espelhamento cair (cabo com mau contato, scrcpy travou), tenta reconectar sozinho em segundo plano antes de incomodar — só avisa e pergunta se quer tentar de novo se isso realmente falhar.
+- Grava a tela e tira prints, salvando tudo organizado em **Vídeos\MirrorPanel Media**, com um modo leve (bitrate/fps/resolução reduzidos) pra aparelhos mais antigos não travarem durante a gravação.
 - Ajusta qualidade (codec, bitrate, taxa de quadros, áudio) individualmente por aparelho, direto pela interface.
 - Mantém a tela do celular sempre ligada enquanto está espelhando.
-- Minimiza para a bandeja do Windows; fechar o painel encerra tudo de forma organizada, sem deixar processo solto.
+- Interface em modo escuro, com a mesma cara de aplicativo moderno do Windows 11.
+- Minimiza para a bandeja do Windows; fechar o painel encerra tudo de forma organizada (scrcpy e o servidor do adb), sem deixar processo solto nem pasta bloqueada.
 - Verifica atualizações automaticamente ao abrir (e tem um botão pra checar na hora que quiser).
 
 ## Como instalar

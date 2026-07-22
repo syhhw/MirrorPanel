@@ -1,0 +1,5 @@
+Pillow
+pystray
+requests
+pywin32
+sv-ttk
