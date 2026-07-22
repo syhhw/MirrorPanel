@@ -14,7 +14,7 @@ from pathlib import Path
 
 import requests
 
-APP_VERSION = "1.0.0-4"  # mantenha igual ao MyAppVersion do installer.iss ao lancar uma nova versao
+APP_VERSION = "1.1.0"  # mantenha igual ao MyAppVersion do installer.iss ao lancar uma nova versao
 GITHUB_REPO = "syhhw/MirrorPanel"
 API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
 REQUEST_HEADERS = {"Accept": "application/vnd.github+json", "User-Agent": "MirrorPanel-updater"}
