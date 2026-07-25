@@ -170,5 +170,5 @@ def save_app_ico(path: Path):
 
 
 if __name__ == "__main__":
-    save_app_ico(Path(__file__).resolve().parent / "mirrorpanel.ico")
+    save_app_ico(Path(__file__).resolve().parent / "installer" / "mirrorpanel.ico")
     print("icone gerado")

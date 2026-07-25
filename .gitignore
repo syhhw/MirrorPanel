@@ -12,6 +12,7 @@
 /recordings/
 /screenshots/
 settings.json
+installer_language.marker
 
 # Python
 __pycache__/
@@ -23,16 +24,4 @@ Thumbs.db
 
 # Binarios de terceiros (scrcpy/adb) - baixe do repositorio oficial de cada um,
 # nao faz sentido re-hospedar aqui (e sao dezenas de MB de DLLs)
-adb.exe
-AdbWinApi.dll
-AdbWinUsbApi.dll
-scrcpy.exe
-scrcpy-server
-SDL3.dll
-avcodec-62.dll
-avformat-62.dll
-avutil-60.dll
-swresample-6.dll
-libusb-1.0.dll
-scrcpy.png
-disconnected.png
+/bin/

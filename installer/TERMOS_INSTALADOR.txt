@@ -1,0 +1,73 @@
+MirrorPanel - Termos de Uso
+
+Este programa e fornecido para uso pessoal de espelhamento e gravacao
+de tela de dispositivos Android conectados por USB ou Wi-Fi. Ao
+prosseguir com a instalacao e aceitar este contrato, voce confirma
+que leu e concorda com os termos abaixo.
+
+1. SEM GARANTIA
+
+O MirrorPanel e fornecido "como esta" e "conforme disponivel", sem
+garantia de qualquer tipo, expressa ou implicita, incluindo, sem
+limitacao, garantias de titularidade, nao violacao, comercializacao
+ou adequacao a uma finalidade especifica. Isso inclui a ausencia de
+garantia de que o programa funcionara sem falhas, de forma
+ininterrupta, ou que sera compativel com um aparelho ou versao do
+Android especifico. O uso do programa e feito por sua conta e risco.
+
+2. LIMITACAO DE RESPONSABILIDADE
+
+Na maxima extensao permitida pela legislacao aplicavel, o autor do
+MirrorPanel nao sera responsavel por qualquer dano direto, indireto,
+incidental, especial ou consequente decorrente do uso ou da
+impossibilidade de uso do programa - incluindo, sem limitacao, perda
+de dados, falha ou corrupcao de uma gravacao, ou qualquer problema no
+funcionamento do aparelho espelhado. Esta limitacao se aplica mesmo
+que o autor tenha sido avisado da possibilidade de tais danos.
+
+3. USO AUTORIZADO
+
+O MirrorPanel deve ser usado somente em dispositivos que voce possui
+ou para os quais tem autorizacao explicita do dono ou responsavel
+pelo aparelho para acessar, espelhar ou gravar a tela. E proibido
+usar o programa para espelhar, gravar ou monitorar o aparelho de
+outra pessoa sem o consentimento expresso e informado de quem o
+utiliza.
+
+Voce e o unico responsavel por cumprir a legislacao aplicavel sobre
+privacidade e monitoramento de dispositivos na sua localidade. O
+autor do MirrorPanel nao se responsabiliza pelo uso indevido do
+programa por terceiros.
+
+4. PRIVACIDADE
+
+O MirrorPanel nao coleta, armazena ou transmite dados de uso,
+telemetria ou qualquer informacao sobre o aparelho espelhado. A
+unica chamada de rede feita pelo programa por conta propria e a
+verificacao de novas versoes nas releases publicas do projeto no
+GitHub - essa checagem nao envia nenhum dado do dispositivo
+conectado, da tela espelhada ou dos arquivos gravados.
+
+O espelhamento e a gravacao acontecem localmente, direto entre o
+celular e o computador (por cabo USB ou pela rede Wi-Fi local);
+nenhum video ou audio passa por servidores do autor ou de terceiros.
+Gravacoes e capturas de tela ficam salvas somente no computador do
+usuario, na pasta Videos\MirrorPanel Media do Windows.
+
+5. COMPONENTES DE TERCEIROS
+
+O MirrorPanel utiliza e distribui os seguintes componentes de
+terceiros:
+
+  - scrcpy (Genymobile / Romain Vimont) - licenciado sob a licenca
+    Apache License 2.0
+    https://github.com/Genymobile/scrcpy
+
+  - Android Debug Bridge (adb) - Android Open Source Project,
+    licenciado sob a licenca Apache License 2.0
+
+O codigo proprio do MirrorPanel tambem e distribuido sob a Apache
+License 2.0 - veja o repositorio do projeto no GitHub para o texto
+completo da licenca.
+
+Copyright (c) 2026 syhhw

@@ -723,9 +723,12 @@ class DeviceRow:
 
 class App:
     def __init__(self, root: tk.Tk):
-        # Idioma detectado (ou lido de settings.json) ANTES de montar qualquer
-        # texto - senao a interface inteira nasceria com as strings padrao
-        # (portugues) e so mudaria depois, sem nenhum efeito visivel.
+        # Aplica o idioma escolhido no instalador (se acabou de instalar/
+        # reinstalar) ANTES de ler settings.json - depois disso, idioma
+        # detectado (ou lido de settings.json) ANTES de montar qualquer texto,
+        # senao a interface inteira nasceria com as strings padrao (portugues)
+        # e so mudaria depois, sem nenhum efeito visivel.
+        engine.apply_installer_language_marker()
         i18n.init_language(engine.load_settings().get("language"))
 
         self.root = root
@@ -749,6 +752,7 @@ class App:
         self.rows: dict[str, DeviceRow] = {}
         self.first_tick_done = False
         self.tray_icon = None
+        self._busy_apk_installs: set = set()  # (model, nome) de instalacoes de APK em andamento
 
         self._build_ui()
         self._log(t("log.started"))
@@ -867,6 +871,13 @@ class App:
 
         log_border = tk.Frame(self.root, bg=BORDER)
         log_border.pack(fill="x", padx=14, pady=(0, 8))
+
+        # Barra indeterminada (sem %): o "adb install" usado por tras do
+        # arrastar-e-soltar do scrcpy nao informa progresso incremental, so
+        # sucesso/falha no final - uma % de verdade aqui seria inventada. So
+        # aparece enquanto ha alguma instalacao de APK em andamento.
+        self.apk_progress = ttk.Progressbar(log_border, mode="indeterminate")
+
         self.log_text = tk.Text(log_border, height=6, state="disabled", font=("Consolas", 9),
                                  bg=SURFACE, fg=FG_MUTED, insertbackground=FG,
                                  selectbackground=ACCENT, relief="flat", padx=10, pady=8,
@@ -895,6 +906,24 @@ class App:
     def _toggle_always_on_top(self):
         self.action_queue.put({"type": "set_always_on_top", "value": self.always_on_top_var.get()})
         self.wake_event.set()
+
+    def _set_apk_progress_visible(self, visible: bool):
+        if visible:
+            if not self.apk_progress.winfo_ismapped():
+                self.apk_progress.pack(fill="x", padx=1, pady=(1, 0), before=self.log_text)
+                self.apk_progress.start(12)
+        else:
+            self.apk_progress.stop()
+            self.apk_progress.pack_forget()
+
+    def _mark_apk_busy(self, model: str, name: str):
+        self._busy_apk_installs.add((model, name))
+        self._set_apk_progress_visible(True)
+
+    def _mark_apk_done(self, model: str, name: str):
+        self._busy_apk_installs.discard((model, name))
+        if not self._busy_apk_installs:
+            self._set_apk_progress_visible(False)
 
     def _log(self, msg: str, level: str = "info"):
         """Adiciona uma linha na Atividade recente, com hora e cor por gravidade
@@ -1146,14 +1175,19 @@ class App:
                 self._log(t("log.device_error", serial=ev['serial']), "error")
             elif t_ == "apk_pushing":
                 self._log(t("log.apk_pushing", name=ev['name'], model=ev['model']), "info")
+                self._mark_apk_busy(ev['model'], ev['name'])
             elif t_ == "apk_push_failed":
                 self._log(t("log.apk_push_failed", name=ev['name'], model=ev['model']), "error")
+                self._mark_apk_done(ev['model'], ev['name'])
             elif t_ == "apk_installing":
                 self._log(t("log.apk_installing", name=ev['name'], model=ev['model']), "info")
+                self._mark_apk_busy(ev['model'], ev['name'])
             elif t_ == "apk_installed":
                 self._log(t("log.apk_installed", name=ev['name'], model=ev['model']), "success")
+                self._mark_apk_done(ev['model'], ev['name'])
             elif t_ == "apk_install_failed":
                 self._log(t("log.apk_install_failed", name=ev['name'], model=ev['model']), "error")
+                self._mark_apk_done(ev['model'], ev['name'])
 
     def _render(self, snapshot: dict):
         self.summary_label.config(text=t("app.summary", n=len(snapshot)))
@@ -1288,16 +1322,25 @@ class App:
         self._do_apply_update(installer_path)
 
     def _do_apply_update(self, installer_path: str):
-        # encerra os espelhamentos/gravacoes com calma (pra nao corromper um
-        # arquivo de gravacao em andamento) e mata o servidor do adb - esse
-        # mesmo shutdown() e usado ao fechar o painel normalmente, e e o que
-        # evita o instalador travar com "arquivo em uso" no adb.exe.
-        self.manager.shutdown()
+        # mesmo motivo do _do_close: shutdown() pode levar alguns segundos com
+        # aparelhos espelhando, e travar a thread da UI bem no meio de aplicar
+        # uma atualizacao pareceria o programa tendo travado/crashado.
         if self.tray_icon:
             try:
                 self.tray_icon.stop()
             except Exception:
                 pass
+        threading.Thread(target=self._shutdown_and_apply_update, args=(installer_path,), daemon=True).start()
+
+    def _shutdown_and_apply_update(self, installer_path: str):
+        self.stop_event.set()
+        self.wake_event.set()
+        self.worker.join(timeout=5)
+        # encerra os espelhamentos/gravacoes com calma (pra nao corromper um
+        # arquivo de gravacao em andamento) e mata o servidor do adb - esse
+        # mesmo shutdown() e usado ao fechar o painel normalmente, e e o que
+        # evita o instalador travar com "arquivo em uso" no adb.exe.
+        self.manager.shutdown()
         # se tudo der certo, apply_update_and_restart encerra o processo (os._exit)
         # e o codigo abaixo nunca roda. So chega aqui se algo falhar de forma
         # detectavel - antes, isso sumia silenciosamente e a atualizacao "nao fazia nada".
@@ -1305,8 +1348,11 @@ class App:
         if error:
             key, params = error
             error_text = t(key, **params)
-            self._log(error_text, "error")
-            messagebox.showerror("MirrorPanel", t("msg.update_apply_failed", error=error_text))
+            self.root.after(0, lambda: self._show_update_apply_error(error_text))
+
+    def _show_update_apply_error(self, error_text: str):
+        self._log(error_text, "error")
+        messagebox.showerror("MirrorPanel", t("msg.update_apply_failed", error=error_text))
 
     def _on_record(self, serial: str, currently_recording: bool):
         if currently_recording:
@@ -1355,15 +1401,29 @@ class App:
         self._do_close()
 
     def _do_close(self):
+        # esconde a janela JA (mesmo feedback instantaneo de minimizar pra bandeja)
+        # - o desligamento de verdade (abaixo) pode levar alguns segundos se algum
+        # scrcpy demorar pra responder ao WM_CLOSE, e isso roda numa thread separada
+        # bem por isso: fechar direto na thread da UI travava a janela ("Nao
+        # respondendo") ate terminar, com um ou mais aparelhos espelhando.
+        self.root.withdraw()
         self.stop_event.set()
         self.wake_event.set()
-        self.manager.shutdown()
         if self.tray_icon:
             try:
                 self.tray_icon.stop()
             except Exception:
                 pass
-        self.root.destroy()
+        threading.Thread(target=self._shutdown_and_destroy, daemon=True).start()
+
+    def _shutdown_and_destroy(self):
+        # espera o ciclo de verificacao em andamento (thread de fundo) terminar
+        # antes de mexer em self.active - senao as duas threads tocam no mesmo
+        # estado (aparelhos ativos, handles de log) ao mesmo tempo no instante
+        # do fechamento.
+        self.worker.join(timeout=5)
+        self.manager.shutdown()
+        self.root.after(0, self.root.destroy)
 
 
 def main():
