@@ -18,8 +18,10 @@ import sv_ttk
 from PIL import ImageTk
 
 import icons
+import i18n
 import mirror_engine as engine
 import updater
+from i18n import t
 
 # Fonte padrao do app inteiro - Segoe UI e a fonte de sistema do Windows 10/11
 # (limpa, sans-serif, ja instalada em qualquer maquina - sem depender de nada externo)
@@ -44,24 +46,47 @@ GREEN = "#3fb950"       # espelhando / sucesso
 AMBER = "#d29922"       # atencao
 RED = "#f85149"         # bloqueado / erro / gravando
 
-STATUS_LABELS = {
-    "mirroring": ("Espelhando", GREEN),
-    "ready": ("Pronto para espelhar", FG_MUTED),
-    "problem": ("Atencao", AMBER),
-    "blocked": ("Falhou varias vezes", RED),
-}
+LOG_MAX_LINES = 500      # nao deixa a Atividade recente crescer pra sempre numa sessao longa
 
-BITRATE_OPTIONS = [
-    ("Baixa - economiza dados", "2M"),
-    ("Media", "4M"),
-    ("Alta (recomendada)", "8M"),
-    ("Muito alta", "16M"),
-]
-FPS_OPTIONS = [
-    ("30 - economiza bateria", 30),
-    ("60 (recomendado)", 60),
-    ("90 - mais fluido", 90),
-]
+
+def _status_labels():
+    """Funcao (nao dict fixo) porque depende do idioma atual - so e chamada
+    depois que i18n.init_language() ja rodou."""
+    return {
+        "mirroring": (t("status.mirroring"), GREEN),
+        "ready": (t("status.ready"), FG_MUTED),
+        "problem": (t("status.problem"), AMBER),
+        "blocked": (t("status.blocked"), RED),
+    }
+
+
+def _bitrate_options():
+    return [
+        (t("settings.bitrate.low"), "2M"),
+        (t("settings.bitrate.medium"), "4M"),
+        (t("settings.bitrate.high"), "8M"),
+        (t("settings.bitrate.veryhigh"), "16M"),
+    ]
+
+
+def _fps_options():
+    return [
+        (t("settings.fps.30"), 30),
+        (t("settings.fps.60"), 60),
+        (t("settings.fps.90"), 90),
+    ]
+
+
+def _problem_hint_text(state: str | None) -> str:
+    """O motor (mirror_engine.py) so expoe o ESTADO cru do adb (unauthorized,
+    offline etc.) - traduzir esse estado numa dica legivel e trabalho da
+    interface, nao dele (o motor nao sabe de idioma nenhum)."""
+    if state == "unauthorized":
+        return t("hint.unauthorized")
+    if state == "offline":
+        return t("hint.offline")
+    return state or ""
+
 
 _icon_cache: dict = {}
 
@@ -148,47 +173,49 @@ class SettingsDialog(tk.Toplevel):
     def __init__(self, parent, serial, model, current, on_save):
         super().__init__(parent)
         self.withdraw()
-        self.title(f"Ajustes - {model}")
+        self.title(t("settings.title", model=model))
         self.resizable(False, False)
         self.transient(parent)
         self.on_save = on_save
         pad = DIALOG_FORM_PAD
+        bitrate_options = _bitrate_options()
+        fps_options = _fps_options()
 
-        ttk.Label(self, text="Codec de video:").grid(row=0, column=0, sticky="w", **pad)
+        ttk.Label(self, text=t("settings.codec")).grid(row=0, column=0, sticky="w", **pad)
         self.codec_var = tk.StringVar(value=current.get("video_codec", "h264"))
         ttk.Combobox(self, textvariable=self.codec_var, values=["h264", "h265"],
                      state="readonly", width=24).grid(row=0, column=1, **pad)
 
-        bitrate_by_value = {v: l for l, v in BITRATE_OPTIONS}
-        ttk.Label(self, text="Qualidade:").grid(row=1, column=0, sticky="w", **pad)
+        bitrate_by_value = {v: l for l, v in bitrate_options}
+        ttk.Label(self, text=t("settings.quality")).grid(row=1, column=0, sticky="w", **pad)
         self.bitrate_var = tk.StringVar(
-            value=bitrate_by_value.get(current.get("bitrate", "8M"), BITRATE_OPTIONS[2][0]))
-        ttk.Combobox(self, textvariable=self.bitrate_var, values=[l for l, _ in BITRATE_OPTIONS],
+            value=bitrate_by_value.get(current.get("bitrate", "8M"), bitrate_options[2][0]))
+        ttk.Combobox(self, textvariable=self.bitrate_var, values=[l for l, _ in bitrate_options],
                      state="readonly", width=24).grid(row=1, column=1, **pad)
 
-        fps_by_value = {v: l for l, v in FPS_OPTIONS}
-        ttk.Label(self, text="Taxa de quadros:").grid(row=2, column=0, sticky="w", **pad)
+        fps_by_value = {v: l for l, v in fps_options}
+        ttk.Label(self, text=t("settings.fps")).grid(row=2, column=0, sticky="w", **pad)
         self.fps_var = tk.StringVar(
-            value=fps_by_value.get(current.get("max_fps", 60), FPS_OPTIONS[1][0]))
-        ttk.Combobox(self, textvariable=self.fps_var, values=[l for l, _ in FPS_OPTIONS],
+            value=fps_by_value.get(current.get("max_fps", 60), fps_options[1][0]))
+        ttk.Combobox(self, textvariable=self.fps_var, values=[l for l, _ in fps_options],
                      state="readonly", width=24).grid(row=2, column=1, **pad)
 
         self.audio_var = tk.BooleanVar(value=current.get("audio", True))
-        ttk.Checkbutton(self, text="Transmitir audio do aparelho",
+        ttk.Checkbutton(self, text=t("settings.audio"),
                          variable=self.audio_var).grid(row=3, column=0, columnspan=2,
                                                         sticky="w", padx=14, pady=(6, 14))
 
         btns = ttk.Frame(self)
         btns.grid(row=4, column=0, columnspan=2, pady=(0, 14))
-        ttk.Button(btns, text="Cancelar", command=self.destroy, width=DIALOG_BUTTON_WIDTH).pack(side="left", padx=6)
-        ttk.Button(btns, text="Salvar", command=self._save, width=DIALOG_BUTTON_WIDTH).pack(side="left", padx=6)
+        ttk.Button(btns, text=t("btn.cancel"), command=self.destroy, width=DIALOG_BUTTON_WIDTH).pack(side="left", padx=6)
+        ttk.Button(btns, text=t("btn.save"), command=self._save, width=DIALOG_BUTTON_WIDTH).pack(side="left", padx=6)
 
         _center_on_parent(self, parent)
         self.grab_set()
 
     def _save(self):
-        bitrate_by_label = {l: v for l, v in BITRATE_OPTIONS}
-        fps_by_label = {l: v for l, v in FPS_OPTIONS}
+        bitrate_by_label = {l: v for l, v in _bitrate_options()}
+        fps_by_label = {l: v for l, v in _fps_options()}
         settings = {
             "video_codec": self.codec_var.get(),
             "bitrate": bitrate_by_label[self.bitrate_var.get()],
@@ -196,6 +223,39 @@ class SettingsDialog(tk.Toplevel):
             "audio": self.audio_var.get(),
         }
         self.on_save(settings)
+        self.destroy()
+
+
+class RenameDialog(tk.Toplevel):
+    """Apelido customizado por aparelho - so pra diferenciar dois do mesmo
+    modelo na lista. Nao muda nada no aparelho, e so cosmetico no painel."""
+
+    def __init__(self, parent, model, current_nickname, on_save):
+        super().__init__(parent)
+        self.withdraw()
+        self.title(t("rename.title", model=model))
+        self.resizable(False, False)
+        self.transient(parent)
+        self.on_save = on_save
+
+        ttk.Label(self, text=t("rename.label")).pack(padx=DIALOG_OUTER_PAD, pady=(16, 6), anchor="w")
+        self.name_var = tk.StringVar(value=current_nickname or "")
+        entry = ttk.Entry(self, textvariable=self.name_var, width=30)
+        entry.pack(padx=DIALOG_OUTER_PAD, pady=(0, 16))
+        entry.bind("<Return>", lambda _e: self._save())
+
+        btns = ttk.Frame(self)
+        btns.pack(pady=(0, 16))
+        ttk.Button(btns, text=t("btn.cancel"), command=self.destroy, width=DIALOG_BUTTON_WIDTH).pack(side="left", padx=6)
+        ttk.Button(btns, text=t("btn.save"), command=self._save, width=DIALOG_BUTTON_WIDTH).pack(side="left", padx=6)
+
+        _center_on_parent(self, parent)
+        self.grab_set()
+        entry.focus_set()
+        entry.select_range(0, "end")
+
+    def _save(self):
+        self.on_save(self.name_var.get())
         self.destroy()
 
 
@@ -207,31 +267,30 @@ class RecordingDialog(tk.Toplevel):
     def __init__(self, parent, model, recordings_dir, on_start):
         super().__init__(parent)
         self.withdraw()
-        self.title(f"Gravar - {model}")
+        self.title(t("recording.title", model=model))
         self.resizable(False, False)
         self.transient(parent)
         self.on_start = on_start
         pad = DIALOG_FORM_PAD
 
-        ttk.Label(self, text="Sera salvo em:").grid(row=0, column=0, sticky="w", **pad)
+        ttk.Label(self, text=t("recording.save_to")).grid(row=0, column=0, sticky="w", **pad)
         ttk.Label(self, text=str(recordings_dir), foreground=FG_MUTED).grid(
             row=0, column=1, sticky="w", padx=(0, 14), pady=6)
 
         self.light_var = tk.BooleanVar(value=False)
         ttk.Checkbutton(
-            self, text="Gravacao leve (recomendado para aparelhos antigos)",
+            self, text=t("recording.light"),
             variable=self.light_var,
         ).grid(row=1, column=0, columnspan=2, sticky="w", padx=14, pady=(0, 4))
         ttk.Label(
-            self, text="Reduz qualidade (bitrate/fps/resolucao) so durante a gravacao, "
-                       "para nao travar celulares mais fracos.",
+            self, text=t("recording.light_hint"),
             foreground=FG_MUTED, font=("Segoe UI", 8), justify="left", wraplength=380,
         ).grid(row=2, column=0, columnspan=2, sticky="w", padx=14, pady=(0, 10))
 
         btns = ttk.Frame(self)
         btns.grid(row=3, column=0, columnspan=2, pady=(0, 14))
-        ttk.Button(btns, text="Cancelar", command=self.destroy, width=DIALOG_BUTTON_WIDTH).pack(side="left", padx=6)
-        ttk.Button(btns, text="Gravar", command=self._start, width=DIALOG_BUTTON_WIDTH).pack(side="left", padx=6)
+        ttk.Button(btns, text=t("btn.cancel"), command=self.destroy, width=DIALOG_BUTTON_WIDTH).pack(side="left", padx=6)
+        ttk.Button(btns, text=t("btn.record"), command=self._start, width=DIALOG_BUTTON_WIDTH).pack(side="left", padx=6)
 
         _center_on_parent(self, parent)
         self.grab_set()
@@ -247,28 +306,28 @@ class UpdateDialog(tk.Toplevel):
     def __init__(self, parent, info: dict, on_accept):
         super().__init__(parent)
         self.withdraw()
-        self.title("Atualizacao disponivel")
+        self.title(t("update.title"))
         self.resizable(False, False)
         self.transient(parent)
         self.on_accept = on_accept
 
-        ttk.Label(self, text=f"MirrorPanel {info['version']} disponivel",
+        ttk.Label(self, text=t("update.available", version=info['version']),
                   font=("Segoe UI", 10, "bold")).pack(padx=DIALOG_OUTER_PAD, pady=(16, 4), anchor="w")
-        ttk.Label(self, text="Novidades desta versao:",
+        ttk.Label(self, text=t("update.notes_header"),
                   foreground=FG_MUTED).pack(padx=DIALOG_OUTER_PAD, anchor="w")
 
         notes = tk.Text(self, width=52, height=10, wrap="word", font=("Segoe UI", 9),
                          bg=SURFACE, fg=FG, insertbackground=FG, selectbackground=ACCENT,
                          relief="solid", borderwidth=1, highlightthickness=1,
                          highlightbackground=BORDER, highlightcolor=BORDER)
-        notes.insert("1.0", info["notes"] or "(sem notas de versao)")
+        notes.insert("1.0", info["notes"] or t("update.no_notes"))
         notes.config(state="disabled")
         notes.pack(padx=DIALOG_OUTER_PAD, pady=(6, 12))
 
         btns = ttk.Frame(self)
         btns.pack(pady=(0, 16))
-        ttk.Button(btns, text="Mais tarde", command=self.destroy, width=DIALOG_BUTTON_WIDTH).pack(side="left", padx=6)
-        ttk.Button(btns, text="Atualizar", command=self._accept, width=DIALOG_BUTTON_WIDTH).pack(side="left", padx=6)
+        ttk.Button(btns, text=t("btn.later"), command=self.destroy, width=DIALOG_BUTTON_WIDTH).pack(side="left", padx=6)
+        ttk.Button(btns, text=t("btn.update"), command=self._accept, width=DIALOG_BUTTON_WIDTH).pack(side="left", padx=6)
 
         _center_on_parent(self, parent)
         self.grab_set()
@@ -284,12 +343,12 @@ class DownloadProgressDialog(tk.Toplevel):
     def __init__(self, parent):
         super().__init__(parent)
         self.withdraw()
-        self.title("Atualizando MirrorPanel")
+        self.title(t("update.downloading_title"))
         self.resizable(False, False)
         self.transient(parent)
         self.protocol("WM_DELETE_WINDOW", lambda: None)
 
-        ttk.Label(self, text="Baixando atualizacao...").pack(padx=DIALOG_OUTER_PAD, pady=(18, 8))
+        ttk.Label(self, text=t("update.downloading")).pack(padx=DIALOG_OUTER_PAD, pady=(18, 8))
         self.bar = ttk.Progressbar(self, mode="determinate", length=280, maximum=100)
         self.bar.pack(padx=DIALOG_OUTER_PAD, pady=(0, 6))
         self.pct_label = ttk.Label(self, text="0%", foreground=FG_MUTED)
@@ -303,11 +362,11 @@ class DownloadProgressDialog(tk.Toplevel):
             pct = min(100, int(downloaded * 100 / total))
             self.bar.config(mode="determinate")
             self.bar["value"] = pct
-            self.pct_label.config(text=f"{pct}%  ({downloaded // 1024} KB / {total // 1024} KB)")
+            self.pct_label.config(text=t("update.progress", pct=pct, done=downloaded // 1024, total=total // 1024))
         else:
             self.bar.config(mode="indeterminate")
             self.bar.start(15)
-            self.pct_label.config(text=f"{downloaded // 1024} KB baixados")
+            self.pct_label.config(text=t("update.progress_unknown", done=downloaded // 1024))
 
 
 class ScreenshotFlash(tk.Toplevel):
@@ -364,21 +423,21 @@ class ScreenshotConfirmDialog(tk.Toplevel):
     def __init__(self, parent, on_copy):
         super().__init__(parent)
         self.withdraw()
-        self.title("Print capturado")
+        self.title(t("screenshot.title"))
         self.resizable(False, False)
         self.transient(parent)
         self.attributes("-topmost", True)
 
-        ttk.Label(self, text="Print capturado!", font=FONT_BOLD).pack(padx=DIALOG_OUTER_PAD, pady=(16, 4))
+        ttk.Label(self, text=t("screenshot.captured"), font=FONT_BOLD).pack(padx=DIALOG_OUTER_PAD, pady=(16, 4))
         ttk.Label(
-            self, text="Deseja copiar para a area de transferencia do Windows?",
+            self, text=t("screenshot.copy_question"),
             foreground=FG_MUTED, justify="center", wraplength=DIALOG_MESSAGE_WRAPLENGTH,
         ).pack(padx=DIALOG_OUTER_PAD, pady=(0, 14))
 
         btns = ttk.Frame(self)
         btns.pack(pady=(0, 16))
-        ttk.Button(btns, text="Nao", command=self.destroy, width=DIALOG_BUTTON_WIDTH).pack(side="left", padx=6)
-        ttk.Button(btns, text="Sim", command=self._accept, width=DIALOG_BUTTON_WIDTH).pack(side="left", padx=6)
+        ttk.Button(btns, text=t("btn.no"), command=self.destroy, width=DIALOG_BUTTON_WIDTH).pack(side="left", padx=6)
+        ttk.Button(btns, text=t("btn.yes"), command=self._accept, width=DIALOG_BUTTON_WIDTH).pack(side="left", padx=6)
 
         self.on_copy = on_copy
         _center_on_parent(self, parent)
@@ -396,22 +455,22 @@ class MirroringDisconnectedDialog(tk.Toplevel):
     def __init__(self, parent, serial: str, model: str, on_retry, on_close=None):
         super().__init__(parent)
         self.withdraw()
-        self.title("Espelhamento desconectado")
+        self.title(t("disconnected.title"))
         self.resizable(False, False)
         self.transient(parent)
         self.attributes("-topmost", True)
         self.protocol("WM_DELETE_WINDOW", self.destroy)
 
-        ttk.Label(self, text="Espelhamento desconectado", font=FONT_BOLD).pack(padx=DIALOG_OUTER_PAD, pady=(16, 4))
+        ttk.Label(self, text=t("disconnected.heading"), font=FONT_BOLD).pack(padx=DIALOG_OUTER_PAD, pady=(16, 4))
         ttk.Label(
-            self, text=f"A conexao com {model} foi interrompida.",
+            self, text=t("disconnected.message", model=model),
             foreground=FG_MUTED, justify="center", wraplength=DIALOG_MESSAGE_WRAPLENGTH,
         ).pack(padx=DIALOG_OUTER_PAD, pady=(0, 14))
 
         btns = ttk.Frame(self)
         btns.pack(pady=(0, 16))
-        ttk.Button(btns, text="Sair", command=self.destroy, width=DIALOG_BUTTON_WIDTH).pack(side="left", padx=6)
-        ttk.Button(btns, text="Reconectar", command=self._retry, width=DIALOG_BUTTON_WIDTH).pack(side="left", padx=6)
+        ttk.Button(btns, text=t("btn.exit"), command=self.destroy, width=DIALOG_BUTTON_WIDTH).pack(side="left", padx=6)
+        ttk.Button(btns, text=t("btn.reconnect"), command=self._retry, width=DIALOG_BUTTON_WIDTH).pack(side="left", padx=6)
 
         self.on_retry = on_retry
         self.on_close = on_close
@@ -428,6 +487,88 @@ class MirroringDisconnectedDialog(tk.Toplevel):
         super().destroy()
 
 
+class ConfirmActionDialog(tk.Toplevel):
+    """Dialogo generico de aviso com 2 botoes (titulo + mensagem + cancelar/
+    confirmar) - usado tanto pra fechar o painel quanto pra aplicar uma
+    atualizacao com gravacao em andamento, pra nao cortar o video sem avisar
+    em nenhum dos dois casos (o arquivo em si nao corrompe - o desligamento
+    gracioso finaliza certinho - mas o video fica mais curto que o esperado)."""
+
+    def __init__(self, parent, title: str, message: str, confirm_text: str, cancel_text: str, on_confirm):
+        super().__init__(parent)
+        self.withdraw()
+        self.title(title)
+        self.resizable(False, False)
+        self.transient(parent)
+        self.attributes("-topmost", True)
+        self.on_confirm = on_confirm
+
+        ttk.Label(self, text=title, font=FONT_BOLD).pack(padx=DIALOG_OUTER_PAD, pady=(16, 4))
+        ttk.Label(
+            self, text=message,
+            foreground=FG_MUTED, justify="center", wraplength=DIALOG_MESSAGE_WRAPLENGTH,
+        ).pack(padx=DIALOG_OUTER_PAD, pady=(0, 14))
+
+        btns = ttk.Frame(self)
+        btns.pack(pady=(0, 16))
+        ttk.Button(btns, text=cancel_text, command=self.destroy, width=DIALOG_BUTTON_WIDTH).pack(side="left", padx=6)
+        ttk.Button(btns, text=confirm_text, command=self._confirm, width=DIALOG_BUTTON_WIDTH).pack(side="left", padx=6)
+
+        _center_on_parent(self, parent)
+        self.grab_set()
+
+    def _confirm(self):
+        self.on_confirm()
+        self.destroy()
+
+
+class ShortcutsDialog(tk.Toplevel):
+    """Referencia rapida dos atalhos de teclado nativos do scrcpy - eles ja
+    funcionam sozinhos (e o proprio scrcpy que trata), mas o usuario nao tem
+    como adivinhar que existem sem ler a documentacao dele em separado."""
+
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.withdraw()
+        self.title(t("shortcuts.title"))
+        self.resizable(False, False)
+        self.transient(parent)
+
+        ttk.Label(self, text=t("shortcuts.title"), font=FONT_BOLD).pack(
+            padx=DIALOG_OUTER_PAD, pady=(16, 4), anchor="w")
+        ttk.Label(self, text=t("shortcuts.hint"), foreground=FG_MUTED).pack(
+            padx=DIALOG_OUTER_PAD, anchor="w", pady=(0, 10))
+
+        rows = [
+            ("MOD+r", t("shortcuts.rotate")),
+            ("MOD+h", t("shortcuts.home")),
+            ("MOD+b", t("shortcuts.back")),
+            ("MOD+s", t("shortcuts.app_switch")),
+            ("MOD+n", t("shortcuts.notifications")),
+            ("MOD+o", t("shortcuts.screen_off")),
+            ("MOD+↑/↓", t("shortcuts.volume")),
+            ("MOD+c", t("shortcuts.copy")),
+            ("MOD+v", t("shortcuts.paste")),
+            ("MOD+g", t("shortcuts.resize")),
+            (".apk", t("shortcuts.drop_apk")),
+        ]
+        grid = ttk.Frame(self)
+        grid.pack(padx=DIALOG_OUTER_PAD, pady=(0, 8))
+        for i, (key, desc) in enumerate(rows):
+            ttk.Label(grid, text=key, font=("Consolas", 9, "bold"), foreground=ACCENT).grid(
+                row=i, column=0, sticky="w", padx=(0, 14), pady=3)
+            ttk.Label(grid, text=desc, foreground=FG, wraplength=260, justify="left").grid(
+                row=i, column=1, sticky="w", pady=3)
+
+        ttk.Label(self, text=t("shortcuts.mod_hint"), foreground=FG_SUBTLE, font=FONT_MUTED).pack(
+            padx=DIALOG_OUTER_PAD, pady=(4, 0), anchor="w")
+
+        ttk.Button(self, text=t("btn.close"), command=self.destroy, width=DIALOG_BUTTON_WIDTH).pack(pady=16)
+
+        _center_on_parent(self, parent)
+        self.grab_set()
+
+
 class DeviceRow:
     def __init__(self, parent, serial: str, callbacks: dict):
         self.serial = serial
@@ -435,7 +576,7 @@ class DeviceRow:
         self.status = None
         self.recording = False
         self.recording_anchor: float | None = None  # time.monotonic() de referencia local
-        self.model_name = serial
+        self.display_name = serial
 
         # borda fina (1px) ao redor de cada linha, pra parecer um "cartao" separado
         self.border = tk.Frame(parent, bg=BORDER)
@@ -448,8 +589,15 @@ class DeviceRow:
         self.dot.grid(row=0, column=0, rowspan=2, padx=(0, 12))
         self.dot_id = self.dot.create_oval(1, 1, 11, 11, fill=FG_MUTED, outline="")
 
-        self.model_label = ttk.Label(self.frame, font=("Segoe UI", 10, "bold"), style="Card.TLabel")
-        self.model_label.grid(row=0, column=1, sticky="w")
+        name_box = ttk.Frame(self.frame, style="Card.TFrame")
+        name_box.grid(row=0, column=1, sticky="w")
+        self.model_label = ttk.Label(name_box, font=("Segoe UI", 10, "bold"), style="Card.TLabel",
+                                      cursor="hand2")
+        self.model_label.pack(side="left")
+        self.model_label.bind("<Button-1>", lambda _e: self._rename())
+        self.rename_btn = ttk.Button(name_box, image=get_icon("edit", 11, FG_MUTED),
+                                      command=self._rename, style="Icon.TButton")
+        self.rename_btn.pack(side="left", padx=(4, 0))
 
         self.detail_label = ttk.Label(self.frame, foreground=FG_MUTED, font=("Segoe UI", 8),
                                        style="CardMuted.TLabel")
@@ -495,11 +643,14 @@ class DeviceRow:
     def _settings(self):
         self.callbacks["settings"](self.serial)
 
+    def _rename(self):
+        self.callbacks["rename"](self.serial)
+
     def _render_model_text(self):
-        text = self.model_name
+        text = self.display_name
         if self.recording_anchor is not None:
             secs = int(time.monotonic() - self.recording_anchor)
-            text += f"   ● Gravando {secs // 60:02d}:{secs % 60:02d}"
+            text += f"   ● {t('device.recording')} {secs // 60:02d}:{secs % 60:02d}"
         self.model_label.config(text=text, foreground=RED if self.recording_anchor is not None else "")
 
     def refresh_timer(self):
@@ -511,8 +662,8 @@ class DeviceRow:
     def update(self, info: dict):
         self.status = info["status"]
         self.recording = info.get("recording", False)
-        self.model_name = info["model"]
-        label, color = STATUS_LABELS.get(self.status, (self.status, FG))
+        self.display_name = info["display_name"]
+        label, color = _status_labels().get(self.status, (self.status, FG))
         self.dot.itemconfig(self.dot_id, fill=color)
 
         if self.recording:
@@ -524,19 +675,19 @@ class DeviceRow:
 
         detail = f"{self.serial}"
         if info["status"] == "mirroring" and info.get("port"):
-            detail += f"  |  porta {info['port']}  |  {label}"
-        elif info["status"] == "problem" and info.get("hint"):
-            detail += f"  |  {info['hint']}"
+            detail += f"  |  {t('device.port')} {info['port']}  |  {label}"
+        elif info["status"] == "problem" and info.get("problem_state"):
+            detail += f"  |  {_problem_hint_text(info['problem_state'])}"
         else:
             detail += f"  |  {label}"
         self.detail_label.config(text=detail)
 
         if self.status == "mirroring":
-            self.toggle_btn.config(text="Parar", image=get_icon("stop", 13, RED), state="normal")
+            self.toggle_btn.config(text=t("btn.stop"), image=get_icon("stop", 13, RED), state="normal")
         elif self.status in ("ready", "blocked"):
-            self.toggle_btn.config(text="Iniciar", image=get_icon("play", 13, GREEN), state="normal")
+            self.toggle_btn.config(text=t("btn.start"), image=get_icon("play", 13, GREEN), state="normal")
         else:
-            self.toggle_btn.config(text="Iniciar", image=get_icon("play", 13, GREEN), state="disabled")
+            self.toggle_btn.config(text=t("btn.start"), image=get_icon("play", 13, GREEN), state="disabled")
 
         is_wireless = ":" in self.serial
         can_touch = self.status in ("mirroring", "ready", "blocked")
@@ -572,10 +723,15 @@ class DeviceRow:
 
 class App:
     def __init__(self, root: tk.Tk):
+        # Idioma detectado (ou lido de settings.json) ANTES de montar qualquer
+        # texto - senao a interface inteira nasceria com as strings padrao
+        # (portugues) e so mudaria depois, sem nenhum efeito visivel.
+        i18n.init_language(engine.load_settings().get("language"))
+
         self.root = root
-        root.title("MirrorPanel")
-        root.geometry("640x580")
-        root.minsize(520, 380)
+        root.title(t("app.title"))
+        root.geometry("640x620")
+        root.minsize(520, 400)
         root.configure(bg=BG)
         _apply_dark_titlebar(root)  # antes de qualquer coisa aparecer na tela
 
@@ -595,7 +751,7 @@ class App:
         self.tray_icon = None
 
         self._build_ui()
-        self._log("Painel iniciado. Detectando dispositivos...")
+        self._log(t("log.started"))
         self._setup_tray()
 
         self.worker = threading.Thread(target=self._background_loop, daemon=True)
@@ -636,6 +792,7 @@ class App:
 
         style.configure("Update.TButton", font=("Segoe UI", 8), foreground=ACCENT, padding=(8, 3))
         style.map("Update.TButton", foreground=[("disabled", FG_SUBTLE)])
+        style.configure("Bulk.TButton", font=("Segoe UI", 8), padding=(8, 3))
 
     # ---------------------------------------------------------------- UI --
     def _build_ui(self):
@@ -647,20 +804,35 @@ class App:
 
         row1 = ttk.Frame(top)
         row1.pack(fill="x")
-        ttk.Label(row1, text="MirrorPanel", style="Title.TLabel").pack(side="left")
-        self.summary_label = ttk.Label(row1, text="Carregando...", style="Summary.TLabel")
+        ttk.Label(row1, text=t("app.title"), style="Title.TLabel").pack(side="left")
+        self.summary_label = ttk.Label(row1, text=t("app.loading"), style="Summary.TLabel")
         self.summary_label.pack(side="right")
 
-        ttk.Label(top, text="Clique Abrir para espelhar um aparelho especifico.",
+        ttk.Label(top, text=t("app.subtitle"),
                   foreground=FG_MUTED, font=("Segoe UI", 8)).pack(anchor="w", pady=(2, 0))
 
         row2 = ttk.Frame(top)
         row2.pack(fill="x", pady=(10, 0))
         self.stay_awake_var = tk.BooleanVar(value=self.manager.stay_awake)
         ttk.Checkbutton(
-            row2, text="Manter tela do celular sempre ligada",
+            row2, text=t("app.stay_awake"),
             variable=self.stay_awake_var, command=self._toggle_stay_awake,
         ).pack(side="left")
+
+        self.always_on_top_var = tk.BooleanVar(value=self.manager.always_on_top)
+        ttk.Checkbutton(
+            row2, text=t("app.always_on_top"),
+            variable=self.always_on_top_var, command=self._toggle_always_on_top,
+        ).pack(side="left", padx=(16, 0))
+
+        row3 = ttk.Frame(top)
+        row3.pack(fill="x", pady=(8, 0))
+        ttk.Button(row3, text=t("app.start_all"), style="Bulk.TButton",
+                   command=self._on_start_all).pack(side="left")
+        ttk.Button(row3, text=t("app.stop_all"), style="Bulk.TButton",
+                   command=self._on_stop_all).pack(side="left", padx=(6, 0))
+        ttk.Button(row3, text=t("app.shortcuts"), style="Bulk.TButton",
+                   command=self._on_show_shortcuts).pack(side="left", padx=(6, 0))
 
         divider = tk.Frame(self.root, bg=BORDER, height=1)
         divider.pack(fill="x")
@@ -672,7 +844,7 @@ class App:
         self.loading_frame.pack(fill="both", expand=True)
         loading_box = ttk.Frame(self.loading_frame)
         loading_box.place(relx=0.5, rely=0.45, anchor="center")
-        ttk.Label(loading_box, text="Carregando dispositivos ADB...",
+        ttk.Label(loading_box, text=t("app.loading_devices"),
                   font=("Segoe UI", 10)).pack(pady=(0, 10))
         self.loading_bar = ttk.Progressbar(loading_box, mode="indeterminate", length=220)
         self.loading_bar.pack()
@@ -680,16 +852,16 @@ class App:
 
         self.list_frame = ttk.Frame(self.content, padding=(14, 10))
         self.empty_label = ttk.Label(
-            self.list_frame, text="Nenhum dispositivo detectado ainda.\nConecte um celular por USB.",
+            self.list_frame, text=t("app.empty"),
             foreground=FG_MUTED, justify="center",
         )
         self.empty_label.pack(pady=40)
 
         bottom = ttk.Frame(self.root, padding=(14, 6))
         bottom.pack(fill="x")
-        ttk.Label(bottom, text="Atividade recente", style="Header.TLabel").pack(side="left")
+        ttk.Label(bottom, text=t("app.activity"), style="Header.TLabel").pack(side="left")
         ttk.Button(
-            bottom, text=" Verificar atualizacoes", image=get_icon("refresh", 13, ACCENT),
+            bottom, text=t("app.check_update"), image=get_icon("refresh", 13, ACCENT),
             compound="left", style="Update.TButton", command=self._on_check_update,
         ).pack(side="right")
 
@@ -711,13 +883,17 @@ class App:
 
         footer = ttk.Frame(self.root, padding=(14, 0, 14, 10))
         footer.pack(fill="x")
-        ttk.Label(footer, text="Minimizar manda para a bandeja. Fechar encerra os espelhamentos abertos.",
+        ttk.Label(footer, text=t("app.footer_hint"),
                   foreground=FG_MUTED, font=FONT_MUTED).pack(side="left")
         ttk.Label(footer, text=f"v{updater.APP_VERSION}",
                   foreground=FG_SUBTLE, font=FONT_MUTED).pack(side="right")
 
     def _toggle_stay_awake(self):
         self.action_queue.put({"type": "set_stay_awake", "value": self.stay_awake_var.get()})
+        self.wake_event.set()
+
+    def _toggle_always_on_top(self):
+        self.action_queue.put({"type": "set_always_on_top", "value": self.always_on_top_var.get()})
         self.wake_event.set()
 
     def _log(self, msg: str, level: str = "info"):
@@ -728,6 +904,12 @@ class App:
         self.log_text.config(state="normal")
         self.log_text.insert("end", f"{timestamp}  ", "timestamp")
         self.log_text.insert("end", f"{msg}\n", level)
+        # nao deixa crescer pra sempre numa sessao longa (o app pode ficar dias
+        # aberto na bandeja) - cada linha ocupa memoria e deixa o widget mais
+        # pesado pra redesenhar/rolar
+        total_lines = int(self.log_text.index("end-1c").split(".")[0])
+        if total_lines > LOG_MAX_LINES:
+            self.log_text.delete("1.0", f"{total_lines - LOG_MAX_LINES + 1}.0")
         self.log_text.see("end")
         self.log_text.config(state="disabled")
 
@@ -735,8 +917,8 @@ class App:
     def _setup_tray(self):
         image = icons.app_icon(64)
         menu = pystray.Menu(
-            pystray.MenuItem("Abrir painel", self._tray_open, default=True),
-            pystray.MenuItem("Sair", self._tray_exit),
+            pystray.MenuItem(t("tray.open"), self._tray_open, default=True),
+            pystray.MenuItem(t("tray.exit"), self._tray_exit),
         )
         self.tray_icon = pystray.Icon("MirrorPanel", image, "MirrorPanel", menu)
         threading.Thread(target=self.tray_icon.run, daemon=True).start()
@@ -831,6 +1013,11 @@ class App:
                 self.manager.start_device(serial)
         elif kind == "set_stay_awake":
             self.manager.set_stay_awake(action["value"])
+        elif kind == "set_always_on_top":
+            self.manager.set_always_on_top(action["value"])
+        elif kind == "set_nickname":
+            self.manager.set_nickname(serial, action["nickname"])
+            self.event_queue.put(("nickname_result", serial))
         elif kind == "start_recording":
             path = self.manager.start_recording(serial, action.get("light", False))
             self.event_queue.put(("record_result", serial, True, path))
@@ -855,49 +1042,53 @@ class App:
                     return
                 if item[0] == "wifi_result":
                     _, serial, target = item
-                    model = self.manager.model_cache.get(serial, serial)
+                    model = self.manager.display_name(serial)
                     if target:
-                        self._log(f"Wi-Fi ativado em {model} ({target}). Pode tirar o cabo.", "success")
+                        self._log(t("log.wifi_on", model=model, target=target), "success")
                     else:
-                        self._log(f"Nao foi possivel ativar Wi-Fi em {model}. "
-                                   f"Confira se o celular esta na mesma rede.", "error")
+                        self._log(t("log.wifi_failed", model=model), "error")
                     continue
                 if item[0] == "record_result":
                     _, serial, started, path = item
-                    model = self.manager.model_cache.get(serial, serial)
+                    model = self.manager.display_name(serial)
                     if started:
-                        self._log(f"Gravando {model} em {path}", "success")
+                        self._log(t("log.recording_started", model=model, path=path), "success")
                     else:
-                        self._log(f"Gravacao de {model} salva.", "success")
+                        self._log(t("log.recording_saved", model=model), "success")
                     continue
                 if item[0] == "screenshot_result":
                     _, serial, path = item
-                    model = self.manager.model_cache.get(serial, serial)
+                    model = self.manager.display_name(serial)
                     if path:
-                        self._log(f"Print de {model} salvo em {path}", "success")
+                        self._log(t("log.screenshot_saved", model=model, path=path), "success")
                         ScreenshotConfirmDialog(self.root, on_copy=lambda p=path: self._on_copy_screenshot(p))
                     else:
-                        self._log(f"Falha ao tirar print de {model}.", "error")
+                        self._log(t("log.screenshot_failed", model=model), "error")
                     continue
                 if item[0] == "clipboard_result":
                     _, ok = item
                     if ok:
-                        self._log("Print copiado para a area de transferencia (Win+V pra ver).", "success")
+                        self._log(t("log.clipboard_ok"), "success")
                     else:
-                        self._log("Nao foi possivel copiar o print para a area de transferencia.", "error")
+                        self._log(t("log.clipboard_failed"), "error")
+                    continue
+                if item[0] == "nickname_result":
+                    _, serial = item
+                    raw_model = self.manager.model_cache.get(serial, serial)
+                    nickname = self.manager.display_name(serial)
+                    self._log(t("log.nickname_saved", model=raw_model, nickname=nickname), "success")
                     continue
                 if item[0] == "update_check_result":
                     result = item[1]
                     if result["status"] == "update":
                         info = result["info"]
-                        self._log(f"Nova versao disponivel: {info['version']}", "success")
+                        self._log(t("log.update_available", version=info['version']), "success")
                         self._ensure_window_visible()
                         UpdateDialog(self.root, info, on_accept=lambda: self._start_update_download(info))
                     elif result["status"] == "current":
-                        self._log(f"Voce esta atualizado (versao {updater.APP_VERSION}).", "info")
+                        self._log(t("log.update_current", version=updater.APP_VERSION), "info")
                     else:
-                        self._log("Nao foi possivel verificar atualizacoes agora "
-                                   "(sem internet ou GitHub indisponivel).", "warning")
+                        self._log(t("log.update_check_failed"), "warning")
                     continue
                 if item[0] == "download_progress":
                     _, downloaded, total = item
@@ -910,13 +1101,10 @@ class App:
                         self.download_dialog.destroy()
                         self.download_dialog = None
                     if success:
-                        self._log("Download concluido. Aplicando atualizacao...", "success")
+                        self._log(t("log.update_downloaded"), "success")
                         self._apply_update(path)
                     else:
-                        messagebox.showerror(
-                            "MirrorPanel",
-                            "Falha ao baixar a atualizacao. Tente novamente mais tarde.",
-                        )
+                        messagebox.showerror("MirrorPanel", t("msg.update_download_failed"))
                     continue
 
                 _, events, snapshot = item
@@ -933,26 +1121,42 @@ class App:
 
     def _handle_events(self, events):
         for ev in events:
-            t = ev.get("type")
-            if t == "arrived":
-                self._log(f"{ev['model']} conectado (porta {ev['port']})", "success")
-            elif t == "reconnected":
-                self._log(f"{ev['model']} reconectado automaticamente.", "success")
-            elif t == "departed":
-                self._log(f"{ev['model']} desconectado", "warning")
+            t_ = ev.get("type")
+            if t_ == "arrived":
+                self._log(t("log.device_arrived", model=ev['model'], port=ev['port']), "success")
+            elif t_ == "reconnected":
+                self._log(t("log.device_reconnected", model=ev['model']), "success")
+            elif t_ == "departed":
+                self._log(t("log.device_departed", model=ev['model']), "warning")
                 self._show_disconnect_dialog(ev["serial"], ev["model"])
-            elif t == "crashed":
-                self._log(f"{ev['model']} encerrou sozinho (tentativa {ev['attempt']})", "error")
+            elif t_ == "crashed":
+                self._log(t("log.device_crashed", model=ev['model'], attempt=ev['attempt']), "error")
                 self._show_disconnect_dialog(ev["serial"], ev["model"])
-            elif t == "blocked":
-                self._log(f"{ev['model']} falhou varias vezes - veja logs/scrcpy_{ev['serial']}.log", "error")
-            elif t == "problem":
-                self._log(f"{ev['serial']}: {ev['hint']}", "warning")
-            elif t == "error":
-                self._log(f"Falha ao iniciar {ev['serial']}", "error")
+            elif t_ == "closed_by_user":
+                # janela fechada pelo proprio X do scrcpy (fora do painel) -
+                # tratado como um "parar" manual: so avisa, sem tentar reconectar
+                # nem mostrar pop-up (o usuario decidiu fechar de proposito).
+                self._log(t("log.device_closed", model=ev['model']), "info")
+            elif t_ == "blocked":
+                self._log(t("log.device_blocked", model=ev['model'], serial=ev['serial']), "error")
+            elif t_ == "problem":
+                hint = _problem_hint_text(ev.get("state"))
+                self._log(t("log.device_problem", serial=ev['serial'], hint=hint), "warning")
+            elif t_ == "error":
+                self._log(t("log.device_error", serial=ev['serial']), "error")
+            elif t_ == "apk_pushing":
+                self._log(t("log.apk_pushing", name=ev['name'], model=ev['model']), "info")
+            elif t_ == "apk_push_failed":
+                self._log(t("log.apk_push_failed", name=ev['name'], model=ev['model']), "error")
+            elif t_ == "apk_installing":
+                self._log(t("log.apk_installing", name=ev['name'], model=ev['model']), "info")
+            elif t_ == "apk_installed":
+                self._log(t("log.apk_installed", name=ev['name'], model=ev['model']), "success")
+            elif t_ == "apk_install_failed":
+                self._log(t("log.apk_install_failed", name=ev['name'], model=ev['model']), "error")
 
     def _render(self, snapshot: dict):
-        self.summary_label.config(text=f"{len(snapshot)} dispositivo(s)")
+        self.summary_label.config(text=t("app.summary", n=len(snapshot)))
 
         if snapshot:
             self.empty_label.pack_forget()
@@ -965,8 +1169,8 @@ class App:
                 del self.rows[serial]
 
         callbacks = {"toggle": self._on_toggle, "wifi": self._on_wifi, "settings": self._on_settings,
-                     "record": self._on_record, "screenshot": self._on_screenshot}
-        for serial, info in sorted(snapshot.items(), key=lambda kv: kv[1]["model"]):
+                     "record": self._on_record, "screenshot": self._on_screenshot, "rename": self._on_rename}
+        for serial, info in sorted(snapshot.items(), key=lambda kv: kv[1]["display_name"]):
             if serial not in self.rows:
                 row = DeviceRow(self.list_frame, serial, callbacks)
                 row.border.pack(fill="x", pady=(0, 6))
@@ -977,6 +1181,23 @@ class App:
         kind = "stop" if status == "mirroring" else "start"
         self.action_queue.put({"type": kind, "serial": serial})
         self.wake_event.set()
+
+    def _on_start_all(self):
+        snapshot = self.manager.snapshot()
+        targets = [s for s, info in snapshot.items() if info["status"] in ("ready", "blocked")]
+        for serial in targets:
+            self.action_queue.put({"type": "start", "serial": serial})
+        self.wake_event.set()
+
+    def _on_stop_all(self):
+        snapshot = self.manager.snapshot()
+        targets = [s for s, info in snapshot.items() if info["status"] == "mirroring"]
+        for serial in targets:
+            self.action_queue.put({"type": "stop", "serial": serial})
+        self.wake_event.set()
+
+    def _on_show_shortcuts(self):
+        ShortcutsDialog(self.root)
 
     def _show_disconnect_dialog(self, serial: str, model: str):
         existing = self.disconnect_dialogs.get(serial)
@@ -991,14 +1212,14 @@ class App:
         self.disconnect_dialogs[serial] = dlg
 
     def _retry_after_disconnect(self, serial: str):
-        model = self.manager.model_cache.get(serial, serial)
-        self._log(f"Tentando reconectar {model}...", "info")
+        model = self.manager.display_name(serial)
+        self._log(t("log.retrying", model=model), "info")
         self.action_queue.put({"type": "start", "serial": serial})
         self.wake_event.set()
 
     def _on_wifi(self, serial: str):
-        model = self.manager.model_cache.get(serial, serial)
-        self._log(f"Ativando Wi-Fi em {model}...", "info")
+        model = self.manager.display_name(serial)
+        self._log(t("log.wifi_activating", model=model), "info")
         self.action_queue.put({"type": "wifi", "serial": serial})
         self.wake_event.set()
 
@@ -1036,7 +1257,7 @@ class App:
         self.event_queue.put(("update_check_result", result))
 
     def _on_check_update(self):
-        self._log("Verificando atualizacoes...", "info")
+        self._log(t("log.update_checking"), "info")
         threading.Thread(target=self._run_update_check, daemon=True).start()
 
     def _start_update_download(self, info: dict):
@@ -1046,15 +1267,30 @@ class App:
         def worker():
             def on_progress(downloaded, total):
                 self.event_queue.put(("download_progress", downloaded, total))
-            ok = updater.download_update(info["url"], dest, on_progress)
+            ok = updater.download_update(info["url"], dest, on_progress, expected_size=info.get("size", 0))
             self.event_queue.put(("download_done", ok, dest))
 
         threading.Thread(target=worker, daemon=True).start()
 
     def _apply_update(self, installer_path: str):
-        # encerra os espelhamentos/gravacoes com calma antes de atualizar (pra nao
-        # corromper um arquivo de gravacao em andamento) e mata o servidor do adb -
-        # esse mesmo shutdown() e usado ao fechar o painel normalmente, e e o que
+        # aplicar a atualizacao encerra TODOS os espelhamentos (inclusive
+        # gravacoes em andamento) - avisa antes, com chance de esperar, em vez
+        # de cortar o video sem dizer nada (mesmo cuidado do botao de fechar).
+        recording_count = len(self.manager.recording)
+        if recording_count > 0:
+            self._ensure_window_visible()
+            ConfirmActionDialog(
+                self.root, t("update_confirm.title"), t("update_confirm.message", n=recording_count),
+                confirm_text=t("btn.update"), cancel_text=t("update_confirm.wait"),
+                on_confirm=lambda: self._do_apply_update(installer_path),
+            )
+            return
+        self._do_apply_update(installer_path)
+
+    def _do_apply_update(self, installer_path: str):
+        # encerra os espelhamentos/gravacoes com calma (pra nao corromper um
+        # arquivo de gravacao em andamento) e mata o servidor do adb - esse
+        # mesmo shutdown() e usado ao fechar o painel normalmente, e e o que
         # evita o instalador travar com "arquivo em uso" no adb.exe.
         self.manager.shutdown()
         if self.tray_icon:
@@ -1067,8 +1303,10 @@ class App:
         # detectavel - antes, isso sumia silenciosamente e a atualizacao "nao fazia nada".
         error = updater.apply_update_and_restart(installer_path)
         if error:
-            self._log(error, "error")
-            messagebox.showerror("MirrorPanel", f"Falha ao aplicar a atualizacao:\n{error}")
+            key, params = error
+            error_text = t(key, **params)
+            self._log(error_text, "error")
+            messagebox.showerror("MirrorPanel", t("msg.update_apply_failed", error=error_text))
 
     def _on_record(self, serial: str, currently_recording: bool):
         if currently_recording:
@@ -1076,7 +1314,7 @@ class App:
             self.wake_event.set()
             return
 
-        model = self.manager.model_cache.get(serial, serial)
+        model = self.manager.display_name(serial)
 
         def on_start(light):
             self.action_queue.put({"type": "start_recording", "serial": serial, "light": light})
@@ -1085,17 +1323,38 @@ class App:
         RecordingDialog(self.root, model, engine.RECORDINGS_DIR, on_start)
 
     def _on_settings(self, serial: str):
-        model = self.manager.model_cache.get(serial, serial)
+        model = self.manager.display_name(serial)
         current = self.manager.get_device_settings(serial)
 
         def on_save(settings):
             self.action_queue.put({"type": "save_settings", "serial": serial, "settings": settings})
             self.wake_event.set()
-            self._log(f"Ajustes salvos para {model}.", "success")
+            self._log(t("log.settings_saved", model=model), "success")
 
         SettingsDialog(self.root, serial, model, current, on_save)
 
+    def _on_rename(self, serial: str):
+        model = self.manager.model_cache.get(serial, serial)
+        current = self.manager.nicknames.get(serial, "")
+
+        def on_save(nickname):
+            self.action_queue.put({"type": "set_nickname", "serial": serial, "nickname": nickname})
+            self.wake_event.set()
+
+        RenameDialog(self.root, model, current, on_save)
+
     def _on_close(self):
+        recording_count = len(self.manager.recording)
+        if recording_count > 0:
+            self._ensure_window_visible()
+            ConfirmActionDialog(
+                self.root, t("close_confirm.title"), t("close_confirm.message", n=recording_count),
+                confirm_text=t("btn.exit"), cancel_text=t("close_confirm.stay"), on_confirm=self._do_close,
+            )
+            return
+        self._do_close()
+
+    def _do_close(self):
         self.stop_event.set()
         self.wake_event.set()
         self.manager.shutdown()

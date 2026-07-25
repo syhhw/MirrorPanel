@@ -115,6 +115,29 @@ def gear(size: int = 16, color: str = "#57606a") -> Image.Image:
     return _finish(img, size)
 
 
+def edit(size: int = 16, color: str = "#57606a") -> Image.Image:
+    """Lapis simples, na diagonal - usado no botao de renomear/apelido."""
+    img = _canvas(size)
+    d = ImageDraw.Draw(img)
+    w, h = img.size
+    body_w = w * 0.16
+    top = (w * 0.72, h * 0.14)
+    bottom = (w * 0.28, h * 0.72)
+    angle = math.atan2(bottom[1] - top[1], bottom[0] - top[0])
+    perp = angle + math.pi / 2
+    ox, oy = math.cos(perp) * body_w / 2, math.sin(perp) * body_w / 2
+    d.polygon([
+        (top[0] + ox, top[1] + oy), (top[0] - ox, top[1] - oy),
+        (bottom[0] - ox, bottom[1] - oy), (bottom[0] + ox, bottom[1] + oy),
+    ], fill=color)
+    tip = (w * 0.20, h * 0.86)
+    tox, toy = math.cos(perp) * body_w * 0.7, math.sin(perp) * body_w * 0.7
+    d.polygon([
+        (bottom[0] + ox, bottom[1] + oy), (bottom[0] - ox, bottom[1] - oy), tip,
+    ], fill=color)
+    return _finish(img, size)
+
+
 def app_icon(size: int = 256, bg: str = "#1f6feb", fg: str = "#ffffff") -> Image.Image:
     """Telefone com um botao de 'play' dentro - representa espelhar/tocar a tela."""
     img = _canvas(size)
