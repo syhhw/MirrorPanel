@@ -14,7 +14,7 @@ from pathlib import Path
 
 import requests
 
-APP_VERSION = "1.1.0-0"  # mantenha igual ao MyAppVersion do installer.iss ao lancar uma nova versao
+APP_VERSION = "1.2.0"  # mantenha igual ao MyAppVersion do installer.iss ao lancar uma nova versao
 GITHUB_REPO = "syhhw/MirrorPanel"
 API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
 REQUEST_HEADERS = {"Accept": "application/vnd.github+json", "User-Agent": "MirrorPanel-updater"}
@@ -49,16 +49,19 @@ def check_for_update_detailed(timeout: float = 6.0) -> dict:
         return {"status": "current", "info": None}
 
     asset_url = asset_name = None
+    asset_size = 0
     for asset in data.get("assets", []):
         name = asset.get("name", "")
         if name.lower().endswith(".exe"):
             asset_url = asset.get("browser_download_url")
             asset_name = name
+            asset_size = asset.get("size") or 0
             break
     if not asset_url:
         return {"status": "error", "info": None}
 
-    info = {"version": tag, "notes": (data.get("body") or "").strip(), "url": asset_url, "asset_name": asset_name}
+    info = {"version": tag, "notes": (data.get("body") or "").strip(), "url": asset_url,
+            "asset_name": asset_name, "size": asset_size}
     return {"status": "update", "info": info}
 
 
@@ -73,14 +76,21 @@ def get_download_path(asset_name: str) -> str:
 
 
 def download_update(url: str, dest_path: str, on_progress=None, chunk_size: int = 65536,
-                     timeout: float = 20.0) -> bool:
+                     timeout: float = 20.0, expected_size: int = 0) -> bool:
     """Baixa em pedacos (nao trava a UI, chamar de uma thread separada).
     on_progress(baixado, total) e chamado a cada pedaco - total pode ser 0 se
-    o servidor nao informar o tamanho."""
+    o servidor nao informar o tamanho.
+
+    expected_size: tamanho do arquivo que a API do GitHub ja informou pro
+    release (0 se por algum motivo nao veio). Depois de baixar, confere se
+    bate - um download truncado (conexao caiu no meio, por exemplo) podia
+    passar batido antes, sendo tratado como sucesso so por nao ter dado
+    excecao, e o instalador corrompido falhava de um jeito confuso depois.
+    """
     try:
         with requests.get(url, stream=True, timeout=timeout) as resp:
             resp.raise_for_status()
-            total = int(resp.headers.get("content-length", 0))
+            total = int(resp.headers.get("content-length", 0)) or expected_size
             downloaded = 0
             with open(dest_path, "wb") as f:
                 for chunk in resp.iter_content(chunk_size=chunk_size):
@@ -90,6 +100,11 @@ def download_update(url: str, dest_path: str, on_progress=None, chunk_size: int 
                     downloaded += len(chunk)
                     if on_progress:
                         on_progress(downloaded, total)
+
+        if expected_size and downloaded != expected_size:
+            logging.error("Download incompleto: esperava %s bytes, veio %s", expected_size, downloaded)
+            Path(dest_path).unlink(missing_ok=True)
+            return False
         return True
     except Exception:
         logging.exception("Falha ao baixar atualizacao")
@@ -100,14 +115,14 @@ def download_update(url: str, dest_path: str, on_progress=None, chunk_size: int 
         return False
 
 
-def apply_update_and_restart(installer_path: str) -> str | None:
+def apply_update_and_restart(installer_path: str) -> tuple[str, dict] | None:
     """Roda o novo instalador e encerra o processo atual, liberando os arquivos
     a tempo do instalador substituir sem erro de "arquivo em uso".
 
-    Devolve uma mensagem de erro (SEM encerrar o processo) se algo falhar de
-    forma detectavel na hora - assim o programa avisa o usuario em vez de so
-    sumir e deixar ele preso pedindo a mesma atualizacao pra sempre. Se tudo
-    correr bem, esta funcao nunca retorna (o processo e encerrado).
+    Devolve (chave_i18n, parametros) - NAO a mensagem ja pronta - se algo falhar
+    de forma detectavel na hora, pra quem chamou traduzir do jeito certo (esse
+    modulo nao sabe de idioma, so a interface sabe). Se tudo correr bem, essa
+    funcao nunca retorna (o processo e encerrado).
 
     /CURRENTUSER forca a instalacao sem pedir elevacao (UAC) - a instalacao
     original ja e por usuario, sem admin; sem isso, o instalador as vezes fica
@@ -121,7 +136,7 @@ def apply_update_and_restart(installer_path: str) -> str | None:
     """
     p = Path(installer_path)
     if not p.exists() or p.stat().st_size < 1_000_000:  # instalador real tem varios MB
-        return f"Arquivo do instalador nao encontrado ou incompleto: {installer_path}"
+        return ("error.installer_missing", {"path": installer_path})
 
     args = [installer_path, "/SILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/CURRENTUSER",
             "/CLOSEAPPLICATIONS", "/RESTARTAPPLICATIONS"]
@@ -129,11 +144,11 @@ def apply_update_and_restart(installer_path: str) -> str | None:
         proc = subprocess.Popen(args, close_fds=True, cwd=str(p.parent))
     except OSError as exc:
         logging.exception("Falha ao iniciar o instalador da atualizacao")
-        return f"Nao foi possivel iniciar o instalador: {exc}"
+        return ("error.installer_start_failed", {"error": str(exc)})
 
     time.sleep(1.5)  # da tempo de pegar uma falha IMEDIATA (instalador corrompido, etc)
     if proc.poll() is not None and proc.returncode != 0:
-        return f"O instalador encerrou sozinho com erro (codigo {proc.returncode})."
+        return ("error.installer_exited", {"code": proc.returncode})
 
     os._exit(0)  # sai AGORA - nao deixa nada (atexit, cleanup) atrasar a liberacao dos arquivos
     return None  # nunca chega aqui

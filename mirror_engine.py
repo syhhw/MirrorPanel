@@ -1,8 +1,7 @@
 """Motor de deteccao/lancamento de espelhamento Android via scrcpy/adb.
 
-Usado tanto pelo console (connect.py) quanto pelo painel grafico (panel.py).
-Nao imprime nada na tela - so loga e devolve eventos, pra caber em qualquer
-interface (console ou GUI).
+Usado pelo painel grafico (panel.py). Nao imprime nada na tela - so loga e
+devolve eventos, pra caber em qualquer interface que venha a consumir isso.
 """
 import ctypes
 import ctypes.wintypes
@@ -21,13 +20,12 @@ from pathlib import Path
 
 # ================================================================
 #  PERFIS PADRAO DE DISPOSITIVO (usados so se o aparelho nunca foi
-#  ajustado pelo botao de engrenagem no painel - ai vale o settings.json)
-#  Chave = serial (especifico) OU modelo (portavel entre cabos/PCs)
+#  ajustado pelo botao de engrenagem no painel - ai vale o settings.json).
+#  Vazio por padrao - e um espaco pra quem compilar o proprio .exe adicionar
+#  perfis fixos por serial ou modelo, se quiser. Chave = serial (especifico)
+#  OU modelo (portavel entre cabos/PCs). Ex.: "SM_G991B": "--video-codec=h265 ..."
 # ================================================================
-PROFILES = {
-    "RQ8N604W3DZ": "--video-codec=h264 --audio-codec=opus --audio-buffer=5 -b 4M --max-fps 60",
-    "RQGL300X9QT": "--video-codec=h265 --audio-codec=opus --audio-buffer=5 -b 8M --max-fps 60",
-}
+PROFILES = {}
 
 # Flags para dispositivos sem perfil nem ajuste salvo
 DEFAULT_FLAGS = "--video-codec=h264 --audio-codec=opus --audio-buffer=5 -b 8M --max-fps 60"
@@ -107,6 +105,17 @@ SCREENSHOTS_DIR = MEDIA_DIR / "Capturas de tela"
 SPI_GETWORKAREA = 0x0030
 CREATE_NO_WINDOW = 0x08000000  # evita que cada chamada ao adb/tasklist abra um console visivel
 
+# O proprio scrcpy ja instala um APK sozinho quando o usuario arrasta o arquivo
+# pra cima da janela de video (recurso nativo dele) - mas isso acontece em
+# silencio, sem nenhum aviso no painel. scrcpy escreve o progresso no proprio
+# log (que a gente ja grava em disco, so nunca lia de volta); essas expressoes
+# reconhecem essas linhas especificas pra transformar em eventos visiveis.
+_APK_PUSHING_RE = re.compile(r"^INFO: Pushing (.+)\.\.\.\s*$")
+_APK_PUSH_FAILED_RE = re.compile(r"^ERROR: Failed to push (.+?) to .+$")
+_APK_INSTALLING_RE = re.compile(r"^INFO: Installing (.+)\.\.\.\s*$")
+_APK_INSTALLED_RE = re.compile(r"^INFO: (.+) successfully installed\s*$")
+_APK_INSTALL_FAILED_RE = re.compile(r"^ERROR: Failed to install (.+)$")
+
 
 def load_settings() -> dict:
     """Le settings.json (Wi-Fi salvos, ajuste por aparelho). So existe depois que
@@ -117,10 +126,16 @@ def load_settings() -> dict:
             data.setdefault("wifi_devices", [])
             data.setdefault("device_overrides", {})
             data.setdefault("stay_awake", DEFAULT_STAY_AWAKE)
+            data.setdefault("always_on_top", ALWAYS_ON_TOP)
+            data.setdefault("nicknames", {})
+            data.setdefault("language", None)  # None = nunca escolhido, detecta do Windows
             return data
         except Exception:
             logging.exception("Falha ao ler settings.json - usando padrao")
-    return {"wifi_devices": [], "device_overrides": {}, "stay_awake": DEFAULT_STAY_AWAKE}
+    return {
+        "wifi_devices": [], "device_overrides": {}, "stay_awake": DEFAULT_STAY_AWAKE,
+        "always_on_top": ALWAYS_ON_TOP, "nicknames": {}, "language": None,
+    }
 
 
 def save_settings(data: dict):
@@ -150,6 +165,9 @@ class ActiveDevice:
     port: int
     slot: int
     started_at: float
+    log_path: Path
+    log_read_pos: int = 0  # ate onde o log do scrcpy ja foi lido (ver _scan_apk_events)
+    monitor_idx: int = 0  # qual monitor (indice em self.slot_managers) esta usando
 
 
 class SlotManager:
@@ -182,6 +200,12 @@ class SlotManager:
 
     def release(self, slot: int):
         self.used.discard(slot)
+        # encolhe a grade pro que sobrou - senao quem continuar espelhando
+        # depois que os outros fecharem fica "espremido" no tamanho de coluna
+        # de quando ainda tinha varios. So afeta o PROXIMO aparelho lancado
+        # (o rect_for de uma janela ja aberta nao muda sozinho, ela so ganha
+        # o tamanho novo se for parada e iniciada de novo).
+        self.cols = max(len(self.used), 1)
 
     def rect_for(self, slot: int):
         col_w = self.width // self.cols
@@ -280,6 +304,43 @@ def get_work_area():
     return rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top
 
 
+def get_all_monitors() -> list[tuple[int, int, int, int]]:
+    """Area util (sem barra de tarefas) de TODOS os monitores conectados - o
+    [0] e sempre o principal, o resto na ordem que o Windows devolver. Antes
+    disso o auto-arranjo so conhecia o monitor principal (SPI_GETWORKAREA),
+    entao um segundo monitor conectado ficava sempre vazio."""
+    ctypes.windll.user32.SetProcessDPIAware()
+    MONITORINFOF_PRIMARY = 0x1
+
+    class _MONITORINFO(ctypes.Structure):
+        _fields_ = [
+            ("cbSize", ctypes.wintypes.DWORD),
+            ("rcMonitor", ctypes.wintypes.RECT),
+            ("rcWork", ctypes.wintypes.RECT),
+            ("dwFlags", ctypes.wintypes.DWORD),
+        ]
+
+    found = []
+
+    @ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p,
+                         ctypes.POINTER(ctypes.wintypes.RECT), ctypes.c_void_p)
+    def _callback(hmonitor, _hdc, _lprect, _lparam):
+        info = _MONITORINFO()
+        info.cbSize = ctypes.sizeof(_MONITORINFO)
+        if ctypes.windll.user32.GetMonitorInfoW(hmonitor, ctypes.byref(info)):
+            r = info.rcWork
+            is_primary = bool(info.dwFlags & MONITORINFOF_PRIMARY)
+            found.append((is_primary, r.left, r.top, r.right - r.left, r.bottom - r.top))
+        return True
+
+    ctypes.windll.user32.EnumDisplayMonitors(None, None, _callback, 0)
+    if not found:
+        return [get_work_area()]  # fallback defensivo - nunca deveria acontecer
+
+    found.sort(key=lambda m: not m[0])  # principal (True) primeiro
+    return [(x, y, w, h) for _, x, y, w, h in found]
+
+
 def kill_existing_scrcpy():
     """Limpeza unica na inicializacao (processos orfaos de uma execucao anterior)."""
     result = subprocess.run(
@@ -359,16 +420,11 @@ def get_screen_resolution(serial: str):
     return (w, h) if w > 0 and h > 0 else None
 
 
-def problem_hint(state: str) -> str:
-    if state == "unauthorized":
-        return "desbloqueie o celular e aceite 'Permitir depuracao USB'"
-    if state == "offline":
-        return "reconecte o cabo ou reinicie o ADB (offline)"
-    return state
 
 
 def launch_device(serial: str, num_hint: str, slots: SlotManager, used_ports: set[int], flags: str,
-                   stay_awake: bool = DEFAULT_STAY_AWAKE, record_path: str | None = None) -> ActiveDevice | None:
+                   stay_awake: bool = DEFAULT_STAY_AWAKE, record_path: str | None = None,
+                   always_on_top: bool = ALWAYS_ON_TOP, monitor_idx: int = 0) -> ActiveDevice | None:
     try:
         model = get_model(serial, num_hint)
         port = next_free_port(BASE_PORT, used_ports)
@@ -377,7 +433,7 @@ def launch_device(serial: str, num_hint: str, slots: SlotManager, used_ports: se
         window_args = ["--no-window-aspect-ratio-lock"]
         if PREFER_TEXT_INPUT:
             window_args.append("--prefer-text")
-        if ALWAYS_ON_TOP:
+        if always_on_top:
             window_args.append("--always-on-top")
         if DISABLE_SCREENSAVER:
             window_args.append("--disable-screensaver")
@@ -405,6 +461,7 @@ def launch_device(serial: str, num_hint: str, slots: SlotManager, used_ports: se
         log_fh = open(log_path, "a", encoding="utf-8")
         log_fh.write(f"\n===== {datetime.now():%Y-%m-%d %H:%M:%S} iniciando =====\n")
         log_fh.flush()
+        log_read_pos = log_fh.tell()  # so acompanha linhas NOVAS desta sessao pra frente
 
         cmd = [str(SCRCPY), "-s", serial, "-p", str(port), "--window-title", model, *flags.split(), *window_args]
         # scrcpy.exe e um app de console e pode se auto-alocar um se nascer sem nenhum
@@ -422,7 +479,9 @@ def launch_device(serial: str, num_hint: str, slots: SlotManager, used_ports: se
 
         logging.info("Conectado: %s (%s) porta=%s flags=%s", model, serial, port, flags)
 
-        return ActiveDevice(proc=proc, log_fh=log_fh, model=model, port=port, slot=slot, started_at=time.monotonic())
+        return ActiveDevice(proc=proc, log_fh=log_fh, model=model, port=port, slot=slot,
+                             started_at=time.monotonic(), log_path=log_path, log_read_pos=log_read_pos,
+                             monitor_idx=monitor_idx)
     except Exception:
         logging.exception("Falha ao iniciar %s", serial)
         return None
@@ -449,13 +508,16 @@ class MirrorManager:
         self.last_problems: dict[str, str] = {}
         self.used_ports: set[int] = set()
         self.poll_count = 0
-        self.screen = get_work_area()
-        self.slots = SlotManager(*self.screen)
+        self.monitor_rects = get_all_monitors()
+        self.slot_managers = [SlotManager(*rect) for rect in self.monitor_rects]
 
         self.settings = load_settings()
         self.stay_awake: bool = self.settings["stay_awake"]
+        self.always_on_top: bool = self.settings["always_on_top"]
         self.wifi_devices: list[str] = list(self.settings["wifi_devices"])
         self.device_overrides: dict[str, dict] = dict(self.settings["device_overrides"])
+        self.nicknames: dict[str, str] = dict(self.settings["nicknames"])
+        self.language: str | None = self.settings["language"]
 
     def _cache_model(self, serial: str) -> str:
         if serial not in self.model_cache:
@@ -524,6 +586,32 @@ class MirrorManager:
         lancados - quem ja esta rodando so pega o ajuste se for reiniciado."""
         self.stay_awake = value
         self.settings["stay_awake"] = value
+        save_settings(self.settings)
+
+    def set_always_on_top(self, value: bool):
+        """Botao 'Manter janelas sempre visiveis'. Mesma logica do stay_awake -
+        vale a partir do proximo espelhamento lancado daquele aparelho."""
+        self.always_on_top = value
+        self.settings["always_on_top"] = value
+        save_settings(self.settings)
+
+    def set_nickname(self, serial: str, nickname: str):
+        """Apelido customizado, so pra diferenciar dois aparelhos do mesmo modelo
+        na lista - nao muda nada no aparelho em si, e so cosmetico no painel."""
+        nickname = nickname.strip()
+        if nickname:
+            self.nicknames[serial] = nickname
+        else:
+            self.nicknames.pop(serial, None)
+        self.settings["nicknames"] = self.nicknames
+        save_settings(self.settings)
+
+    def display_name(self, serial: str) -> str:
+        return self.nicknames.get(serial) or self.model_cache.get(serial, serial)
+
+    def set_language(self, lang: str):
+        self.language = lang
+        self.settings["language"] = lang
         save_settings(self.settings)
 
     def start_recording(self, serial: str, light: bool = False) -> str:
@@ -668,15 +756,23 @@ class MirrorManager:
         return target
 
     def start_device(self, serial: str) -> bool:
-        """Lanca manualmente o espelhamento de um aparelho ja detectado (botao 'Iniciar')."""
+        """Lanca manualmente o espelhamento de um aparelho ja detectado (botao 'Iniciar').
+
+        Escolhe o monitor com MENOS aparelhos abertos no momento (o principal
+        desempata primeiro, por ser o [0]) - com um so monitor conectado, isso
+        sempre escolhe o mesmo, entao o comportamento antigo (so um monitor)
+        continua identico.
+        """
         if serial in self.active:
             return True
         fallback = self.model_cache.get(serial, f"Device_{serial[-4:]}")
+        monitor_idx = min(range(len(self.slot_managers)), key=lambda i: len(self.slot_managers[i].used))
+        slots = self.slot_managers[monitor_idx]
         if AUTO_ARRANGE_WINDOWS:
-            self.slots.ensure_capacity(len(self.active) + 1)
+            slots.ensure_capacity(len(slots.used) + 1)
         flags = self.resolve_flags(serial, fallback)
-        new_dev = launch_device(serial, fallback, self.slots, self.used_ports, flags,
-                                 self.stay_awake, self.recording.get(serial))
+        new_dev = launch_device(serial, fallback, slots, self.used_ports, flags,
+                                 self.stay_awake, self.recording.get(serial), self.always_on_top, monitor_idx)
         if new_dev:
             self.active[serial] = new_dev
             self.model_cache[serial] = new_dev.model
@@ -690,13 +786,50 @@ class MirrorManager:
         dev = self.active.pop(serial, None)
         if not dev:
             return False
-        self.slots.release(dev.slot)
+        self.slot_managers[dev.monitor_idx].release(dev.slot)
         self.used_ports.discard(dev.port)
         graceful_stop(dev.proc)
         dev.log_fh.close()
         self.blocked.discard(serial)
         self.crash_counts.pop(serial, None)
         return True
+
+    def _scan_apk_events(self, dev: ActiveDevice) -> list[dict]:
+        """Le o que o scrcpy escreveu no proprio log desde a ultima verificacao
+        (tipo um "tail -f") e procura por linhas de push/instalacao de APK via
+        arrastar-e-soltar - isso ja acontece sozinho (recurso nativo do scrcpy),
+        mas em silencio total; sem isso, o usuario fica sem nenhum feedback ate
+        o icone aparecer (ou nao) no launcher do celular."""
+        try:
+            with open(dev.log_path, "r", encoding="utf-8", errors="replace") as f:
+                f.seek(dev.log_read_pos)
+                new_text = f.read()
+                dev.log_read_pos = f.tell()
+        except OSError:
+            return []
+
+        events = []
+        for line in new_text.splitlines():
+            m = _APK_INSTALLING_RE.match(line)
+            if m:
+                events.append({"type": "apk_installing", "model": dev.model, "name": Path(m.group(1)).name})
+                continue
+            m = _APK_INSTALLED_RE.match(line)
+            if m:
+                events.append({"type": "apk_installed", "model": dev.model, "name": Path(m.group(1)).name})
+                continue
+            m = _APK_INSTALL_FAILED_RE.match(line)
+            if m:
+                events.append({"type": "apk_install_failed", "model": dev.model, "name": Path(m.group(1)).name})
+                continue
+            m = _APK_PUSHING_RE.match(line)
+            if m:
+                events.append({"type": "apk_pushing", "model": dev.model, "name": Path(m.group(1)).name})
+                continue
+            m = _APK_PUSH_FAILED_RE.match(line)
+            if m:
+                events.append({"type": "apk_push_failed", "model": dev.model, "name": Path(m.group(1)).name})
+        return events
 
     def tick(self) -> list[dict]:
         """Uma rodada de verificacao. Devolve a lista de eventos ocorridos nesta rodada."""
@@ -718,7 +851,7 @@ class MirrorManager:
 
         for serial, st in problems.items():
             if self.last_problems.get(serial) != st:
-                events.append({"type": "problem", "serial": serial, "state": st, "hint": problem_hint(st)})
+                events.append({"type": "problem", "serial": serial, "state": st})
                 logging.info("Estado de atencao: %s -> %s", serial, st)
         self.last_ready, self.last_problems = ready, problems
 
@@ -726,11 +859,12 @@ class MirrorManager:
         for serial in list(self.active.keys()):
             dev = self.active[serial]
             unplugged = serial not in ready
-            crashed = (not unplugged) and dev.proc.poll() is not None
+            returncode = None if unplugged else dev.proc.poll()
+            crashed = (not unplugged) and returncode is not None
             if not (unplugged or crashed):
                 continue
 
-            self.slots.release(dev.slot)
+            self.slot_managers[dev.monitor_idx].release(dev.slot)
             self.used_ports.discard(dev.port)
             dev.log_fh.close()
             del self.active[serial]
@@ -739,8 +873,21 @@ class MirrorManager:
                 logging.info("Desconectado: %s (%s)", dev.model, serial)
                 self.crash_counts.pop(serial, None)
                 self.blocked.discard(serial)
+            elif returncode == 0:
+                # codigo 0 = "Normal program termination" (documentado no --help
+                # do scrcpy) - e o que ele devolve quando fecha por WM_CLOSE, seja
+                # o nosso graceful_stop() OU o usuario clicando no X da PROPRIA
+                # janela do scrcpy (fora do painel). Sem essa checagem, fechar a
+                # janela manualmente virava um "crash" pro motor, que tentava
+                # reconectar sozinho sem parar - abrindo de novo toda vez que o
+                # usuario fechava, num loop infinito.
+                logging.info("Janela fechada (fora do painel): %s (%s)", dev.model, serial)
+                self.crash_counts.pop(serial, None)
+                self.blocked.discard(serial)
+                events.append({"type": "closed_by_user", "serial": serial, "model": dev.model})
+                continue
             else:
-                logging.warning("scrcpy caiu: %s (%s) codigo=%s", dev.model, serial, dev.proc.poll())
+                logging.warning("scrcpy caiu: %s (%s) codigo=%s", dev.model, serial, returncode)
 
             # nao avisa na hora - guarda pra tentar reconectar sozinho, em silencio,
             # algumas vezes primeiro (ver bloco logo abaixo). Cabo com mau contato
@@ -752,6 +899,10 @@ class MirrorManager:
                 # contra o aparelho do que uma que morre logo de cara toda vez
                 "long_uptime": (time.monotonic() - dev.started_at) > 10,
             }
+
+        # --- progresso de instalacao de APK via arrastar-e-soltar (recurso do scrcpy) ---
+        for dev in self.active.values():
+            events.extend(self._scan_apk_events(dev))
 
         # --- tentativas silenciosas de reconexao, antes de avisar o usuario ---
         for serial, entry in list(self.pending_reconnect.items()):
@@ -819,8 +970,9 @@ class MirrorManager:
                 status = "ready"
             rows[serial] = {
                 "model": self.model_cache.get(serial, serial),
+                "display_name": self.display_name(serial),
                 "status": status,
-                "hint": problem_hint(self.last_problems[serial]) if serial in self.last_problems else None,
+                "problem_state": self.last_problems.get(serial),
                 "port": self.active[serial].port if serial in self.active else None,
                 "recording": serial in self.recording,
                 "recording_seconds": (time.monotonic() - self.recording_started_at[serial])
