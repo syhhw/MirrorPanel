@@ -1,0 +1,71 @@
+MirrorPanel - Terms of Use
+
+This program is provided for personal use mirroring and recording the
+screen of Android devices connected via USB or Wi-Fi. By proceeding
+with the installation and accepting this agreement, you confirm that
+you have read and agree to the terms below.
+
+1. NO WARRANTY
+
+MirrorPanel is provided "as is" and "as available", without warranty
+of any kind, express or implied, including, without limitation, any
+warranties of title, non-infringement, merchantability, or fitness
+for a particular purpose. This includes no warranty that the program
+will operate error-free, uninterrupted, or will be compatible with
+any specific device or version of Android. Use of the program is at
+your own risk.
+
+2. LIMITATION OF LIABILITY
+
+To the maximum extent permitted by applicable law, the author of
+MirrorPanel shall not be liable for any direct, indirect, incidental,
+special, or consequential damages arising out of the use or inability
+to use the program - including, without limitation, data loss,
+failure or corruption of a recording, or any issue with the mirrored
+device. This limitation applies even if the author has been advised
+of the possibility of such damages.
+
+3. AUTHORIZED USE
+
+MirrorPanel must only be used on devices that you own or for which
+you have the explicit authorization of the owner or person
+responsible for the device to access, mirror, or record its screen.
+Using the program to mirror, record, or monitor another person's
+device without their express and informed consent is prohibited.
+
+You are solely responsible for complying with applicable privacy and
+device-monitoring laws in your jurisdiction. The author of
+MirrorPanel is not responsible for misuse of the program by third
+parties.
+
+4. PRIVACY
+
+MirrorPanel does not collect, store, or transmit usage data,
+telemetry, or any information about the mirrored device. The only
+network request the program makes on its own is checking for new
+versions through the project's public releases on GitHub - this
+check does not send any data about the connected device, the
+mirrored screen, or recorded files.
+
+Mirroring and recording happen locally, directly between the phone
+and the computer (over a USB cable or the local Wi-Fi network); no
+video or audio passes through servers operated by the author or any
+third party. Recordings and screenshots are saved only on the user's
+computer, in the Videos\MirrorPanel Media folder.
+
+5. THIRD-PARTY COMPONENTS
+
+MirrorPanel uses and distributes the following third-party
+components:
+
+  - scrcpy (Genymobile / Romain Vimont) - licensed under the
+    Apache License 2.0
+    https://github.com/Genymobile/scrcpy
+
+  - Android Debug Bridge (adb) - Android Open Source Project,
+    licensed under the Apache License 2.0
+
+MirrorPanel's own code is also distributed under the Apache License
+2.0 - see the project's GitHub repository for the full license text.
+
+Copyright (c) 2026 syhhw

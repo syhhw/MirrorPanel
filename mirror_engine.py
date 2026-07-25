@@ -69,7 +69,7 @@ def bin_dir() -> Path:
     (sys._MEIPASS) que o bootloader recria a cada execucao com os binarios embutidos."""
     if getattr(sys, "frozen", False):
         return Path(getattr(sys, "_MEIPASS", sys.executable))
-    return Path(__file__).resolve().parent
+    return Path(__file__).resolve().parent / "bin"
 
 
 def _videos_dir() -> Path:
@@ -143,6 +143,32 @@ def save_settings(data: dict):
         SETTINGS_PATH.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
     except Exception:
         logging.exception("Falha ao salvar settings.json")
+
+
+INSTALLER_LANGUAGE_MARKER = SCRIPT_DIR / "installer_language.marker"
+
+
+def apply_installer_language_marker():
+    """O instalador (installer.iss) grava esse marcador TODA vez que roda -
+    instalacao nova ou reinstalacao/atualizacao por cima de uma ja existente -
+    com o idioma escolhido na propria tela do instalador. Chamado uma vez no
+    inicio do programa, antes de i18n.init_language(): mescla o idioma dentro
+    do settings.json de verdade (sem apagar apelidos, Wi-Fi salvo ou qualquer
+    outra preferencia ja gravada) e apaga o marcador em seguida - assim a
+    escolha feita AGORA no instalador sempre vale a partir da proxima
+    abertura, mesmo reinstalando por cima de um settings.json com uso
+    acumulado (o motivo de uma versao anterior desse mesmo mecanismo so
+    funcionar na primeira instalacao e ignorar reinstalacoes)."""
+    if not INSTALLER_LANGUAGE_MARKER.exists():
+        return
+    try:
+        lang = INSTALLER_LANGUAGE_MARKER.read_text(encoding="utf-8").strip()
+        if lang in ("pt", "en"):
+            settings = load_settings()
+            settings["language"] = lang
+            save_settings(settings)
+    finally:
+        INSTALLER_LANGUAGE_MARKER.unlink(missing_ok=True)
 
 
 def build_flags(device_settings: dict) -> str:
@@ -875,12 +901,13 @@ class MirrorManager:
                 self.blocked.discard(serial)
             elif returncode == 0:
                 # codigo 0 = "Normal program termination" (documentado no --help
-                # do scrcpy) - e o que ele devolve quando fecha por WM_CLOSE, seja
-                # o nosso graceful_stop() OU o usuario clicando no X da PROPRIA
-                # janela do scrcpy (fora do painel). Sem essa checagem, fechar a
-                # janela manualmente virava um "crash" pro motor, que tentava
-                # reconectar sozinho sem parar - abrindo de novo toda vez que o
-                # usuario fechava, num loop infinito.
+                # do scrcpy) - e o que ele devolve ao fechar por WM_CLOSE. O botao
+                # "Parar" do painel nunca cai aqui (stop_device ja tira o aparelho
+                # de self.active na hora); isso so acontece quando o USUARIO fecha
+                # a janela do scrcpy pelo proprio X, fora do painel. Sem essa
+                # checagem, fechar a janela manualmente virava um "crash" pro
+                # motor, que tentava reconectar sozinho sem parar - abrindo de
+                # novo toda vez que o usuario fechava, num loop infinito.
                 logging.info("Janela fechada (fora do painel): %s (%s)", dev.model, serial)
                 self.crash_counts.pop(serial, None)
                 self.blocked.discard(serial)

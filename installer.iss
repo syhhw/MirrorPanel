@@ -3,7 +3,7 @@
 ; depois de rodar o PyInstaller em modo --onedir (pasta dist\MirrorPanel).
 
 #define MyAppName "MirrorPanel"
-#define MyAppVersion "1.2.0"
+#define MyAppVersion "1.2.0-1"
 #define MyAppPublisher "MirrorPanel"
 #define MyAppExeName "MirrorPanel.exe"
 ; Pasta gerada pelo PyInstaller --onedir (troque se o seu caminho for diferente)
@@ -25,10 +25,10 @@ AllowNoIcons=yes
 ; imensa maioria dos usuarios nao sabe (nem precisa) responder.
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=commandline
-LicenseFile=TERMOS_INSTALADOR.txt
+LicenseFile=installer\TERMOS_INSTALADOR.txt
 OutputDir=installer_output
 OutputBaseFilename=MirrorPanel-Setup
-SetupIconFile=mirrorpanel.ico
+SetupIconFile=installer\mirrorpanel.ico
 UninstallDisplayIcon={app}\{#MyAppExeName}
 Compression=lzma
 SolidCompression=yes
@@ -39,8 +39,12 @@ DisableProgramGroupPage=yes
 [Languages]
 ; Portugues listado primeiro = idioma padrao/pre-selecionado na tela de escolha.
 ; Com mais de um idioma aqui, o Inno Setup mostra essa tela sozinho, sem codigo extra.
-Name: "brazilianportuguese"; MessagesFile: "compiler:Languages\BrazilianPortuguese.isl"
-Name: "english"; MessagesFile: "compiler:Default.isl"
+; LicenseFile por idioma - sem isso, o texto dos Termos de Uso ficava sempre em
+; portugues mesmo escolhendo English na tela de idioma (so a INTERFACE do
+; instalador - Next/Cancel etc. - seguia o idioma escolhido; o LicenseFile do
+; [Setup] e um arquivo fixo unico, a menos que cada idioma sobrescreva o dele).
+Name: "brazilianportuguese"; MessagesFile: "compiler:Languages\BrazilianPortuguese.isl"; LicenseFile: "installer\TERMOS_INSTALADOR.txt"
+Name: "english"; MessagesFile: "compiler:Default.isl"; LicenseFile: "installer\TERMOS_INSTALADOR_EN.txt"
 
 [Tasks]
 ; Caixa de selecao "Criar atalho na Area de Trabalho" (desmarcada = usuario decide)
@@ -66,3 +70,34 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: de
 ; justamente na atualizacao silenciosa que precisamos reabrir o programa
 ; sozinho (sem isso, o usuario tinha que abrir manualmente depois de atualizar).
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#MyAppName}}"; Flags: nowait postinstall
+
+[Code]
+// Liga o idioma escolhido no PROPRIO instalador ao idioma inicial do programa -
+// antes os dois eram totalmente independentes (o instalador so usava a escolha
+// pra si mesmo - assistente, Termos de Uso - e o programa sempre detectava o
+// idioma do Windows sozinho, ignorando o que foi escolhido aqui).
+//
+// NAO escreve direto em settings.json (uma tentativa anterior fazia isso, e
+// so o gerava se ele ainda nao existisse - o que soava seguro, mas na pratica
+// significava que so a PRIMEIRA instalacao aplicava a escolha; reinstalar por
+// cima, que e o caso normal, sempre ignorava o idioma escolhido aqui). Em vez
+// disso, grava so um marcador simples - o proprio programa (mirror_engine.py,
+// apply_installer_language_marker) le esse arquivo, MESCLA o idioma dentro do
+// settings.json de verdade (sem apagar apelidos/Wi-Fi salvos/outras
+// preferencias ja gravadas) e apaga o marcador em seguida. Grava TODA vez que
+// o instalador roda (instalacao nova ou reinstalacao) - a pessoa esta
+// escolhendo o idioma na tela agora mesmo, entao a escolha de agora e a que
+// vale, mesmo numa reinstalacao.
+procedure CurStepChanged(CurStep: TSetupStep);
+var
+  LangCode: string;
+begin
+  if CurStep = ssPostInstall then
+  begin
+    if ActiveLanguage = 'brazilianportuguese' then
+      LangCode := 'pt'
+    else
+      LangCode := 'en';
+    SaveStringToFile(ExpandConstant('{app}\installer_language.marker'), LangCode, False);
+  end;
+end;

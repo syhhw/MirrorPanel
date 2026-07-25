@@ -232,6 +232,65 @@ class ClosedByUserVsCrashTest(unittest.TestCase):
         self.assertEqual(self.mgr.pending_reconnect, {})
 
 
+class ApplyInstallerLanguageMarkerTest(unittest.TestCase):
+    """Regressao: o instalador grava um marcador com o idioma escolhido na
+    propria tela dele TODA vez que roda (instalacao nova ou reinstalacao).
+    Uma versao anterior gravava o idioma direto em settings.json, e so se ele
+    ainda nao existisse - o que na pratica significava que so a PRIMEIRA
+    instalacao aplicava a escolha, e reinstalar por cima (o caso comum, ja
+    que o usuario tem uso acumulado) sempre ignorava o idioma escolhido."""
+
+    def setUp(self):
+        self.tmpdir = tempfile.TemporaryDirectory()
+        self.settings_path = Path(self.tmpdir.name) / "settings.json"
+        self.marker_path = Path(self.tmpdir.name) / "installer_language.marker"
+        self.patches = [
+            patch.object(engine, "SETTINGS_PATH", self.settings_path),
+            patch.object(engine, "INSTALLER_LANGUAGE_MARKER", self.marker_path),
+        ]
+        for p in self.patches:
+            p.start()
+
+    def tearDown(self):
+        for p in self.patches:
+            p.stop()
+        self.tmpdir.cleanup()
+
+    def test_no_marker_is_a_no_op(self):
+        engine.apply_installer_language_marker()
+        self.assertFalse(self.settings_path.exists())
+
+    def test_fresh_install_writes_language_and_deletes_marker(self):
+        self.marker_path.write_text("en", encoding="utf-8")
+        engine.apply_installer_language_marker()
+        self.assertFalse(self.marker_path.exists())
+        self.assertEqual(engine.load_settings()["language"], "en")
+
+    def test_reinstall_over_existing_settings_updates_language_without_erasing_the_rest(self):
+        """O cerne do bug relatado ao vivo: reinstalar (settings.json ja
+        existente, com apelidos/Wi-Fi de uso real) tem que aplicar o idioma
+        novo escolhido no instalador SEM apagar o resto do que ja tinha."""
+        self.settings_path.write_text(
+            '{"language": "pt", "nicknames": {"SERIAL1": "Meu celular"}, "wifi_devices": ["192.168.0.10:5555"]}',
+            encoding="utf-8",
+        )
+        self.marker_path.write_text("en", encoding="utf-8")
+
+        engine.apply_installer_language_marker()
+
+        self.assertFalse(self.marker_path.exists())
+        settings = engine.load_settings()
+        self.assertEqual(settings["language"], "en")
+        self.assertEqual(settings["nicknames"], {"SERIAL1": "Meu celular"})
+        self.assertEqual(settings["wifi_devices"], ["192.168.0.10:5555"])
+
+    def test_invalid_marker_content_is_ignored_but_still_deleted(self):
+        self.marker_path.write_text("lixo", encoding="utf-8")
+        engine.apply_installer_language_marker()
+        self.assertFalse(self.marker_path.exists())
+        self.assertFalse(self.settings_path.exists())
+
+
 class SnapshotProblemStateTest(unittest.TestCase):
     """mirror_engine.py nao sabe de idioma nenhum - snapshot() precisa devolver
     o ESTADO cru do adb (quem traduz pra uma dica legivel e o painel, em
