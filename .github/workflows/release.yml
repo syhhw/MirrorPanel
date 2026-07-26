@@ -1,0 +1,94 @@
+name: Release
+
+# Dispara so quando uma tag vX.Y.Z (ou vX.Y.Z-N, padrao ja usado neste
+# projeto) e enviada - "git tag v1.3.0 && git push origin v1.3.0" e o unico
+# passo manual que sobra; o resto (build, instalador, release) e tudo aqui.
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write # gh release create precisa disso pra publicar
+
+env:
+  # Versao EXATA do scrcpy empacotada e testada - nao e "latest" de proposito.
+  # mirror_engine.py depende do formato exato do log dessa versao (deteccao
+  # de instalacao de APK via arrastar-e-soltar, codigos de saida etc.) -
+  # trocar aqui sem testar contra um aparelho real de verdade pode quebrar
+  # silenciosamente esses regex.
+  SCRCPY_VERSION: "4.0"
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configura Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: "pip"
+
+      - name: Instala dependencias
+        run: |
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Roda a suite de testes (nao builda nem publica nada se falhar)
+        run: python -m unittest discover -s tests -v
+
+      - name: Baixa scrcpy/adb (binarios de terceiros - nao versionados no repo)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $url = "https://github.com/Genymobile/scrcpy/releases/download/v$env:SCRCPY_VERSION/scrcpy-win64-v$env:SCRCPY_VERSION.zip"
+          Invoke-WebRequest -Uri $url -OutFile scrcpy.zip
+          Expand-Archive -Path scrcpy.zip -DestinationPath scrcpy-extracted
+          New-Item -ItemType Directory -Force -Path bin | Out-Null
+          $src = "scrcpy-extracted\scrcpy-win64-v$env:SCRCPY_VERSION"
+          Copy-Item "$src\adb.exe", "$src\AdbWinApi.dll", "$src\AdbWinUsbApi.dll", "$src\scrcpy.exe", "$src\scrcpy-server", "$src\SDL3.dll", "$src\avcodec-62.dll", "$src\avformat-62.dll", "$src\avutil-60.dll", "$src\swresample-6.dll", "$src\libusb-1.0.dll", "$src\scrcpy.png", "$src\disconnected.png" -Destination bin\
+
+      - name: Escreve a versao da tag em updater.py e installer.iss
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $version = "${{ github.ref_name }}" -replace '^v', ''
+          (Get-Content mirrorpanel\updater.py) -replace 'APP_VERSION = "[^"]*"', "APP_VERSION = `"$version`"" | Set-Content mirrorpanel\updater.py
+          (Get-Content installer\installer.iss) -replace '#define MyAppVersion "[^"]*"', "#define MyAppVersion `"$version`"" | Set-Content installer\installer.iss
+          Write-Host "Versao aplicada: $version"
+
+      - name: Gera o dist com o PyInstaller
+        run: >
+          pyinstaller mirrorpanel\__main__.py --name MirrorPanel --onedir --windowed --noconfirm --clean
+          --paths .
+          --icon installer\mirrorpanel.ico
+          --add-binary "bin\adb.exe;."
+          --add-binary "bin\AdbWinApi.dll;."
+          --add-binary "bin\AdbWinUsbApi.dll;."
+          --add-binary "bin\scrcpy.exe;."
+          --add-binary "bin\scrcpy-server;."
+          --add-binary "bin\SDL3.dll;."
+          --add-binary "bin\avcodec-62.dll;."
+          --add-binary "bin\avformat-62.dll;."
+          --add-binary "bin\avutil-60.dll;."
+          --add-binary "bin\swresample-6.dll;."
+          --add-binary "bin\libusb-1.0.dll;."
+          --add-binary "bin\scrcpy.png;."
+          --add-binary "bin\disconnected.png;."
+          --collect-data sv_ttk
+          --distpath dist --workpath build
+
+      - name: Compila o instalador (Inno Setup, ja vem na imagem do runner)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $iscc = Get-Command ISCC.exe -ErrorAction SilentlyContinue
+          if ($iscc) { $isccPath = $iscc.Source } else { $isccPath = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" }
+          & $isccPath installer\installer.iss
+
+      - name: Publica a release no GitHub com o instalador anexado
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${{ github.ref_name }}" installer_output\MirrorPanel-Setup.exe --title "MirrorPanel ${{ github.ref_name }}" --generate-notes
