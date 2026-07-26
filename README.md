@@ -1,5 +1,7 @@
 # MirrorPanel
 
+![MirrorPanel espelhando um celular Android](docs/screenshot.png)
+
 Painel para gerenciar o espelhamento e a gravação de vários aparelhos Android ao mesmo tempo, usando [scrcpy](https://github.com/Genymobile/scrcpy) e o ADB por baixo dos panos — sem precisar mexer em linha de comando.
 
 [![Baixar MirrorPanel](https://img.shields.io/badge/Baixar-MirrorPanel--Setup.exe-1f6feb?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/syhhw/MirrorPanel/releases/latest/download/MirrorPanel-Setup.exe)
