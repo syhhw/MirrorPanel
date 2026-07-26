@@ -7,7 +7,9 @@
 #define MyAppPublisher "MirrorPanel"
 #define MyAppExeName "MirrorPanel.exe"
 ; Pasta gerada pelo PyInstaller --onedir (troque se o seu caminho for diferente)
-#define MyDistDir "dist\MirrorPanel"
+; Caminhos daqui pra baixo sao relativos a ESTE arquivo (dentro de installer/agora) -
+; dist/ e installer_output/ continuam na raiz do projeto, por isso o "..\".
+#define MyDistDir "..\dist\MirrorPanel"
 
 [Setup]
 AppId={{7C1B2F1A-9B3E-4E5A-9B0E-4C6D6A1B7E10}}
@@ -25,10 +27,10 @@ AllowNoIcons=yes
 ; imensa maioria dos usuarios nao sabe (nem precisa) responder.
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=commandline
-LicenseFile=installer\TERMOS_INSTALADOR.txt
-OutputDir=installer_output
+LicenseFile=TERMOS_INSTALADOR.txt
+OutputDir=..\installer_output
 OutputBaseFilename=MirrorPanel-Setup
-SetupIconFile=installer\mirrorpanel.ico
+SetupIconFile=mirrorpanel.ico
 UninstallDisplayIcon={app}\{#MyAppExeName}
 Compression=lzma
 SolidCompression=yes
@@ -43,8 +45,8 @@ DisableProgramGroupPage=yes
 ; portugues mesmo escolhendo English na tela de idioma (so a INTERFACE do
 ; instalador - Next/Cancel etc. - seguia o idioma escolhido; o LicenseFile do
 ; [Setup] e um arquivo fixo unico, a menos que cada idioma sobrescreva o dele).
-Name: "brazilianportuguese"; MessagesFile: "compiler:Languages\BrazilianPortuguese.isl"; LicenseFile: "installer\TERMOS_INSTALADOR.txt"
-Name: "english"; MessagesFile: "compiler:Default.isl"; LicenseFile: "installer\TERMOS_INSTALADOR_EN.txt"
+Name: "brazilianportuguese"; MessagesFile: "compiler:Languages\BrazilianPortuguese.isl"; LicenseFile: "TERMOS_INSTALADOR.txt"
+Name: "english"; MessagesFile: "compiler:Default.isl"; LicenseFile: "TERMOS_INSTALADOR_EN.txt"
 
 [Tasks]
 ; Caixa de selecao "Criar atalho na Area de Trabalho" (desmarcada = usuario decide)

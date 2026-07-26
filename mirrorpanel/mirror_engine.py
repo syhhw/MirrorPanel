@@ -61,7 +61,7 @@ def app_dir() -> Path:
     entre execucoes (a pasta de extracao do onefile e temporaria e some ao fechar)."""
     if getattr(sys, "frozen", False):
         return Path(sys.executable).resolve().parent
-    return Path(__file__).resolve().parent
+    return Path(__file__).resolve().parent.parent  # mirrorpanel/mirror_engine.py -> raiz do projeto
 
 
 def bin_dir() -> Path:
@@ -69,7 +69,7 @@ def bin_dir() -> Path:
     (sys._MEIPASS) que o bootloader recria a cada execucao com os binarios embutidos."""
     if getattr(sys, "frozen", False):
         return Path(getattr(sys, "_MEIPASS", sys.executable))
-    return Path(__file__).resolve().parent / "bin"
+    return Path(__file__).resolve().parent.parent / "bin"
 
 
 def _videos_dir() -> Path:
