@@ -11,7 +11,7 @@ from unittest.mock import MagicMock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import mirror_engine as engine
+from mirrorpanel import mirror_engine as engine
 
 
 class SlotManagerTest(unittest.TestCase):

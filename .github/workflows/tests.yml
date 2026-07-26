@@ -1,0 +1,27 @@
+name: Testes
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    # winreg, ctypes.windll e outras APIs do Windows sao usadas direto no
+    # codigo (mirror_engine.py, panel.py) - so roda em runner Windows, o
+    # padrao ubuntu-latest quebraria na primeira linha de import.
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configura Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: "pip"
+
+      - name: Instala dependencias
+        run: pip install -r requirements.txt
+
+      - name: Roda a suite de testes
+        run: python -m unittest discover -s tests -v

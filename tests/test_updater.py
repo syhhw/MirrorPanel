@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import updater
+from mirrorpanel import updater
 
 
 class ParseVersionTest(unittest.TestCase):
@@ -41,44 +41,44 @@ class CheckForUpdateDetailedTest(unittest.TestCase):
         resp.raise_for_status.return_value = None
         return resp
 
-    @patch("updater.requests.get")
+    @patch("mirrorpanel.updater.requests.get")
     def test_update_available(self, mock_get):
         mock_get.return_value = self._mock_response({
             "tag_name": "v99.0.0",
             "body": "novidades",
             "assets": [{"name": "MirrorPanel-Setup.exe", "browser_download_url": "http://x/y.exe", "size": 12345}],
         })
-        with patch("updater.APP_VERSION", "1.0.0"):
+        with patch("mirrorpanel.updater.APP_VERSION", "1.0.0"):
             result = updater.check_for_update_detailed()
         self.assertEqual(result["status"], "update")
         self.assertEqual(result["info"]["version"], "v99.0.0")
         self.assertEqual(result["info"]["size"], 12345)
 
-    @patch("updater.requests.get")
+    @patch("mirrorpanel.updater.requests.get")
     def test_already_current(self, mock_get):
         mock_get.return_value = self._mock_response({"tag_name": "v0.0.1", "assets": []})
-        with patch("updater.APP_VERSION", "99.0.0"):
+        with patch("mirrorpanel.updater.APP_VERSION", "99.0.0"):
             result = updater.check_for_update_detailed()
         self.assertEqual(result["status"], "current")
         self.assertIsNone(result["info"])
 
-    @patch("updater.requests.get")
+    @patch("mirrorpanel.updater.requests.get")
     def test_network_failure_is_swallowed_not_raised(self, mock_get):
         mock_get.side_effect = Exception("sem internet")
         result = updater.check_for_update_detailed()
         self.assertEqual(result["status"], "error")
         self.assertIsNone(result["info"])
 
-    @patch("updater.requests.get")
+    @patch("mirrorpanel.updater.requests.get")
     def test_no_exe_asset_is_error(self, mock_get):
         mock_get.return_value = self._mock_response({
             "tag_name": "v99.0.0", "assets": [{"name": "readme.txt", "browser_download_url": "http://x"}],
         })
-        with patch("updater.APP_VERSION", "1.0.0"):
+        with patch("mirrorpanel.updater.APP_VERSION", "1.0.0"):
             result = updater.check_for_update_detailed()
         self.assertEqual(result["status"], "error")
 
-    @patch("updater.requests.get")
+    @patch("mirrorpanel.updater.requests.get")
     def test_missing_tag_is_error(self, mock_get):
         mock_get.return_value = self._mock_response({"assets": []})
         result = updater.check_for_update_detailed()
@@ -90,7 +90,7 @@ class DownloadUpdateTest(unittest.TestCase):
     realmente chegou - antes, um download truncado (conexao caiu no meio)
     virava "sucesso" so por nao ter lancado excecao."""
 
-    @patch("updater.requests.get")
+    @patch("mirrorpanel.updater.requests.get")
     def test_size_mismatch_fails_and_deletes_partial_file(self, mock_get):
         resp = MagicMock()
         resp.raise_for_status.return_value = None
@@ -104,7 +104,7 @@ class DownloadUpdateTest(unittest.TestCase):
             self.assertFalse(ok)
             self.assertFalse(os.path.exists(dest))
 
-    @patch("updater.requests.get")
+    @patch("mirrorpanel.updater.requests.get")
     def test_matching_size_succeeds(self, mock_get):
         payload = b"x" * 100
         resp = MagicMock()
@@ -120,7 +120,7 @@ class DownloadUpdateTest(unittest.TestCase):
             with open(dest, "rb") as f:
                 self.assertEqual(f.read(), payload)
 
-    @patch("updater.requests.get")
+    @patch("mirrorpanel.updater.requests.get")
     def test_no_expected_size_skips_check(self, mock_get):
         """Se a API nao informou tamanho nenhum (expected_size=0), nao ha o
         que conferir - continua funcionando como antes."""
@@ -156,7 +156,7 @@ class ApplyUpdateAndRestartTest(unittest.TestCase):
             result = updater.apply_update_and_restart(fake)
         self.assertEqual(result[0], "error.installer_missing")
 
-    @patch("updater.subprocess.Popen")
+    @patch("mirrorpanel.updater.subprocess.Popen")
     def test_popen_failure_returns_error_tuple(self, mock_popen):
         mock_popen.side_effect = OSError("arquivo nao executavel")
         with tempfile.TemporaryDirectory() as tmp:
@@ -167,8 +167,8 @@ class ApplyUpdateAndRestartTest(unittest.TestCase):
         self.assertEqual(result[0], "error.installer_start_failed")
         self.assertIn("arquivo nao executavel", result[1]["error"])
 
-    @patch("updater.time.sleep")
-    @patch("updater.subprocess.Popen")
+    @patch("mirrorpanel.updater.time.sleep")
+    @patch("mirrorpanel.updater.subprocess.Popen")
     def test_installer_immediate_nonzero_exit_returns_error_tuple(self, mock_popen, mock_sleep):
         proc = MagicMock()
         proc.poll.return_value = 1

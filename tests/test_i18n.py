@@ -7,7 +7,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import i18n
+from mirrorpanel import i18n
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
@@ -60,7 +60,7 @@ class PanelUsesOnlyRealKeysTest(unittest.TestCase):
     sem precisar abrir a interface manualmente pra notar que o texto sumiu."""
 
     def test_all_translation_keys_used_in_panel_exist(self):
-        source = (PROJECT_ROOT / "panel.py").read_text(encoding="utf-8")
+        source = (PROJECT_ROOT / "mirrorpanel" / "panel.py").read_text(encoding="utf-8")
         # \b antes do "t" e essencial - sem isso, "insert(", "get(", "int(" etc
         # tambem "combinam" (a busca acha o "t(" no fim desses nomes), gerando
         # um monte de falso positivo que nao tem nada a ver com i18n.t(...)

@@ -17,11 +17,11 @@ import pystray
 import sv_ttk
 from PIL import ImageTk
 
-import icons
-import i18n
-import mirror_engine as engine
-import updater
-from i18n import t
+from mirrorpanel import icons
+from mirrorpanel import i18n
+from mirrorpanel import mirror_engine as engine
+from mirrorpanel import updater
+from mirrorpanel.i18n import t
 
 # Fonte padrao do app inteiro - Segoe UI e a fonte de sistema do Windows 10/11
 # (limpa, sans-serif, ja instalada em qualquer maquina - sem depender de nada externo)
@@ -1430,7 +1430,3 @@ def main():
     root = tk.Tk()
     App(root)
     root.mainloop()
-
-
-if __name__ == "__main__":
-    main()
