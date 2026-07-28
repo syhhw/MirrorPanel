@@ -2,10 +2,12 @@
 
 Roda com: python -m unittest discover -s tests   (a partir da raiz do projeto)
 """
+import subprocess
 import sys
 import tempfile
 import time
 import unittest
+import zipfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -119,6 +121,16 @@ class ApkLogScanTest(unittest.TestCase):
         self.assertTrue(all(e["name"] == "app.apk" for e in events))
         self.assertTrue(all(e["model"] == "TestPhone" for e in events))
 
+    def test_full_push_flow_generic_file(self):
+        """Mesmo fluxo do teste acima, mas pro caminho de PUSH generico (arquivo
+        que nao e .apk) - o unico que faltava um evento de conclusao."""
+        dev = self._dev()
+        self._append("INFO: Pushing app.xapk...\n"
+                      "INFO: app.xapk successfully pushed to /sdcard/Download/app.xapk\n")
+        events = self.mgr._scan_apk_events(dev)
+        self.assertEqual([e["type"] for e in events], ["apk_pushing", "apk_pushed"])
+        self.assertTrue(all(e["name"] == "app.xapk" for e in events))
+
     def test_no_duplicate_events_on_rescan(self):
         dev = self._dev()
         self._append("INFO: Pushing app.apk...\n")
@@ -146,6 +158,19 @@ class ApkLogScanTest(unittest.TestCase):
         events = self.mgr._scan_apk_events(dev)
         self.assertEqual(events, [{"type": "apk_push_failed", "model": "TestPhone", "name": "photo.png"}])
 
+    def test_generic_file_push_success(self):
+        """Regressao: a barra de progresso ficava presa pra sempre ao arrastar um
+        .xapk (ou qualquer arquivo que nao seja .apk) - o scrcpy loga o sucesso
+        do push como "X successfully pushed to Y" (confirmado direto no
+        codigo-fonte real dele, app/src/file_pusher.c), mas so existia regex
+        pro sucesso de INSTALACAO ("successfully installed"), nunca pro sucesso
+        de PUSH. O evento "comecou" (apk_pushing) chegava, o par "terminou"
+        nunca chegava, e a barra ficava girando pra sempre."""
+        dev = self._dev()
+        self._append("INFO: app.xapk successfully pushed to /sdcard/Download/app.xapk\n")
+        events = self.mgr._scan_apk_events(dev)
+        self.assertEqual(events, [{"type": "apk_pushed", "model": "TestPhone", "name": "app.xapk"}])
+
     def test_extracts_basename_from_path(self):
         dev = self._dev()
         self._append("INFO: Installing C:/Users/test/Downloads/meuapp.apk...\n")
@@ -156,6 +181,156 @@ class ApkLogScanTest(unittest.TestCase):
         dev = self._dev()
         self._append("INFO: Renderer: direct3d11\nINFO: Texture: 1080x2340\n")
         self.assertEqual(self.mgr._scan_apk_events(dev), [])
+
+
+class InstallOrPushToDeviceTest(unittest.TestCase):
+    """install_or_push_to_device e o passo de UM aparelho da transferencia em
+    lote (o laco pelos aparelhos ativos fica em panel.py, que chama isso pra
+    cada um) - decide instalar vs enviar so pela extensao do arquivo, igual o
+    scrcpy faz no arrastar-e-soltar nativo dele (confirmado direto no
+    codigo-fonte real do scrcpy, app/src/input_manager.c: is_apk() compara a
+    extensao exata via strcmp, nao so verifica se contem "apk")."""
+
+    def setUp(self):
+        self.mgr = engine.MirrorManager.__new__(engine.MirrorManager)
+
+    def _fake_result(self, returncode):
+        result = MagicMock()
+        result.returncode = returncode
+        return result
+
+    def test_apk_file_calls_install(self):
+        with patch.object(engine, "run_adb", return_value=self._fake_result(0)) as mock_run:
+            ok = self.mgr.install_or_push_to_device("SERIAL1", "C:/Users/test/app.apk")
+        self.assertTrue(ok)
+        mock_run.assert_called_once_with("-s", "SERIAL1", "install", "C:/Users/test/app.apk", timeout=120)
+
+    def test_non_apk_file_calls_push_to_download_folder(self):
+        """Qualquer extensao que nao seja .apk nem .xapk (essa tem tratamento
+        proprio - ver test_xapk_routes_to_install_xapk_to_device) vira push
+        generico, nunca install - senao o adb install rejeita o arquivo."""
+        with patch.object(engine, "run_adb", return_value=self._fake_result(0)) as mock_run:
+            ok = self.mgr.install_or_push_to_device("SERIAL1", "C:/Users/test/photo.png")
+        self.assertTrue(ok)
+        mock_run.assert_called_once_with(
+            "-s", "SERIAL1", "push", "C:/Users/test/photo.png", "/sdcard/Download/", timeout=120)
+
+    def test_extension_check_is_case_insensitive(self):
+        with patch.object(engine, "run_adb", return_value=self._fake_result(0)) as mock_run:
+            self.mgr.install_or_push_to_device("SERIAL1", "C:/Users/test/APP.APK")
+        self.assertIn("install", mock_run.call_args.args)
+
+    def test_nonzero_returncode_is_failure(self):
+        with patch.object(engine, "run_adb", return_value=self._fake_result(1)):
+            ok = self.mgr.install_or_push_to_device("SERIAL1", "app.apk")
+        self.assertFalse(ok)
+
+    def test_timeout_is_failure_not_exception(self):
+        with patch.object(engine, "run_adb",
+                           side_effect=subprocess.TimeoutExpired(cmd="adb", timeout=120)):
+            ok = self.mgr.install_or_push_to_device("SERIAL1", "app.apk")
+        self.assertFalse(ok)
+
+    def test_xapk_routes_to_install_xapk_to_device(self):
+        """install_or_push_to_device e so o roteador por extensao - a logica
+        de verdade do .xapk mora em install_xapk_to_device (testado a fundo
+        na classe abaixo); aqui so confere que o roteamento acontece."""
+        with patch.object(self.mgr, "install_xapk_to_device", return_value=True) as mock_xapk:
+            ok = self.mgr.install_or_push_to_device("SERIAL1", "app.xapk")
+        self.assertTrue(ok)
+        mock_xapk.assert_called_once_with("SERIAL1", "app.xapk")
+
+
+class InstallXapkToDeviceTest(unittest.TestCase):
+    """.xapk e um zip com o base.apk mais splits (idioma/densidade/abi) - so
+    "adb install" rejeita isso, precisa extrair e usar "adb install-multiple"
+    com todos os .apk de uma vez. Alguns .xapk (jogos grandes) tambem trazem
+    dados OBB em Android/obb/ dentro do zip."""
+
+    def setUp(self):
+        self.mgr = engine.MirrorManager.__new__(engine.MirrorManager)
+        self.tmpdir = tempfile.TemporaryDirectory()
+
+    def tearDown(self):
+        self.tmpdir.cleanup()
+
+    def _make_xapk(self, name="app.xapk", apks=("base.apk", "config.en.apk"), obb_files=None):
+        path = Path(self.tmpdir.name) / name
+        with zipfile.ZipFile(path, "w") as zf:
+            for apk_name in apks:
+                zf.writestr(apk_name, b"conteudo falso de apk")
+            for obb_path, content in (obb_files or {}).items():
+                zf.writestr(obb_path, content)
+        return str(path)
+
+    def _fake_result(self, returncode=0):
+        result = MagicMock()
+        result.returncode = returncode
+        return result
+
+    def test_install_multiple_called_with_all_apks(self):
+        xapk_path = self._make_xapk()
+        with patch.object(engine, "run_adb", return_value=self._fake_result(0)) as mock_run:
+            ok = self.mgr.install_xapk_to_device("SERIAL1", xapk_path)
+        self.assertTrue(ok)
+        call_args = mock_run.call_args_list[0].args
+        self.assertEqual(call_args[:3], ("-s", "SERIAL1", "install-multiple"))
+        self.assertIn("-r", call_args)
+        self.assertTrue(any(a.endswith("base.apk") for a in call_args))
+        self.assertTrue(any(a.endswith("config.en.apk") for a in call_args))
+
+    def test_no_apk_inside_is_failure(self):
+        path = Path(self.tmpdir.name) / "empty.xapk"
+        with zipfile.ZipFile(path, "w") as zf:
+            zf.writestr("manifest.json", b"{}")
+        with patch.object(engine, "run_adb") as mock_run:
+            ok = self.mgr.install_xapk_to_device("SERIAL1", str(path))
+        self.assertFalse(ok)
+        mock_run.assert_not_called()
+
+    def test_install_multiple_nonzero_returncode_is_failure(self):
+        xapk_path = self._make_xapk()
+        with patch.object(engine, "run_adb", return_value=self._fake_result(1)):
+            ok = self.mgr.install_xapk_to_device("SERIAL1", xapk_path)
+        self.assertFalse(ok)
+
+    def test_corrupt_zip_is_failure(self):
+        path = Path(self.tmpdir.name) / "corrupt.xapk"
+        path.write_bytes(b"isso nao e um zip de verdade")
+        with patch.object(engine, "run_adb") as mock_run:
+            ok = self.mgr.install_xapk_to_device("SERIAL1", str(path))
+        self.assertFalse(ok)
+        mock_run.assert_not_called()
+
+    def test_obb_data_is_pushed_after_successful_install(self):
+        xapk_path = self._make_xapk(obb_files={"Android/obb/com.example.app/main.1.obb": b"dados obb falsos"})
+        with patch.object(engine, "run_adb", return_value=self._fake_result(0)) as mock_run:
+            ok = self.mgr.install_xapk_to_device("SERIAL1", xapk_path)
+        self.assertTrue(ok)
+        push_calls = [c for c in mock_run.call_args_list if "push" in c.args]
+        self.assertEqual(len(push_calls), 1)
+        self.assertIn("/sdcard/Android/obb/com.example.app/", push_calls[0].args)
+
+    def test_obb_push_failure_does_not_undo_successful_install(self):
+        """OBB e complemento - se o app em si ja instalou certo, um timeout no
+        push do OBB nao pode fazer a instalacao inteira parecer que falhou."""
+        xapk_path = self._make_xapk(obb_files={"Android/obb/com.example.app/main.1.obb": b"x"})
+
+        def side_effect(*args, **kwargs):
+            if "install-multiple" in args:
+                return self._fake_result(0)
+            raise subprocess.TimeoutExpired(cmd="adb", timeout=180)
+
+        with patch.object(engine, "run_adb", side_effect=side_effect):
+            ok = self.mgr.install_xapk_to_device("SERIAL1", xapk_path)
+        self.assertTrue(ok)
+
+    def test_no_obb_folder_is_fine(self):
+        xapk_path = self._make_xapk()
+        with patch.object(engine, "run_adb", return_value=self._fake_result(0)) as mock_run:
+            ok = self.mgr.install_xapk_to_device("SERIAL1", xapk_path)
+        self.assertTrue(ok)
+        mock_run.assert_called_once()  # so a chamada de install-multiple, nenhum push
 
 
 class ClosedByUserVsCrashTest(unittest.TestCase):

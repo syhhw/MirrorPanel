@@ -12,8 +12,10 @@ import re
 import socket
 import subprocess
 import sys
+import tempfile
 import time
 import winreg
+import zipfile
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -111,6 +113,7 @@ CREATE_NO_WINDOW = 0x08000000  # evita que cada chamada ao adb/tasklist abra um 
 # log (que a gente ja grava em disco, so nunca lia de volta); essas expressoes
 # reconhecem essas linhas especificas pra transformar em eventos visiveis.
 _APK_PUSHING_RE = re.compile(r"^INFO: Pushing (.+)\.\.\.\s*$")
+_APK_PUSHED_RE = re.compile(r"^INFO: (.+) successfully pushed to .+$")
 _APK_PUSH_FAILED_RE = re.compile(r"^ERROR: Failed to push (.+?) to .+$")
 _APK_INSTALLING_RE = re.compile(r"^INFO: Installing (.+)\.\.\.\s*$")
 _APK_INSTALLED_RE = re.compile(r"^INFO: (.+) successfully installed\s*$")
@@ -781,6 +784,69 @@ class MirrorManager:
 
         return target
 
+    def install_or_push_to_device(self, serial: str, path: str) -> bool:
+        """Instala (.apk ou .xapk) ou envia (qualquer outro arquivo, pra
+        Download/) um arquivo escolhido no PROPRIO painel pra um aparelho -
+        ao contrario do arrastar-e-soltar (recurso nativo do scrcpy, so
+        funciona com um aparelho espelhando por vez, direto na janela dele,
+        e so sabe fazer push mesmo com um .xapk - ver install_xapk_to_device),
+        isso funciona em qualquer aparelho detectado, espelhando ou nao, e da
+        pra chamar em lote pra varios de uma vez (quem itera e o painel, ver
+        _dispatch_action em panel.py - esse metodo so faz UM aparelho por
+        chamada)."""
+        suffix = Path(path).suffix.lower()
+        if suffix == ".xapk":
+            return self.install_xapk_to_device(serial, path)
+        try:
+            if suffix == ".apk":
+                result = run_adb("-s", serial, "install", path, timeout=120)
+            else:
+                result = run_adb("-s", serial, "push", path, "/sdcard/Download/", timeout=120)
+            return result.returncode == 0
+        except subprocess.TimeoutExpired:
+            return False
+
+    def install_xapk_to_device(self, serial: str, path: str) -> bool:
+        """Instalacao de verdade de um .xapk - ele e um zip com o base.apk mais
+        APKs de split (idioma/densidade/abi etc), e um "adb install" comum
+        rejeita isso (nao e um .apk valido sozinho). Extrai pra uma pasta
+        temporaria, junta todos os .apk que achar e manda de uma vez soh com
+        "adb install-multiple" (unico jeito do Android aceitar varios APKs
+        como uma instalacao so). Se tiver dados OBB (jogos grandes costumam
+        ter, em Android/obb/ dentro do xapk), copia pra la tambem depois -
+        mas so como complemento: falha no OBB nao desfaz a instalacao do app,
+        que ja tinha dado certo antes."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            try:
+                with zipfile.ZipFile(path) as zf:
+                    zf.extractall(tmpdir)
+            except (zipfile.BadZipFile, OSError):
+                return False
+
+            apks = sorted(str(p) for p in Path(tmpdir).rglob("*.apk"))
+            if not apks:
+                return False
+
+            try:
+                result = run_adb("-s", serial, "install-multiple", "-r", *apks, timeout=180)
+            except subprocess.TimeoutExpired:
+                return False
+            if result.returncode != 0:
+                return False
+
+            obb_dir = Path(tmpdir) / "Android" / "obb"
+            if obb_dir.is_dir():
+                for package_dir in obb_dir.iterdir():
+                    if not package_dir.is_dir():
+                        continue
+                    try:
+                        run_adb("-s", serial, "push", str(package_dir),
+                                f"/sdcard/Android/obb/{package_dir.name}/", timeout=180)
+                    except subprocess.TimeoutExpired:
+                        pass
+
+            return True
+
     def start_device(self, serial: str) -> bool:
         """Lanca manualmente o espelhamento de um aparelho ja detectado (botao 'Iniciar').
 
@@ -851,6 +917,10 @@ class MirrorManager:
             m = _APK_PUSHING_RE.match(line)
             if m:
                 events.append({"type": "apk_pushing", "model": dev.model, "name": Path(m.group(1)).name})
+                continue
+            m = _APK_PUSHED_RE.match(line)
+            if m:
+                events.append({"type": "apk_pushed", "model": dev.model, "name": Path(m.group(1)).name})
                 continue
             m = _APK_PUSH_FAILED_RE.match(line)
             if m:

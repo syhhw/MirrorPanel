@@ -138,6 +138,39 @@ def edit(size: int = 16, color: str = "#57606a") -> Image.Image:
     return _finish(img, size)
 
 
+def keyboard(size: int = 16, color: str = "#57606a") -> Image.Image:
+    """Teclado simplificado (corpo + 2 fileiras de teclinhas) - usado no
+    botao de atalhos de teclado."""
+    img = _canvas(size)
+    d = ImageDraw.Draw(img)
+    w, h = img.size
+    body = [w * 0.08, h * 0.26, w * 0.92, h * 0.76]
+    d.rounded_rectangle(body, radius=w * 0.08, outline=color, width=max(2 * SUPERSAMPLE, int(w * 0.09)))
+
+    key_w, key_h, gap, row_gap = w * 0.108, h * 0.14, w * 0.045, h * 0.10
+    total_w = 5 * key_w + 4 * gap
+    start_x = (w - total_w) / 2
+    row0_y = h * 0.32
+    row1_y = row0_y + key_h + row_gap
+    for row_y in (row0_y, row1_y):
+        for col in range(5):
+            x = start_x + col * (key_w + gap)
+            d.rounded_rectangle([x, row_y, x + key_w, row_y + key_h], radius=key_w * 0.25, fill=color)
+    return _finish(img, size)
+
+
+def upload(size: int = 16, color: str = "#1f6feb") -> Image.Image:
+    """Seta simples pra cima - icone de enviar."""
+    img = _canvas(size)
+    d = ImageDraw.Draw(img)
+    w, h = img.size
+    width = max(2 * SUPERSAMPLE, int(w * 0.16))
+    d.line([(w / 2, h * 0.85), (w / 2, h * 0.40)], fill=color, width=width)
+    arrow_w = w * 0.26
+    d.polygon([(w / 2 - arrow_w, h * 0.48), (w / 2 + arrow_w, h * 0.48), (w / 2, h * 0.15)], fill=color)
+    return _finish(img, size)
+
+
 def app_icon(size: int = 256, bg: str = "#1f6feb", fg: str = "#ffffff") -> Image.Image:
     """Telefone com um botao de 'play' dentro - representa espelhar/tocar a tela."""
     img = _canvas(size)

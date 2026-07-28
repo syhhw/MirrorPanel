@@ -41,6 +41,14 @@ _STRINGS = {
     "app.start_all": {"pt": "Iniciar todos", "en": "Start all"},
     "app.stop_all": {"pt": "Parar todos", "en": "Stop all"},
     "app.shortcuts": {"pt": "Atalhos", "en": "Shortcuts"},
+    "app.batch_transfer": {"pt": "Enviar arquivo p/ todos", "en": "Send file to all"},
+
+    # ------------------------------------------------ transferencia em lote --
+    "batch_transfer.pick_file": {"pt": "Escolha um arquivo para enviar", "en": "Choose a file to send"},
+    "batch_transfer.no_devices": {
+        "pt": "Nenhum aparelho detectado no momento.",
+        "en": "No device currently detected.",
+    },
 
     # --------------------------------------------------------------- tray --
     "tray.open": {"pt": "Abrir painel", "en": "Open panel"},
@@ -217,6 +225,10 @@ _STRINGS = {
     "log.device_problem": {"pt": "{serial}: {hint}", "en": "{serial}: {hint}"},
     "log.device_error": {"pt": "Falha ao iniciar {serial}", "en": "Failed to start {serial}"},
     "log.apk_pushing": {"pt": "Enviando {name} para {model}...", "en": "Sending {name} to {model}..."},
+    "log.apk_pushed": {
+        "pt": "{name} enviado com sucesso para {model}.",
+        "en": "{name} successfully sent to {model}.",
+    },
     "log.apk_push_failed": {"pt": "Falha ao enviar {name} para {model}.", "en": "Failed to send {name} to {model}."},
     "log.apk_installing": {"pt": "Instalando {name} em {model}...", "en": "Installing {name} on {model}..."},
     "log.apk_installed": {
@@ -224,6 +236,10 @@ _STRINGS = {
         "en": "{name} successfully installed on {model}.",
     },
     "log.apk_install_failed": {"pt": "Falha ao instalar {name} em {model}.", "en": "Failed to install {name} on {model}."},
+    "log.batch_transfer_started": {
+        "pt": "Enviando {name} para {count} aparelho(s)...",
+        "en": "Sending {name} to {count} device(s)...",
+    },
     "log.retrying": {"pt": "Tentando reconectar {model}...", "en": "Trying to reconnect {model}..."},
     "log.settings_saved": {"pt": "Ajustes salvos para {model}.", "en": "Settings saved for {model}."},
     "log.nickname_saved": {"pt": "{model} agora aparece como \"{nickname}\".", "en": "{model} now shows as \"{nickname}\"."},
