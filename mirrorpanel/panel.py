@@ -321,7 +321,11 @@ class UpdateDialog(tk.Toplevel):
                          bg=SURFACE, fg=FG, insertbackground=FG, selectbackground=ACCENT,
                          relief="solid", borderwidth=1, highlightthickness=1,
                          highlightbackground=BORDER, highlightcolor=BORDER)
-        notes.insert("1.0", info["notes"] or t("update.no_notes"))
+        # A release pode trazer as notas em pt e en juntas (marcadores [pt]/[en]) -
+        # mostra so a secao do idioma atual do app, que segue o escolhido no
+        # instalador (ver apply_installer_language_marker em mirror_engine.py).
+        notes_text = updater.extract_notes_for_language(info["notes"], i18n.get_language())
+        notes.insert("1.0", notes_text or t("update.no_notes"))
         notes.config(state="disabled")
         notes.pack(padx=DIALOG_OUTER_PAD, pady=(6, 12))
 

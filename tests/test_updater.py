@@ -34,6 +34,36 @@ class ParseVersionTest(unittest.TestCase):
         self.assertGreater(updater._parse_version("1.0.0-1"), updater._parse_version("1.0.0"))
 
 
+class ExtractNotesForLanguageTest(unittest.TestCase):
+    """As notas de uma release do GitHub podem trazer pt e en juntas, separadas
+    por marcadores [pt]/[en] - a interface mostra so a secao do idioma atual
+    do app (ver UpdateDialog em panel.py). updater.py recebe o idioma como
+    parametro explicito, nunca importa i18n.py (motor/updater nao sabem de
+    idioma sozinhos - so dividem o texto que ja veio pronto)."""
+
+    def test_extracts_requested_language_section(self):
+        body = "[pt]\nCorrigido o bug X.\n\n[en]\nFixed bug X.\n"
+        self.assertEqual(updater.extract_notes_for_language(body, "pt"), "Corrigido o bug X.")
+        self.assertEqual(updater.extract_notes_for_language(body, "en"), "Fixed bug X.")
+
+    def test_language_section_order_does_not_matter(self):
+        body = "[en]\nFixed bug X.\n\n[pt]\nCorrigido o bug X.\n"
+        self.assertEqual(updater.extract_notes_for_language(body, "pt"), "Corrigido o bug X.")
+        self.assertEqual(updater.extract_notes_for_language(body, "en"), "Fixed bug X.")
+
+    def test_no_marker_returns_whole_body_unfiltered(self):
+        """Releases antigas (lancadas antes dessa convencao) nao tem marcador
+        nenhum - tem que continuar mostrando a nota inteira, nao sumir com ela."""
+        body = "- Corrigido o bug X.\n- Nova funcionalidade Y.\n"
+        self.assertEqual(updater.extract_notes_for_language(body, "en"), body.strip())
+
+    def test_missing_language_falls_back_to_whole_body(self):
+        """So tem [pt] escrito (esquecimento, ou release antiga parcialmente
+        migrada) - pedir "en" nao pode dar um texto vazio/quebrado."""
+        body = "[pt]\nCorrigido o bug X.\n"
+        self.assertEqual(updater.extract_notes_for_language(body, "en"), body.strip())
+
+
 class CheckForUpdateDetailedTest(unittest.TestCase):
     def _mock_response(self, json_data):
         resp = MagicMock()
