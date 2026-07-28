@@ -11,7 +11,8 @@ import queue
 import threading
 import time
 import tkinter as tk
-from tkinter import ttk, messagebox
+from pathlib import Path
+from tkinter import ttk, messagebox, filedialog
 
 import pystray
 import sv_ttk
@@ -628,6 +629,10 @@ class DeviceRow:
                                         command=self._settings, style="Icon.TButton")
         self.settings_btn.pack(side="left", padx=1)
 
+        self.send_file_btn = ttk.Button(icons_box, image=get_icon("upload", 15, ACCENT),
+                                         command=self._send_file, style="Icon.TButton")
+        self.send_file_btn.pack(side="left", padx=1)
+
     def _toggle(self):
         self.callbacks["toggle"](self.serial, self.status)
 
@@ -642,6 +647,9 @@ class DeviceRow:
 
     def _settings(self):
         self.callbacks["settings"](self.serial)
+
+    def _send_file(self):
+        self.callbacks["send_file"](self.serial)
 
     def _rename(self):
         self.callbacks["rename"](self.serial)
@@ -694,6 +702,7 @@ class DeviceRow:
         self.wifi_btn.config(state="normal" if (can_touch and not is_wireless) else "disabled")
         self.settings_btn.config(state="normal" if can_touch else "disabled")
         self.screenshot_btn.config(state="normal" if can_touch else "disabled")
+        self.send_file_btn.config(state="normal" if can_touch else "disabled")
 
         if self.recording:
             self.record_btn.config(image=get_icon("stop", 13, RED),
@@ -831,12 +840,14 @@ class App:
 
         row3 = ttk.Frame(top)
         row3.pack(fill="x", pady=(8, 0))
-        ttk.Button(row3, text=t("app.start_all"), style="Bulk.TButton",
-                   command=self._on_start_all).pack(side="left")
-        ttk.Button(row3, text=t("app.stop_all"), style="Bulk.TButton",
-                   command=self._on_stop_all).pack(side="left", padx=(6, 0))
-        ttk.Button(row3, text=t("app.shortcuts"), style="Bulk.TButton",
-                   command=self._on_show_shortcuts).pack(side="left", padx=(6, 0))
+        ttk.Button(row3, text=t("app.start_all"), image=get_icon("play", 13, GREEN), compound="left",
+                   style="Bulk.TButton", command=self._on_start_all).pack(side="left")
+        ttk.Button(row3, text=t("app.stop_all"), image=get_icon("stop", 13, RED), compound="left",
+                   style="Bulk.TButton", command=self._on_stop_all).pack(side="left", padx=(6, 0))
+        ttk.Button(row3, text=t("app.shortcuts"), image=get_icon("keyboard", 13, FG_MUTED), compound="left",
+                   style="Bulk.TButton", command=self._on_show_shortcuts).pack(side="left", padx=(6, 0))
+        ttk.Button(row3, text=t("app.batch_transfer"), image=get_icon("upload", 13, ACCENT), compound="left",
+                   style="Bulk.TButton", command=self._on_batch_transfer).pack(side="left", padx=(6, 0))
 
         divider = tk.Frame(self.root, bg=BORDER, height=1)
         divider.pack(fill="x")
@@ -1059,6 +1070,30 @@ class App:
         elif kind == "copy_screenshot":
             ok = self.manager.copy_image_to_clipboard(action["path"])
             self.event_queue.put(("clipboard_result", ok))
+        elif kind == "batch_transfer":
+            path = action["path"]
+            name = Path(path).name
+            # .xapk tambem e instalacao de verdade agora (install_xapk_to_device
+            # extrai e usa adb install-multiple) - so o resto vira push generico.
+            is_install = Path(path).suffix.lower() in (".apk", ".xapk")
+            serials = list(self.manager.last_ready)
+            self.event_queue.put(("batch_transfer_started", name, len(serials)))
+            for target_serial in serials:
+                model = self.manager.display_name(target_serial)
+                self.event_queue.put(("batch_transfer_progress", model, name, is_install, None))
+                ok = self.manager.install_or_push_to_device(target_serial, path)
+                self.event_queue.put(("batch_transfer_progress", model, name, is_install, ok))
+        elif kind == "single_transfer":
+            # mesmo caminho do batch_transfer acima, so que pra UM aparelho so
+            # (reaproveita o mesmo evento batch_transfer_progress - a UI nao
+            # precisa saber se veio do botao em lote ou do botao por aparelho).
+            path = action["path"]
+            name = Path(path).name
+            is_install = Path(path).suffix.lower() in (".apk", ".xapk")
+            model = self.manager.display_name(serial)
+            self.event_queue.put(("batch_transfer_progress", model, name, is_install, None))
+            ok = self.manager.install_or_push_to_device(serial, path)
+            self.event_queue.put(("batch_transfer_progress", model, name, is_install, ok))
 
     # ------------------------------------------------------- thread da UI --
     def _drain_queue(self):
@@ -1100,6 +1135,25 @@ class App:
                         self._log(t("log.clipboard_ok"), "success")
                     else:
                         self._log(t("log.clipboard_failed"), "error")
+                    continue
+                if item[0] == "batch_transfer_started":
+                    _, name, count = item
+                    self._log(t("log.batch_transfer_started", name=name, count=count), "info")
+                    continue
+                if item[0] == "batch_transfer_progress":
+                    _, model, name, is_install, ok = item
+                    if ok is None:
+                        self._log(t("log.apk_installing" if is_install else "log.apk_pushing",
+                                     name=name, model=model), "info")
+                        self._mark_apk_busy(model, name)
+                    else:
+                        self._mark_apk_done(model, name)
+                        if ok:
+                            self._log(t("log.apk_installed" if is_install else "log.apk_pushed",
+                                         name=name, model=model), "success")
+                        else:
+                            self._log(t("log.apk_install_failed" if is_install else "log.apk_push_failed",
+                                         name=name, model=model), "error")
                     continue
                 if item[0] == "nickname_result":
                     _, serial = item
@@ -1176,6 +1230,9 @@ class App:
             elif t_ == "apk_pushing":
                 self._log(t("log.apk_pushing", name=ev['name'], model=ev['model']), "info")
                 self._mark_apk_busy(ev['model'], ev['name'])
+            elif t_ == "apk_pushed":
+                self._log(t("log.apk_pushed", name=ev['name'], model=ev['model']), "success")
+                self._mark_apk_done(ev['model'], ev['name'])
             elif t_ == "apk_push_failed":
                 self._log(t("log.apk_push_failed", name=ev['name'], model=ev['model']), "error")
                 self._mark_apk_done(ev['model'], ev['name'])
@@ -1203,7 +1260,8 @@ class App:
                 del self.rows[serial]
 
         callbacks = {"toggle": self._on_toggle, "wifi": self._on_wifi, "settings": self._on_settings,
-                     "record": self._on_record, "screenshot": self._on_screenshot, "rename": self._on_rename}
+                     "record": self._on_record, "screenshot": self._on_screenshot, "rename": self._on_rename,
+                     "send_file": self._on_send_file}
         for serial, info in sorted(snapshot.items(), key=lambda kv: kv[1]["display_name"]):
             if serial not in self.rows:
                 row = DeviceRow(self.list_frame, serial, callbacks)
@@ -1232,6 +1290,34 @@ class App:
 
     def _on_show_shortcuts(self):
         ShortcutsDialog(self.root)
+
+    def _on_batch_transfer(self):
+        """Instala (.apk/.xapk) ou envia (qualquer outro arquivo) um arquivo
+        escolhido pra TODOS os aparelhos detectados de uma vez - espelhando
+        ou nao, diferente do arrastar-e-soltar (que so alcanca um aparelho
+        por vez, o que estiver espelhando na janela onde o arquivo foi
+        solto - e la, so um .apk de verdade vira instalacao)."""
+        path = filedialog.askopenfilename(title=t("batch_transfer.pick_file"))
+        self._dispatch_batch_transfer(path)
+
+    def _dispatch_batch_transfer(self, path: str):
+        if not path:
+            return
+        if not self.manager.last_ready:
+            messagebox.showinfo("MirrorPanel", t("batch_transfer.no_devices"))
+            return
+        self.action_queue.put({"type": "batch_transfer", "path": path})
+        self.wake_event.set()
+
+    def _on_send_file(self, serial: str):
+        """Mesma logica de instalar/enviar do botao em lote (.apk/.xapk vira
+        instalacao de verdade, o resto vira push), mas so pra ESSE aparelho -
+        o botao em lote nao dava jeito de escolher um so."""
+        path = filedialog.askopenfilename(title=t("batch_transfer.pick_file"))
+        if not path:
+            return
+        self.action_queue.put({"type": "single_transfer", "serial": serial, "path": path})
+        self.wake_event.set()
 
     def _show_disconnect_dialog(self, serial: str, model: str):
         existing = self.disconnect_dialogs.get(serial)
