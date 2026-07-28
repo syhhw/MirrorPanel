@@ -26,6 +26,27 @@ def _parse_version(tag: str) -> tuple:
     return tuple(int(n) for n in numbers) if numbers else (0,)
 
 
+def extract_notes_for_language(body: str, lang: str) -> str:
+    """As notas de uma release podem trazer as duas linguas, separadas por
+    marcadores "[pt]"/"[en]" - devolve so a secao do idioma pedido. Releases
+    antigas (escritas antes dessa convencao, sem marcador nenhum) devolvem o
+    corpo inteiro sem filtrar, pra nao esconder a nota so por causa do formato.
+
+    Esta funcao recebe "lang" como parametro explicito (nao importa i18n.py)
+    de proposito - quem decide o idioma atual e sempre a interface (ver regra
+    do projeto: motor/updater nunca sabem de idioma sozinhos), isso aqui e so
+    uma divisao de texto, nao uma traducao."""
+    marker = f"[{lang}]"
+    if marker not in body:
+        return body.strip()
+    start = body.index(marker) + len(marker)
+    end = len(body)
+    for other in re.finditer(r"\[(\w+)\]", body[start:]):
+        end = start + other.start()
+        break
+    return body[start:end].strip()
+
+
 def check_for_update_detailed(timeout: float = 6.0) -> dict:
     """Consulta o GitHub Releases e SEMPRE devolve um status, mesmo quando nao ha
     atualizacao ou a consulta falha - usado tanto na checagem automatica (pra
