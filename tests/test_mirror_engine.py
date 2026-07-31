@@ -63,6 +63,45 @@ class SlotManagerTest(unittest.TestCase):
         self.assertEqual(len(set(slots)), 3)
 
 
+class StartDeviceAlwaysUsesPrimaryMonitorTest(unittest.TestCase):
+    """Regressao pedida pelo usuario: start_device distribuia sozinho pro
+    monitor menos ocupado, entao um segundo/terceiro aparelho podia abrir
+    numa tela secundaria sem ele pedir ou mover nada. Agora sempre abre no
+    monitor PRINCIPAL (indice 0) - so o usuario decide usar outro monitor,
+    arrastando a janela pra la depois de aberta."""
+
+    def setUp(self):
+        self.mgr = engine.MirrorManager.__new__(engine.MirrorManager)
+        self.mgr.active = {}
+        self.mgr.model_cache = {}
+        self.mgr.recording = {}
+        self.mgr.recording_light = {}
+        self.mgr.device_overrides = {}
+        self.mgr.blocked = set()
+        self.mgr.crash_counts = {}
+        self.mgr.used_ports = set()
+        self.mgr.stay_awake = True
+        self.mgr.always_on_top = False
+
+        # monitor principal ja com 3 janelas abertas, secundario vazio - a
+        # logica antiga ("menos ocupado") teria escolhido o secundario aqui.
+        self.primary = engine.SlotManager(0, 0, 1920, 1080)
+        self.primary.ensure_capacity(3)
+        for _ in range(3):
+            self.primary.acquire()
+        self.secondary = engine.SlotManager(1920, 0, 1920, 1080)
+        self.mgr.slot_managers = [self.primary, self.secondary]
+
+    def test_new_device_opens_on_primary_even_when_it_has_more_windows(self):
+        fake_dev = MagicMock()
+        with patch.object(engine, "launch_device", return_value=fake_dev) as mock_launch:
+            ok = self.mgr.start_device("SERIAL1")
+        self.assertTrue(ok)
+        call_args = mock_launch.call_args.args
+        self.assertIs(call_args[2], self.primary)  # "slots" passado e o do monitor principal
+        self.assertEqual(call_args[8], 0)  # monitor_idx
+
+
 class BuildFlagsTest(unittest.TestCase):
     def test_default_settings(self):
         flags = engine.build_flags({})
