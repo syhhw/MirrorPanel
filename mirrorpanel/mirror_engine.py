@@ -850,15 +850,17 @@ class MirrorManager:
     def start_device(self, serial: str) -> bool:
         """Lanca manualmente o espelhamento de um aparelho ja detectado (botao 'Iniciar').
 
-        Escolhe o monitor com MENOS aparelhos abertos no momento (o principal
-        desempata primeiro, por ser o [0]) - com um so monitor conectado, isso
-        sempre escolhe o mesmo, entao o comportamento antigo (so um monitor)
-        continua identico.
+        Sempre abre no monitor PRINCIPAL ([0] em get_all_monitors, garantido
+        por MONITORINFOF_PRIMARY) - uma versao anterior distribuia sozinho
+        pro monitor menos ocupado assim que o principal ficasse com mais
+        janelas que outro, o que abria tela em monitor secundario sem o
+        usuario pedir/mover nada. Quem decide usar outro monitor agora e
+        sempre o usuario, arrastando a janela pra la depois de aberta.
         """
         if serial in self.active:
             return True
         fallback = self.model_cache.get(serial, f"Device_{serial[-4:]}")
-        monitor_idx = min(range(len(self.slot_managers)), key=lambda i: len(self.slot_managers[i].used))
+        monitor_idx = 0
         slots = self.slot_managers[monitor_idx]
         if AUTO_ARRANGE_WINDOWS:
             slots.ensure_capacity(len(slots.used) + 1)
