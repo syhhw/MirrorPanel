@@ -168,6 +168,61 @@ def _center_on_parent(win: tk.Toplevel, parent: tk.Misc):
     win.deiconify()
 
 
+class Tooltip:
+    """Dica de texto ao passar o mouse - usada nos botoes so-icone (sem texto
+    visivel) do cartao de aparelho, pra nao alargar a linha mas ainda deixar
+    claro pra que serve cada um. Espera um instante antes de mostrar, pra nao
+    piscar toda vez que o mouse so passa de raspao por cima do botao."""
+
+    DELAY_MS = 450
+
+    def __init__(self, widget: tk.Widget, text: str = ""):
+        self.widget = widget
+        self.text = text
+        self._after_id = None
+        self._tip: tk.Toplevel | None = None
+        widget.bind("<Enter>", self._schedule, add="+")
+        widget.bind("<Leave>", self._hide, add="+")
+        widget.bind("<ButtonPress>", self._hide, add="+")
+
+    def set_text(self, text: str):
+        self.text = text
+
+    def _schedule(self, _event=None):
+        self._cancel_pending()
+        self._after_id = self.widget.after(self.DELAY_MS, self._show)
+
+    def _cancel_pending(self):
+        if self._after_id is not None:
+            self.widget.after_cancel(self._after_id)
+            self._after_id = None
+
+    def _show(self):
+        self._after_id = None
+        # o aparelho pode ter sido desconectado (linha removida) enquanto o
+        # temporizador contava - sem essa checagem, criar o tooltip num botao
+        # ja destruido lanca TclError
+        if self._tip is not None or not self.text or not self.widget.winfo_exists():
+            return
+        self._tip = tk.Toplevel(self.widget)
+        self._tip.overrideredirect(True)
+        self._tip.attributes("-topmost", True)
+        border = tk.Frame(self._tip, bg=BORDER)
+        border.pack()
+        tk.Label(border, text=self.text, bg=SURFACE, fg=FG, font=FONT_MUTED,
+                 padx=8, pady=3).pack(padx=1, pady=1)
+        self._tip.update_idletasks()
+        x = self.widget.winfo_rootx() + self.widget.winfo_width() // 2 - self._tip.winfo_width() // 2
+        y = self.widget.winfo_rooty() + self.widget.winfo_height() + 6
+        self._tip.geometry(f"+{x}+{y}")
+
+    def _hide(self, _event=None):
+        self._cancel_pending()
+        if self._tip is not None:
+            self._tip.destroy()
+            self._tip = None
+
+
 class SettingsDialog(tk.Toplevel):
     """Ajuste de qualidade por aparelho - so opcoes prontas, sem digitar nada tecnico."""
 
@@ -603,6 +658,7 @@ class DeviceRow:
         self.rename_btn = ttk.Button(name_box, image=get_icon("edit", 11, FG_MUTED),
                                       command=self._rename, style="Icon.TButton")
         self.rename_btn.pack(side="left", padx=(4, 0))
+        Tooltip(self.rename_btn, t("device.tip_rename"))
 
         self.detail_label = ttk.Label(self.frame, foreground=FG_MUTED, font=("Segoe UI", 8),
                                        style="CardMuted.TLabel")
@@ -615,27 +671,36 @@ class DeviceRow:
                                       style="Toggle.TButton")
         self.toggle_btn.pack(side="left", padx=(0, 8))
 
+        # Icones agrupados por proposito (com um respiro maior entre grupos, em
+        # vez de um espacamento uniforme que fazia tudo parecer uma fileira so
+        # de botoes soltos): conectar/transferir, depois capturar, depois
+        # ajustar - a mesma ordem que faz sentido usar num aparelho novo.
         icons_box = ttk.Frame(actions, style="Card.TFrame")
         icons_box.pack(side="left")
 
         self.wifi_btn = ttk.Button(icons_box, image=get_icon("wifi", 15, ACCENT),
                                     command=self._wifi, style="Icon.TButton")
         self.wifi_btn.pack(side="left", padx=1)
+        Tooltip(self.wifi_btn, t("device.tip_wifi"))
+
+        self.send_file_btn = ttk.Button(icons_box, image=get_icon("upload", 15, ACCENT),
+                                         command=self._send_file, style="Icon.TButton")
+        self.send_file_btn.pack(side="left", padx=(1, 6))
+        Tooltip(self.send_file_btn, t("device.tip_send_file"))
 
         self.screenshot_btn = ttk.Button(icons_box, image=get_icon("camera", 15, FG_MUTED),
                                           command=self._screenshot, style="Icon.TButton")
         self.screenshot_btn.pack(side="left", padx=1)
+        Tooltip(self.screenshot_btn, t("device.tip_screenshot"))
 
         self.record_btn = ttk.Button(icons_box, command=self._record, style="Icon.TButton")
-        self.record_btn.pack(side="left", padx=1)
+        self.record_btn.pack(side="left", padx=(1, 6))
+        self.record_tip = Tooltip(self.record_btn, t("device.tip_record"))
 
         self.settings_btn = ttk.Button(icons_box, image=get_icon("gear", 15, FG_MUTED),
                                         command=self._settings, style="Icon.TButton")
         self.settings_btn.pack(side="left", padx=1)
-
-        self.send_file_btn = ttk.Button(icons_box, image=get_icon("upload", 15, ACCENT),
-                                         command=self._send_file, style="Icon.TButton")
-        self.send_file_btn.pack(side="left", padx=1)
+        Tooltip(self.settings_btn, t("device.tip_settings"))
 
     def _toggle(self):
         self.callbacks["toggle"](self.serial, self.status)
@@ -711,9 +776,11 @@ class DeviceRow:
         if self.recording:
             self.record_btn.config(image=get_icon("stop", 13, RED),
                                     state="normal" if self.status == "mirroring" else "disabled")
+            self.record_tip.set_text(t("device.tip_stop_recording"))
         else:
             self.record_btn.config(image=get_icon("record", 13, RED),
                                     state="normal" if self.status == "mirroring" else "disabled")
+            self.record_tip.set_text(t("device.tip_record"))
 
     def flash(self):
         """Pisca a borda do cartao (fallback de feedback quando nao ha janela de
@@ -801,7 +868,7 @@ class App:
         style.configure("Card.TFrame", background=SURFACE)
         style.configure("Card.TLabel", background=SURFACE, foreground=FG, font=("Segoe UI", 10, "bold"))
         style.configure("CardMuted.TLabel", background=SURFACE, foreground=FG_MUTED)
-        style.configure("Icon.TButton", padding=3)
+        style.configure("Icon.TButton", padding=5)
         style.configure("Toggle.TButton", font=("Segoe UI", 9, "bold"))
         style.configure("Summary.TLabel", font=("Segoe UI", 9, "bold"), foreground=FG)
         style.configure("Header.TLabel", font=("Segoe UI", 9, "bold"), foreground=FG)
@@ -809,7 +876,23 @@ class App:
 
         style.configure("Update.TButton", font=("Segoe UI", 8), foreground=ACCENT, padding=(8, 3))
         style.map("Update.TButton", foreground=[("disabled", FG_SUBTLE)])
-        style.configure("Bulk.TButton", font=("Segoe UI", 8), padding=(8, 3))
+        # Bulk.TButton = botoes de acao em lote no cabecalho (Iniciar/Parar todos,
+        # Enviar arquivo, Atalhos) - fonte e padding maiores que antes pra ficarem
+        # mais folgados/faceis de acertar com o mouse, deixando de parecer botoes
+        # "espremidos" numa fileira.
+        style.configure("Bulk.TButton", font=("Segoe UI", 9), padding=(11, 7))
+
+    def _button_group(self, parent, buttons):
+        """Cartao com um grupo de botoes de acao em lote (borda fina + fundo
+        SURFACE elevado, mesma linguagem visual dos cartoes de aparelho) -
+        cada item de 'buttons' e (texto, nome_do_icone, cor_do_icone, comando)."""
+        border = tk.Frame(parent, bg=BORDER)
+        card = ttk.Frame(border, style="Card.TFrame", padding=(8, 6))
+        card.pack(padx=1, pady=1)
+        for i, (text, icon_name, icon_color, command) in enumerate(buttons):
+            ttk.Button(card, text=text, image=get_icon(icon_name, 14, icon_color), compound="left",
+                       style="Bulk.TButton", command=command).pack(side="left", padx=(0 if i == 0 else 6, 0))
+        return border
 
     # ---------------------------------------------------------------- UI --
     def _build_ui(self):
@@ -842,16 +925,25 @@ class App:
             variable=self.always_on_top_var, command=self._toggle_always_on_top,
         ).pack(side="left", padx=(16, 0))
 
+        # Duas turmas de botao, cada uma dentro do seu proprio "cartao" (mesma
+        # linguagem visual dos cartoes de aparelho: borda fina + fundo SURFACE
+        # elevado) - controle de SESSAO (liga/desliga todo mundo, o par mais
+        # usado) separado dos UTILITARIOS (enviar arquivo, ver atalhos, usados
+        # bem menos). Um separador fino de linha (testado antes) ficava discreto
+        # demais pra notar a diferenca; dois cartoes lado a lado com um vao
+        # entre eles fica bem mais claro e "arrumado".
         row3 = ttk.Frame(top)
-        row3.pack(fill="x", pady=(8, 0))
-        ttk.Button(row3, text=t("app.start_all"), image=get_icon("play", 13, GREEN), compound="left",
-                   style="Bulk.TButton", command=self._on_start_all).pack(side="left")
-        ttk.Button(row3, text=t("app.stop_all"), image=get_icon("stop", 13, RED), compound="left",
-                   style="Bulk.TButton", command=self._on_stop_all).pack(side="left", padx=(6, 0))
-        ttk.Button(row3, text=t("app.shortcuts"), image=get_icon("keyboard", 13, FG_MUTED), compound="left",
-                   style="Bulk.TButton", command=self._on_show_shortcuts).pack(side="left", padx=(6, 0))
-        ttk.Button(row3, text=t("app.batch_transfer"), image=get_icon("upload", 13, ACCENT), compound="left",
-                   style="Bulk.TButton", command=self._on_batch_transfer).pack(side="left", padx=(6, 0))
+        row3.pack(fill="x", pady=(10, 0))
+
+        self._button_group(row3, [
+            (t("app.start_all"), "play", GREEN, self._on_start_all),
+            (t("app.stop_all"), "stop", RED, self._on_stop_all),
+        ]).pack(side="left")
+
+        self._button_group(row3, [
+            (t("app.batch_transfer"), "upload", ACCENT, self._on_batch_transfer),
+            (t("app.shortcuts"), "keyboard", FG_MUTED, self._on_show_shortcuts),
+        ]).pack(side="left", padx=(10, 0))
 
         divider = tk.Frame(self.root, bg=BORDER, height=1)
         divider.pack(fill="x")
@@ -971,6 +1063,27 @@ class App:
         )
         self.tray_icon = pystray.Icon("MirrorPanel", image, "MirrorPanel", menu)
         threading.Thread(target=self.tray_icon.run, daemon=True).start()
+
+    def _notify(self, title: str, message: str):
+        """Notificacao nativa do Windows (balao perto do relogio) - so faz
+        sentido quando o painel esta ESCONDIDO (minimizado/bandeja). Com a
+        janela visivel, o log (e o proprio dialogo, quando ha um) ja avisam
+        na hora - notificar de novo seria repetir o aviso a toa. Antes disso,
+        um aparelho bloqueado por falhas repetidas (evento "blocked") so
+        virava uma linha de log silenciosa: minimizado, ninguem via.
+
+        Nunca deixa uma falha aqui derrubar o app - e so um "a mais", nao
+        algo essencial pro funcionamento (mesma filosofia do updater.py:
+        invisivel ate ser preciso, e nunca a causa de um crash).
+        """
+        if self.root.state() not in ("withdrawn", "iconic"):
+            return
+        if not self.tray_icon:
+            return
+        try:
+            self.tray_icon.notify(message, title)
+        except Exception:
+            logging.exception("Falha ao mostrar notificacao da bandeja")
 
     def _tray_open(self, icon=None, item=None):
         self.root.after(0, self._restore_window)
@@ -1173,8 +1286,10 @@ class App:
                     result = item[1]
                     if result["status"] == "update":
                         info = result["info"]
-                        self._log(t("log.update_available", version=info['version']), "success")
-                        self._ensure_window_visible()
+                        msg = t("log.update_available", version=info['version'])
+                        self._log(msg, "success")
+                        self._notify(t("app.title"), msg)  # antes de _ensure_window_visible: senao o
+                        self._ensure_window_visible()       # estado deixa de ser "minimizado" e a notificacao nunca dispara
                         UpdateDialog(self.root, info, on_accept=lambda: self._start_update_download(info))
                     elif result["status"] == "current":
                         self._log(t("log.update_current", version=updater.APP_VERSION), "info")
@@ -1218,10 +1333,14 @@ class App:
             elif t_ == "reconnected":
                 self._log(t("log.device_reconnected", model=ev['model']), "success")
             elif t_ == "departed":
-                self._log(t("log.device_departed", model=ev['model']), "warning")
+                msg = t("log.device_departed", model=ev['model'])
+                self._log(msg, "warning")
+                self._notify(t("app.title"), msg)
                 self._show_disconnect_dialog(ev["serial"], ev["model"])
             elif t_ == "crashed":
-                self._log(t("log.device_crashed", model=ev['model'], attempt=ev['attempt']), "error")
+                msg = t("log.device_crashed", model=ev['model'], attempt=ev['attempt'])
+                self._log(msg, "error")
+                self._notify(t("app.title"), msg)
                 self._show_disconnect_dialog(ev["serial"], ev["model"])
             elif t_ == "closed_by_user":
                 # janela fechada pelo proprio X do scrcpy (fora do painel) -
@@ -1229,7 +1348,11 @@ class App:
                 # nem mostrar pop-up (o usuario decidiu fechar de proposito).
                 self._log(t("log.device_closed", model=ev['model']), "info")
             elif t_ == "blocked":
-                self._log(t("log.device_blocked", model=ev['model'], serial=ev['serial']), "error")
+                # antes so virava uma linha de log - minimizado, ninguem via que
+                # o aparelho parou de tentar reconectar sozinho.
+                msg = t("log.device_blocked", model=ev['model'], serial=ev['serial'])
+                self._log(msg, "error")
+                self._notify(t("app.title"), msg)
             elif t_ == "problem":
                 hint = _problem_hint_text(ev.get("state"))
                 self._log(t("log.device_problem", serial=ev['serial'], hint=hint), "warning")

@@ -73,12 +73,21 @@ _STRINGS = {
     "btn.exit": {"pt": "Sair", "en": "Exit"},
     "btn.reconnect": {"pt": "Reconectar", "en": "Reconnect"},
     "btn.close": {"pt": "Fechar", "en": "Close"},
-    "btn.rename": {"pt": "Renomear", "en": "Rename"},
 
     # -------------------------------------------------- device row/timer --
     "device.recording": {"pt": "Gravando", "en": "Recording"},
-    "device.nickname_tooltip": {"pt": "Clique para renomear", "en": "Click to rename"},
     "device.port": {"pt": "porta", "en": "port"},
+
+    # ---------------------------------------------- dicas dos botoes-icone --
+    # Os botoes do cartao de aparelho sao so icone (sem texto, pra nao alargar
+    # a linha) - essas dicas aparecem ao passar o mouse por cima de cada um.
+    "device.tip_rename": {"pt": "Renomear", "en": "Rename"},
+    "device.tip_wifi": {"pt": "Ativar Wi-Fi", "en": "Enable Wi-Fi"},
+    "device.tip_send_file": {"pt": "Enviar arquivo", "en": "Send file"},
+    "device.tip_screenshot": {"pt": "Tirar print", "en": "Take screenshot"},
+    "device.tip_record": {"pt": "Gravar tela", "en": "Record screen"},
+    "device.tip_stop_recording": {"pt": "Parar gravacao", "en": "Stop recording"},
+    "device.tip_settings": {"pt": "Ajustes de qualidade", "en": "Quality settings"},
 
     # -------------------------------------------------------- ajustes --
     "settings.title": {"pt": "Ajustes - {model}", "en": "Settings - {model}"},
@@ -170,7 +179,10 @@ _STRINGS = {
     "shortcuts.copy": {"pt": "Copiar do celular para o PC", "en": "Copy from phone to PC"},
     "shortcuts.paste": {"pt": "Colar do PC no celular", "en": "Paste from PC to phone"},
     "shortcuts.resize": {"pt": "Ajustar janela ao tamanho real (pixel a pixel)", "en": "Resize window to actual size (pixel-perfect)"},
-    "shortcuts.drop_apk": {"pt": "Arrastar um .apk pra janela instala ele no aparelho", "en": "Drag a .apk onto the window to install it on the device"},
+    "shortcuts.drop_apk": {
+        "pt": "Arrastar um .apk pra janela instala ele no aparelho (outros arquivos sao so enviados)",
+        "en": "Drag a .apk onto the window to install it on the device (other files are just sent)",
+    },
     "shortcuts.mod_hint": {
         "pt": "MOD = tecla Alt esquerdo ou Windows (Super)",
         "en": "MOD = Left Alt or Windows (Super) key",
