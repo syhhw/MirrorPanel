@@ -967,7 +967,18 @@ class MirrorManager:
             dev.log_fh.close()
             del self.active[serial]
 
-            if unplugged:
+            # O proprio scrcpy sabe quando o aparelho foi desconectado de verdade -
+            # ele detecta isso por evento (fim do stream USB/video), nao ficando
+            # perguntando "adb devices" de tempos em tempos como a gente - e sai com
+            # o codigo 2 quando isso acontece (SCRCPY_EXIT_DISCONNECTED, confirmado
+            # no source dele). Confia nisso tambem, nao so no nosso proprio
+            # "unplugged": as vezes o NOSSO poll do adb ainda acha o aparelho "ready"
+            # no exato instante em que o scrcpy ja percebeu que caiu, e sem essa
+            # checagem esse caso virava "crashed" (conta pro limite de tentativas e
+            # pode bloquear o aparelho) em vez de "desconectado" (sem penalidade).
+            really_disconnected = unplugged or returncode == 2
+
+            if really_disconnected:
                 logging.info("Desconectado: %s (%s)", dev.model, serial)
                 self.crash_counts.pop(serial, None)
                 self.blocked.discard(serial)
@@ -993,7 +1004,7 @@ class MirrorManager:
             # nao deveria assustar o usuario com um pop-up a cada oscilacao.
             self.pending_reconnect[serial] = {
                 "attempts": 0, "next_attempt_at": time.monotonic(),
-                "model": dev.model, "kind": "departed" if unplugged else "crashed",
+                "model": dev.model, "kind": "departed" if really_disconnected else "crashed",
                 # sessao que rodou de boa por um tempo antes de cair conta menos
                 # contra o aparelho do que uma que morre logo de cara toda vez
                 "long_uptime": (time.monotonic() - dev.started_at) > 10,

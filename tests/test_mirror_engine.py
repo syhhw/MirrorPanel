@@ -445,6 +445,20 @@ class ClosedByUserVsCrashTest(unittest.TestCase):
         self.assertIn("SERIAL1", self.mgr.active)
         self.assertEqual(self.mgr.pending_reconnect, {})
 
+    def test_exit_code_two_is_treated_as_disconnect_even_if_our_own_poll_still_sees_it(self):
+        # SCRCPY_EXIT_DISCONNECTED (confirmado em scrcpy.h do source oficial v4.0) - o
+        # proprio scrcpy detectou a desconexao por evento (fim do stream USB/video),
+        # mais rapido que o nosso proximo "adb devices". Mesmo se o NOSSO poll ainda
+        # achar o aparelho "ready" nesse instante exato (o cenario aqui simulado:
+        # list_devices ainda devolve SERIAL1), tem que contar como desconexao de
+        # verdade - sem penalidade de crash_counts, sem risco de bloquear o aparelho.
+        self.fake_proc.poll.return_value = 2
+        events = self._tick_with_device_still_plugged_in()
+        self.assertEqual(events, [])
+        self.assertIn("SERIAL1", self.mgr.pending_reconnect)
+        self.assertEqual(self.mgr.pending_reconnect["SERIAL1"]["kind"], "departed")
+        self.assertNotIn("SERIAL1", self.mgr.crash_counts)
+
 
 class ApplyInstallerLanguageMarkerTest(unittest.TestCase):
     """Regressao: o instalador grava um marcador com o idioma escolhido na

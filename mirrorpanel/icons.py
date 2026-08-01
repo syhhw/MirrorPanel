@@ -172,27 +172,29 @@ def upload(size: int = 16, color: str = "#1f6feb") -> Image.Image:
 
 
 def app_icon(size: int = 256, bg: str = "#1f6feb", fg: str = "#ffffff") -> Image.Image:
-    """Telefone com um botao de 'play' dentro - representa espelhar/tocar a tela."""
+    """Telefone com um botao de 'play' dentro - representa espelhar/tocar a tela.
+
+    So formas solidas (sem linha fina de moldura/bezel): o desenho original tinha
+    uma borda do telefone desenhada como uma faixa fininha entre dois retangulos
+    arredondados, que sumia no downscale pros tamanhos pequenos de verdade (16/24px,
+    o que aparece na barra de tarefas/bandeja do Windows) - virava um quadrado azul
+    com uma mancha branca, sem dar pra reconhecer nem o telefone nem o play. Formas
+    solidas e mais grossas sobrevivem ao anti-serrilhado do LANCZOS mesmo pequenas.
+    """
     img = _canvas(size)
     d = ImageDraw.Draw(img)
     w, h = img.size
     d.rounded_rectangle([0, 0, w, h], radius=w * 0.22, fill=bg)
 
-    pw, ph = w * 0.34, h * 0.62
+    pw, ph = w * 0.42, h * 0.68
     px, py = (w - pw) / 2, (h - ph) / 2
-    d.rounded_rectangle([px, py, px + pw, py + ph], radius=pw * 0.18, fill=fg)
+    d.rounded_rectangle([px, py, px + pw, py + ph], radius=pw * 0.20, fill=fg)
 
-    bezel_x, bezel_top, bezel_bottom = pw * 0.09, ph * 0.09, ph * 0.13
-    d.rounded_rectangle(
-        [px + bezel_x, py + bezel_top, px + pw - bezel_x, py + ph - bezel_bottom],
-        radius=pw * 0.12, fill=bg,
-    )
-
-    cx, cy = px + pw / 2, py + ph / 2 - ph * 0.02
-    tri = pw * 0.36
+    cx, cy = px + pw / 2, py + ph / 2
+    tri = pw * 0.46
     d.polygon(
-        [(cx - tri * 0.32, cy - tri * 0.46), (cx - tri * 0.32, cy + tri * 0.46), (cx + tri * 0.55, cy)],
-        fill=fg,
+        [(cx - tri * 0.34, cy - tri * 0.50), (cx - tri * 0.34, cy + tri * 0.50), (cx + tri * 0.58, cy)],
+        fill=bg,
     )
     return _finish(img, size)
 
