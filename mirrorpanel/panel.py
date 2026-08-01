@@ -765,7 +765,7 @@ class App:
         self.rows: dict[str, DeviceRow] = {}
         self.first_tick_done = False
         self.tray_icon = None
-        self._busy_apk_installs: set = set()  # (model, nome) de instalacoes de APK em andamento
+        self._busy_apk_count = 0  # quantas instalacoes/transferencias estao em andamento agora
 
         self._build_ui()
         self._log(t("log.started"))
@@ -931,13 +931,18 @@ class App:
             self.apk_progress.stop()
             self.apk_progress.pack_forget()
 
-    def _mark_apk_busy(self, model: str, name: str):
-        self._busy_apk_installs.add((model, name))
+    def _mark_apk_busy(self):
+        # Contador simples, nao um set de (model, nome): duas instalacoes
+        # concorrentes pro MESMO aparelho+arquivo (arrastar-e-soltar nativo
+        # e o botao de enviar arquivo, por exemplo) tinham a mesma chave -
+        # com um set, a PRIMEIRA a terminar removia a chave e escondia a
+        # barra cedo demais, mesmo com a segunda ainda rodando.
+        self._busy_apk_count += 1
         self._set_apk_progress_visible(True)
 
-    def _mark_apk_done(self, model: str, name: str):
-        self._busy_apk_installs.discard((model, name))
-        if not self._busy_apk_installs:
+    def _mark_apk_done(self):
+        self._busy_apk_count = max(0, self._busy_apk_count - 1)
+        if self._busy_apk_count == 0:
             self._set_apk_progress_visible(False)
 
     def _log(self, msg: str, level: str = "info"):
@@ -1076,28 +1081,27 @@ class App:
             self.event_queue.put(("clipboard_result", ok))
         elif kind == "batch_transfer":
             path = action["path"]
-            name = Path(path).name
-            # .xapk tambem e instalacao de verdade agora (install_xapk_to_device
-            # extrai e usa adb install-multiple) - so o resto vira push generico.
-            is_install = Path(path).suffix.lower() in (".apk", ".xapk")
             serials = list(self.manager.last_ready)
-            self.event_queue.put(("batch_transfer_started", name, len(serials)))
+            self.event_queue.put(("batch_transfer_started", Path(path).name, len(serials)))
             for target_serial in serials:
-                model = self.manager.display_name(target_serial)
-                self.event_queue.put(("batch_transfer_progress", model, name, is_install, None))
-                ok = self.manager.install_or_push_to_device(target_serial, path)
-                self.event_queue.put(("batch_transfer_progress", model, name, is_install, ok))
+                self._transfer_file_to_device(target_serial, path)
         elif kind == "single_transfer":
             # mesmo caminho do batch_transfer acima, so que pra UM aparelho so
             # (reaproveita o mesmo evento batch_transfer_progress - a UI nao
             # precisa saber se veio do botao em lote ou do botao por aparelho).
-            path = action["path"]
-            name = Path(path).name
-            is_install = Path(path).suffix.lower() in (".apk", ".xapk")
-            model = self.manager.display_name(serial)
-            self.event_queue.put(("batch_transfer_progress", model, name, is_install, None))
-            ok = self.manager.install_or_push_to_device(serial, path)
-            self.event_queue.put(("batch_transfer_progress", model, name, is_install, ok))
+            self._transfer_file_to_device(serial, action["path"])
+
+    def _transfer_file_to_device(self, serial: str, path: str):
+        """Passo de UM aparelho da transferencia (lote ou individual) -
+        instala (.apk/.xapk vira instalacao de verdade, install_xapk_to_device
+        extrai e usa adb install-multiple) ou envia (qualquer outro arquivo,
+        push generico)."""
+        name = Path(path).name
+        is_install = Path(path).suffix.lower() in (".apk", ".xapk")
+        model = self.manager.display_name(serial)
+        self.event_queue.put(("batch_transfer_progress", model, name, is_install, None))
+        ok = self.manager.install_or_push_to_device(serial, path)
+        self.event_queue.put(("batch_transfer_progress", model, name, is_install, ok))
 
     # ------------------------------------------------------- thread da UI --
     def _drain_queue(self):
@@ -1149,9 +1153,9 @@ class App:
                     if ok is None:
                         self._log(t("log.apk_installing" if is_install else "log.apk_pushing",
                                      name=name, model=model), "info")
-                        self._mark_apk_busy(model, name)
+                        self._mark_apk_busy()
                     else:
-                        self._mark_apk_done(model, name)
+                        self._mark_apk_done()
                         if ok:
                             self._log(t("log.apk_installed" if is_install else "log.apk_pushed",
                                          name=name, model=model), "success")
@@ -1233,22 +1237,22 @@ class App:
                 self._log(t("log.device_error", serial=ev['serial']), "error")
             elif t_ == "apk_pushing":
                 self._log(t("log.apk_pushing", name=ev['name'], model=ev['model']), "info")
-                self._mark_apk_busy(ev['model'], ev['name'])
+                self._mark_apk_busy()
             elif t_ == "apk_pushed":
                 self._log(t("log.apk_pushed", name=ev['name'], model=ev['model']), "success")
-                self._mark_apk_done(ev['model'], ev['name'])
+                self._mark_apk_done()
             elif t_ == "apk_push_failed":
                 self._log(t("log.apk_push_failed", name=ev['name'], model=ev['model']), "error")
-                self._mark_apk_done(ev['model'], ev['name'])
+                self._mark_apk_done()
             elif t_ == "apk_installing":
                 self._log(t("log.apk_installing", name=ev['name'], model=ev['model']), "info")
-                self._mark_apk_busy(ev['model'], ev['name'])
+                self._mark_apk_busy()
             elif t_ == "apk_installed":
                 self._log(t("log.apk_installed", name=ev['name'], model=ev['model']), "success")
-                self._mark_apk_done(ev['model'], ev['name'])
+                self._mark_apk_done()
             elif t_ == "apk_install_failed":
                 self._log(t("log.apk_install_failed", name=ev['name'], model=ev['model']), "error")
-                self._mark_apk_done(ev['model'], ev['name'])
+                self._mark_apk_done()
 
     def _render(self, snapshot: dict):
         self.summary_label.config(text=t("app.summary", n=len(snapshot)))
@@ -1302,9 +1306,6 @@ class App:
         por vez, o que estiver espelhando na janela onde o arquivo foi
         solto - e la, so um .apk de verdade vira instalacao)."""
         path = filedialog.askopenfilename(title=t("batch_transfer.pick_file"))
-        self._dispatch_batch_transfer(path)
-
-    def _dispatch_batch_transfer(self, path: str):
         if not path:
             return
         if not self.manager.last_ready:
@@ -1414,7 +1415,10 @@ class App:
     def _do_apply_update(self, installer_path: str):
         # mesmo motivo do _do_close: shutdown() pode levar alguns segundos com
         # aparelhos espelhando, e travar a thread da UI bem no meio de aplicar
-        # uma atualizacao pareceria o programa tendo travado/crashado.
+        # uma atualizacao pareceria o programa tendo travado/crashado. Esconde
+        # a janela JA (mesmo feedback instantaneo do fechar) - se a atualizacao
+        # falhar, _recover_from_failed_update traz ela de volta.
+        self.root.withdraw()
         if self.tray_icon:
             try:
                 self.tray_icon.stop()
@@ -1438,10 +1442,24 @@ class App:
         if error:
             key, params = error
             error_text = t(key, **params)
-            self.root.after(0, lambda: self._show_update_apply_error(error_text))
+            self.root.after(0, lambda: self._recover_from_failed_update(error_text))
 
-    def _show_update_apply_error(self, error_text: str):
+    def _recover_from_failed_update(self, error_text: str):
+        """apply_update_and_restart falhou de forma detectavel (instalador
+        sumiu, nao abriu, saiu com erro) - a essa altura ja paramos a thread
+        de fundo, o servidor adb e o icone da bandeja, pra nao deixar um
+        icone fantasma na bandeja caso a atualizacao desse certo e o
+        processo encerrasse na hora (os._exit). Como nao deu certo, o
+        programa continua rodando de verdade - sem reconstruir tudo isso do
+        zero, a janela ficava visivel mas "morta": nunca mais detectava
+        aparelho nenhum, sem icone na bandeja, ate o usuario fechar e abrir
+        o programa de novo na mao."""
         self._log(error_text, "error")
+        self.stop_event = threading.Event()
+        self.worker = threading.Thread(target=self._background_loop, daemon=True)
+        self.worker.start()
+        self._setup_tray()
+        self._restore_window()
         messagebox.showerror("MirrorPanel", t("msg.update_apply_failed", error=error_text))
 
     def _on_record(self, serial: str, currently_recording: bool):
