@@ -41,6 +41,10 @@ ALWAYS_ON_TOP = False        # janelas sempre acima das outras
 DISABLE_SCREENSAVER = True   # impede o PC de bloquear/escurecer
 DEFAULT_STAY_AWAKE = True    # mantem a tela do celular ligada enquanto espelhando (com cabo) - tem botao no painel
 PREFER_TEXT_INPUT = True     # digita acentos (ç, é, ã...) corretamente; so atrapalha jogos que usam WASD
+# Desativado por padrao: minimizar deve se comportar como qualquer programa
+# do Windows (vai pra barra de tarefas), nao sumir sem aviso pra bandeja. Quem
+# quiser o comportamento antigo liga pelo checkbox no cabecalho do painel.
+DEFAULT_MINIMIZE_TO_TRAY = False
 
 # Usado so durante a gravacao, quando o usuario marca "gravacao leve" (aparelhos antigos
 # podem nao aguentar codificar em resolucao/fps altos ao mesmo tempo que gravam).
@@ -130,6 +134,7 @@ def load_settings() -> dict:
             data.setdefault("device_overrides", {})
             data.setdefault("stay_awake", DEFAULT_STAY_AWAKE)
             data.setdefault("always_on_top", ALWAYS_ON_TOP)
+            data.setdefault("minimize_to_tray", DEFAULT_MINIMIZE_TO_TRAY)
             data.setdefault("nicknames", {})
             data.setdefault("language", None)  # None = nunca escolhido, detecta do Windows
             return data
@@ -137,7 +142,8 @@ def load_settings() -> dict:
             logging.exception("Falha ao ler settings.json - usando padrao")
     return {
         "wifi_devices": [], "device_overrides": {}, "stay_awake": DEFAULT_STAY_AWAKE,
-        "always_on_top": ALWAYS_ON_TOP, "nicknames": {}, "language": None,
+        "always_on_top": ALWAYS_ON_TOP, "minimize_to_tray": DEFAULT_MINIMIZE_TO_TRAY,
+        "nicknames": {}, "language": None,
     }
 
 
@@ -543,6 +549,7 @@ class MirrorManager:
         self.settings = load_settings()
         self.stay_awake: bool = self.settings["stay_awake"]
         self.always_on_top: bool = self.settings["always_on_top"]
+        self.minimize_to_tray: bool = self.settings["minimize_to_tray"]
         self.wifi_devices: list[str] = list(self.settings["wifi_devices"])
         self.device_overrides: dict[str, dict] = dict(self.settings["device_overrides"])
         self.nicknames: dict[str, str] = dict(self.settings["nicknames"])
@@ -622,6 +629,14 @@ class MirrorManager:
         vale a partir do proximo espelhamento lancado daquele aparelho."""
         self.always_on_top = value
         self.settings["always_on_top"] = value
+        save_settings(self.settings)
+
+    def set_minimize_to_tray(self, value: bool):
+        """Botao 'Minimizar pra bandeja'. Desativado por padrao - minimizar se
+        comporta como qualquer programa do Windows (vai pra barra de tarefas),
+        so muda se o usuario ligar isso explicitamente."""
+        self.minimize_to_tray = value
+        self.settings["minimize_to_tray"] = value
         save_settings(self.settings)
 
     def set_nickname(self, serial: str, nickname: str):
