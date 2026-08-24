@@ -186,12 +186,15 @@ def app_icon(size: int = 256, bg: str = "#1f6feb", fg: str = "#ffffff") -> Image
     w, h = img.size
     d.rounded_rectangle([0, 0, w, h], radius=w * 0.22, fill=bg)
 
-    pw, ph = w * 0.42, h * 0.68
+    pw, ph = w * 0.50, h * 0.76
     px, py = (w - pw) / 2, (h - ph) / 2
     d.rounded_rectangle([px, py, px + pw, py + ph], radius=pw * 0.20, fill=fg)
 
     cx, cy = px + pw / 2, py + ph / 2
-    tri = pw * 0.46
+    # tri grande o bastante pra sobreviver ao downscale de 16px sem virar uma
+    # manchinha ambigua - o primeiro ajuste (pw*0.46) ainda ficava pequeno
+    # demais pra ler como triangulo de verdade nesse tamanho, so um blob.
+    tri = pw * 0.72
     d.polygon(
         [(cx - tri * 0.34, cy - tri * 0.50), (cx - tri * 0.34, cy + tri * 0.50), (cx + tri * 0.58, cy)],
         fill=bg,

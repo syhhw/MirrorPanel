@@ -33,15 +33,17 @@ _STRINGS = {
     "app.activity": {"pt": "Atividade recente", "en": "Recent activity"},
     "app.check_update": {"pt": " Verificar atualizacoes", "en": " Check for updates"},
     "app.footer_hint": {
-        "pt": "Minimizar manda para a bandeja. Fechar encerra os espelhamentos abertos.",
-        "en": "Minimizing sends to the tray. Closing stops any open mirrors.",
+        "pt": "Fechar encerra os espelhamentos abertos.",
+        "en": "Closing stops any open mirrors.",
     },
     "app.stay_awake": {"pt": "Manter tela do celular sempre ligada", "en": "Keep phone screen always on"},
     "app.always_on_top": {"pt": "Manter janelas sempre visiveis (por cima)", "en": "Keep mirror windows always on top"},
+    "app.minimize_to_tray": {"pt": "Minimizar pra bandeja", "en": "Minimize to tray"},
     "app.start_all": {"pt": "Iniciar todos", "en": "Start all"},
     "app.stop_all": {"pt": "Parar todos", "en": "Stop all"},
     "app.shortcuts": {"pt": "Atalhos", "en": "Shortcuts"},
     "app.batch_transfer": {"pt": "Enviar arquivo p/ todos", "en": "Send file to all"},
+    "app.settings": {"pt": "Configuracoes", "en": "Settings"},
 
     # ------------------------------------------------ transferencia em lote --
     "batch_transfer.pick_file": {"pt": "Escolha um arquivo para enviar", "en": "Choose a file to send"},
@@ -90,6 +92,7 @@ _STRINGS = {
     "device.tip_settings": {"pt": "Ajustes de qualidade", "en": "Quality settings"},
 
     # -------------------------------------------------------- ajustes --
+    "settings.app_title": {"pt": "Configuracoes do MirrorPanel", "en": "MirrorPanel settings"},
     "settings.title": {"pt": "Ajustes - {model}", "en": "Settings - {model}"},
     "settings.codec": {"pt": "Codec de video:", "en": "Video codec:"},
     "settings.quality": {"pt": "Qualidade:", "en": "Quality:"},
