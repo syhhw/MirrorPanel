@@ -188,13 +188,12 @@ class Tooltip:
 
     def set_text(self, text: str):
         self.text = text
-        # se o tooltip ja estiver na tela nesse exato instante (ex: gravacao
-        # parou por outro motivo enquanto o mouse ainda estava em cima do
-        # botao), atualiza o texto ja visivel tambem - senao ficava mostrando
-        # a acao errada ("Parar gravacao" com a gravacao ja parada) ate o
-        # mouse sair e entrar de novo.
+        # atualiza o tooltip ja visivel tambem, se for o caso (ex: gravacao
+        # parou com o mouse ainda em cima do botao) - senao ficava mostrando
+        # a acao errada ate o mouse sair e entrar de novo.
         if self._label is not None and self._label.winfo_exists():
             self._label.config(text=text)
+            self._reposition()
 
     def _schedule(self, _event=None):
         self._cancel_pending()
@@ -220,9 +219,14 @@ class Tooltip:
         self._label = tk.Label(border, text=self.text, bg=SURFACE, fg=FG, font=FONT_MUTED,
                                 padx=8, pady=3)
         self._label.pack(padx=1, pady=1)
+        self._reposition()
+
+    def _reposition(self):
         self._tip.update_idletasks()
         x = self.widget.winfo_rootx() + self.widget.winfo_width() // 2 - self._tip.winfo_width() // 2
         y = self.widget.winfo_rooty() + self.widget.winfo_height() + 6
+        sw = self._tip.winfo_screenwidth()
+        x = max(0, min(x, sw - self._tip.winfo_width()))
         self._tip.geometry(f"+{x}+{y}")
 
     def _hide(self, _event=None):
@@ -375,6 +379,7 @@ class UpdateDialog(tk.Toplevel):
         self.title(t("update.title"))
         self.resizable(False, False)
         self.transient(parent)
+        self.attributes("-topmost", True)  # sem isso podia nascer atras de outra janela
         self.on_accept = on_accept
 
         ttk.Label(self, text=t("update.available", version=info['version']),
@@ -596,30 +601,23 @@ class AppSettingsDialog(tk.Toplevel):
     """Preferencias gerais do painel (nao e por aparelho - isso e o
     SettingsDialog mais acima). Cada opcao aplica na hora, igual sempre
     funcionou quando eram checkbox soltos no cabecalho - so a localizacao
-    mudou, o comportamento e identico (sem botao Salvar/Cancelar de proposito)."""
+    mudou, o comportamento e identico (sem botao Salvar/Cancelar de proposito).
 
-    def __init__(self, parent, stay_awake_var, always_on_top_var, minimize_to_tray_var,
-                 on_toggle_stay_awake, on_toggle_always_on_top, on_toggle_minimize_to_tray):
+    'items' e uma lista de (var, label_key, hint_key_ou_None, command)."""
+
+    def __init__(self, parent, items):
         super().__init__(parent)
         self.withdraw()
         self.title(t("settings.app_title"))
         self.resizable(False, False)
         self.transient(parent)
 
-        ttk.Checkbutton(
-            self, text=t("app.stay_awake"),
-            variable=stay_awake_var, command=on_toggle_stay_awake,
-        ).pack(padx=DIALOG_OUTER_PAD, pady=(18, 10), anchor="w")
-
-        ttk.Checkbutton(
-            self, text=t("app.always_on_top"),
-            variable=always_on_top_var, command=on_toggle_always_on_top,
-        ).pack(padx=DIALOG_OUTER_PAD, pady=10, anchor="w")
-
-        ttk.Checkbutton(
-            self, text=t("app.minimize_to_tray"),
-            variable=minimize_to_tray_var, command=on_toggle_minimize_to_tray,
-        ).pack(padx=DIALOG_OUTER_PAD, pady=10, anchor="w")
+        for i, (var, label_key, hint_key, command) in enumerate(items):
+            ttk.Checkbutton(self, text=t(label_key), variable=var, command=command).pack(
+                padx=DIALOG_OUTER_PAD, pady=(18 if i == 0 else 10, 0 if hint_key else 10), anchor="w")
+            if hint_key:
+                ttk.Label(self, text=t(hint_key), foreground=FG_MUTED, font=FONT_MUTED).pack(
+                    padx=(DIALOG_OUTER_PAD + 20, DIALOG_OUTER_PAD), pady=(0, 10), anchor="w")
 
         ttk.Button(self, text=t("btn.close"), command=self.destroy, width=DIALOG_BUTTON_WIDTH).pack(pady=(8, 16))
 
@@ -858,17 +856,7 @@ class App:
 
         self.root = root
         root.title(t("app.title"))
-        # 640 dava certo antes do 3o botao (Configuracoes) entrar no cartao de
-        # utilitarios - a fileira de botoes do cabecalho passou a pedir ~701px
-        # (medido com winfo_reqwidth), e o pack() nao redimensiona a janela
-        # sozinho quando o conteudo nao cabe: em vez de crescer, ele ESPREME o
-        # ultimo botao pra caber no espaco que sobra, cortando o texto sem
-        # aviso nenhum ("Configuracoes" virava soh "Cor", sem reticencias,
-        # sem erro, nada - so o botao ficando estreito demais pro texto).
-        # minsize tambem sobe, senao o mesmo corte reaparece so de arrastar
-        # a janela mais estreita manualmente.
         root.geometry("740x620")
-        root.minsize(710, 400)
         root.configure(bg=BG)
         _apply_dark_titlebar(root)  # antes de qualquer coisa aparecer na tela
 
@@ -889,6 +877,11 @@ class App:
         self._busy_apk_count = 0  # quantas instalacoes/transferencias estao em andamento agora
 
         self._build_ui()
+        # minsize medido de verdade (nao um numero fixo) - senao a fileira de
+        # botoes do cabecalho pode ficar espremida de novo (sem erro nenhum)
+        # numa fonte/DPI/traducao diferente da que foi testada.
+        self.root.update_idletasks()
+        self.root.minsize(self._header_actions_row.winfo_reqwidth() + 60, 400)
         self._log(t("log.started"))
         self._setup_tray()
 
@@ -984,15 +977,15 @@ class App:
         # bem menos). Um separador fino de linha (testado antes) ficava discreto
         # demais pra notar a diferenca; dois cartoes lado a lado com um vao
         # entre eles fica bem mais claro e "arrumado".
-        row3 = ttk.Frame(top)
-        row3.pack(fill="x", pady=(10, 0))
+        self._header_actions_row = ttk.Frame(top)
+        self._header_actions_row.pack(fill="x", pady=(10, 0))
 
-        self._button_group(row3, [
+        self._button_group(self._header_actions_row, [
             (t("app.start_all"), "play", GREEN, self._on_start_all),
             (t("app.stop_all"), "stop", RED, self._on_stop_all),
         ]).pack(side="left")
 
-        self._button_group(row3, [
+        self._button_group(self._header_actions_row, [
             (t("app.batch_transfer"), "upload", ACCENT, self._on_batch_transfer),
             (t("app.shortcuts"), "keyboard", FG_MUTED, self._on_show_shortcuts),
             (t("app.settings"), "gear", FG_MUTED, self._open_app_settings),
@@ -1059,16 +1052,8 @@ class App:
         ttk.Label(footer, text=f"v{updater.APP_VERSION}",
                   foreground=FG_SUBTLE, font=FONT_MUTED).pack(side="right")
 
-    def _toggle_stay_awake(self):
-        self.action_queue.put({"type": "set_stay_awake", "value": self.stay_awake_var.get()})
-        self.wake_event.set()
-
-    def _toggle_always_on_top(self):
-        self.action_queue.put({"type": "set_always_on_top", "value": self.always_on_top_var.get()})
-        self.wake_event.set()
-
-    def _toggle_minimize_to_tray(self):
-        self.action_queue.put({"type": "set_minimize_to_tray", "value": self.minimize_to_tray_var.get()})
+    def _toggle_setting(self, action_type: str, var: tk.BooleanVar):
+        self.action_queue.put({"type": action_type, "value": var.get()})
         self.wake_event.set()
 
     def _set_apk_progress_visible(self, visible: bool):
@@ -1155,12 +1140,18 @@ class App:
         self.root.focus_force()
 
     def _ensure_window_visible(self):
-        """Traz o painel de volta da bandeja antes de abrir um dialogo disparado
-        por um evento em segundo plano (queda de conexao, atualizacao disponivel).
-        Sem isso, o dialogo seria centralizado sobre uma janela escondida - o
-        que faz ele nascer fora do lugar (ou nem aparecer de verdade)."""
-        if self.root.state() in ("withdrawn", "iconic"):
+        """Traz o painel de volta antes de abrir um dialogo disparado por um
+        evento em segundo plano (queda de conexao, atualizacao disponivel) -
+        senao o dialogo nasceria atras de uma janela escondida/minimizada.
+        Escondida na bandeja (sem entrada na barra de tarefas) precisa do
+        restore completo; so minimizada (o padrao agora) so desminimiza, sem
+        roubar o foco de quem o usuario esta usando - minimizar sozinho nunca
+        pediu pra reaparecer na tela."""
+        state = self.root.state()
+        if state == "withdrawn":
             self._restore_window()
+        elif state == "iconic":
+            self.root.deiconify()
 
     def _tray_exit(self, icon=None, item=None):
         self.root.after(0, self._on_close)
@@ -1168,9 +1159,13 @@ class App:
     def _on_unmap(self, event):
         # so esconde pra bandeja (sem entrada na barra de tarefas) se o
         # usuario ligou isso explicitamente no checkbox - por padrao,
-        # minimizar se comporta como qualquer programa do Windows.
+        # minimizar se comporta como qualquer programa do Windows. Le a
+        # BooleanVar (atualizada na hora, na thread da UI) e nao
+        # self.manager.minimize_to_tray (so atualizado depois, quando a
+        # thread de fundo processa a fila) - senao ligar o checkbox e
+        # minimizar rapido em seguida podia nao valer na primeira vez.
         if (event.widget is self.root and self.root.state() == "iconic"
-                and self.manager.minimize_to_tray):
+                and self.minimize_to_tray_var.get()):
             self.root.withdraw()
 
     # ---------------------------------------------------- thread de fundo --
@@ -1490,10 +1485,14 @@ class App:
         ShortcutsDialog(self.root)
 
     def _open_app_settings(self):
-        AppSettingsDialog(
-            self.root, self.stay_awake_var, self.always_on_top_var, self.minimize_to_tray_var,
-            self._toggle_stay_awake, self._toggle_always_on_top, self._toggle_minimize_to_tray,
-        )
+        AppSettingsDialog(self.root, [
+            (self.stay_awake_var, "app.stay_awake", None,
+             lambda: self._toggle_setting("set_stay_awake", self.stay_awake_var)),
+            (self.always_on_top_var, "app.always_on_top", None,
+             lambda: self._toggle_setting("set_always_on_top", self.always_on_top_var)),
+            (self.minimize_to_tray_var, "app.minimize_to_tray", "app.minimize_to_tray_hint",
+             lambda: self._toggle_setting("set_minimize_to_tray", self.minimize_to_tray_var)),
+        ])
 
     def _on_batch_transfer(self):
         """Instala (.apk/.xapk) ou envia (qualquer outro arquivo) um arquivo
