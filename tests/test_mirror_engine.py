@@ -82,6 +82,7 @@ class StartDeviceAlwaysUsesPrimaryMonitorTest(unittest.TestCase):
         self.mgr.used_ports = set()
         self.mgr.stay_awake = True
         self.mgr.always_on_top = False
+        self.mgr.minimize_to_tray = False
 
         # monitor principal ja com 3 janelas abertas, secundario vazio - a
         # logica antiga ("menos ocupado") teria escolhido o secundario aqui.

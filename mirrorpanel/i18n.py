@@ -39,6 +39,10 @@ _STRINGS = {
     "app.stay_awake": {"pt": "Manter tela do celular sempre ligada", "en": "Keep phone screen always on"},
     "app.always_on_top": {"pt": "Manter janelas sempre visiveis (por cima)", "en": "Keep mirror windows always on top"},
     "app.minimize_to_tray": {"pt": "Minimizar pra bandeja", "en": "Minimize to tray"},
+    "app.minimize_to_tray_hint": {
+        "pt": "Ligado, minimizar esconde o painel na bandeja em vez da barra de tarefas.",
+        "en": "When on, minimizing hides the panel to the tray instead of the taskbar.",
+    },
     "app.start_all": {"pt": "Iniciar todos", "en": "Start all"},
     "app.stop_all": {"pt": "Parar todos", "en": "Stop all"},
     "app.shortcuts": {"pt": "Atalhos", "en": "Shortcuts"},
@@ -309,7 +313,7 @@ def init_language(saved: str | None):
     """Chamado uma vez, no inicio do programa. 'saved' vem do settings.json (None
     se e a primeira execucao, e ai detecta do Windows)."""
     global _current_lang
-    if saved in _STRINGS.get("app.title", {}):
+    if saved in LANGUAGES:
         _current_lang = saved
     else:
         _current_lang = _detect_system_language()

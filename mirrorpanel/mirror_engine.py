@@ -147,7 +147,7 @@ def load_settings() -> dict:
     }
 
 
-def save_settings(data: dict):
+def save_settings(data: dict) -> None:
     try:
         SETTINGS_PATH.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
     except Exception:
