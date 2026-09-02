@@ -17,7 +17,15 @@ env:
   # de instalacao de APK via arrastar-e-soltar, codigos de saida etc.) -
   # trocar aqui sem testar contra um aparelho real de verdade pode quebrar
   # silenciosamente esses regex.
-  SCRCPY_VERSION: "4.0"
+  #
+  # 4.0 -> 4.1: conferido linha por linha via source oficial (gh api) antes de
+  # trocar - file_pusher.c (as 6 linhas de log que os regex de
+  # _scan_apk_events dependem) e scrcpy.h (enum scrcpy_exit_code, base do
+  # SCRCPY_EXIT_DISCONNECTED usado no tick() pra sincronizar reconexao) estao
+  # byte a byte identicos entre as duas versoes. Os nomes dos DLLs no zip do
+  # Windows tambem nao mudaram apesar do FFmpeg ter sido atualizado nessa
+  # release, entao a lista de Copy-Item abaixo continua valendo sem alteracao.
+  SCRCPY_VERSION: "4.1"
 
 jobs:
   release:
