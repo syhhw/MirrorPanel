@@ -41,9 +41,9 @@ def extract_notes_for_language(body: str, lang: str) -> str:
         return body.strip()
     start = body.index(marker) + len(marker)
     end = len(body)
-    for other in re.finditer(r"\[(\w+)\]", body[start:]):
+    other = re.search(r"\[(\w+)\]", body[start:])
+    if other:
         end = start + other.start()
-        break
     return body[start:end].strip()
 
 
@@ -111,7 +111,8 @@ def download_update(url: str, dest_path: str, on_progress=None, chunk_size: int 
     try:
         with requests.get(url, stream=True, timeout=timeout) as resp:
             resp.raise_for_status()
-            total = int(resp.headers.get("content-length", 0)) or expected_size
+            content_length = resp.headers.get("content-length")
+            total = int(content_length) if content_length else expected_size
             downloaded = 0
             with open(dest_path, "wb") as f:
                 for chunk in resp.iter_content(chunk_size=chunk_size):
