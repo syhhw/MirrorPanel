@@ -157,6 +157,29 @@ def upload(size: int = 16, color: str = "#1f6feb") -> Image.Image:
     return _finish(img, size)
 
 
+def qr(size: int = 16, color: str = "#1f6feb") -> Image.Image:
+    """Icone estilizado de QR code - 3 quadrados de canto (o padrao real de
+    todo QR code) + alguns blocos soltos, o suficiente pra reconhecer sem
+    tentar reproduzir um QR de verdade."""
+    img, d, w, h = _setup_draw(size)
+    pad = w * 0.1
+    corner = w * 0.30
+
+    def finder(x, y):
+        d.rectangle([x, y, x + corner, y + corner], outline=color, width=max(2 * SUPERSAMPLE, int(w * 0.07)))
+        inset = corner * 0.32
+        d.rectangle([x + inset, y + inset, x + corner - inset, y + corner - inset], fill=color)
+
+    finder(pad, pad)
+    finder(w - pad - corner, pad)
+    finder(pad, h - pad - corner)
+
+    block = w * 0.09
+    for bx, by in ((0.62, 0.62), (0.78, 0.62), (0.62, 0.78), (0.78, 0.78), (0.70, 0.70)):
+        d.rectangle([w * bx, h * by, w * bx + block, h * by + block], fill=color)
+    return _finish(img, size)
+
+
 def app_icon(size: int = 256, bg: str = "#1f6feb", fg: str = "#ffffff") -> Image.Image:
     """Telefone com um botao de 'play' dentro - representa espelhar/tocar a tela.
 

@@ -15,6 +15,7 @@ from pathlib import Path
 from tkinter import ttk, messagebox, filedialog
 
 import pystray
+import qrcode
 import sv_ttk
 from PIL import ImageTk
 
@@ -442,6 +443,57 @@ class DownloadProgressDialog(tk.Toplevel):
             self.bar.config(mode="indeterminate")
             self.bar.start(15)
             self.pct_label.config(text=t("update.progress_unknown", done=downloaded // 1024))
+
+
+class QrPairingDialog(tk.Toplevel):
+    """Parear um aparelho novo (nunca conectado por cabo) direto por Wi-Fi -
+    mostra um QR code que o proprio Android le em Depuracao via Wi-Fi >
+    Parear dispositivo com codigo QR. Fica esperando o celular escanear em
+    segundo plano (App._on_qr_pairing cuida disso), sem travar o painel -
+    por isso nao e modal, o usuario pode continuar usando o resto da janela
+    enquanto isso."""
+
+    def __init__(self, parent, qr_image, on_close=None):
+        super().__init__(parent)
+        self.withdraw()
+        self.title(t("qr_pairing.title"))
+        self.resizable(False, False)
+        self.transient(parent)
+        self.protocol("WM_DELETE_WINDOW", self.destroy)
+        self.configure(bg=BG)
+        self.on_close = on_close
+
+        ttk.Label(
+            self, text=t("qr_pairing.instructions"), foreground=FG_MUTED,
+            justify="center", wraplength=280,
+        ).pack(padx=DIALOG_OUTER_PAD, pady=(16, 12))
+
+        # fundo branco ao redor do QR - "zona de silencio" que camera de
+        # celular precisa pra ler direito, mesmo no tema escuro do painel
+        self._qr_img = ImageTk.PhotoImage(qr_image)
+        quiet_zone = tk.Frame(self, bg="#ffffff", padx=10, pady=10)
+        quiet_zone.pack(padx=DIALOG_OUTER_PAD)
+        tk.Label(quiet_zone, image=self._qr_img, bd=0).pack()
+
+        ttk.Label(
+            self, text=t("qr_pairing.dev_options_hint"), foreground=FG_SUBTLE,
+            font=FONT_MUTED, justify="center", wraplength=280,
+        ).pack(padx=DIALOG_OUTER_PAD, pady=(10, 4))
+
+        ttk.Label(self, text=t("qr_pairing.waiting"), foreground=FG_MUTED).pack(pady=(6, 4))
+        self.bar = ttk.Progressbar(self, mode="indeterminate", length=280)
+        self.bar.pack(padx=DIALOG_OUTER_PAD, pady=(0, 12))
+        self.bar.start(12)
+
+        ttk.Button(self, text=t("btn.cancel"), command=self.destroy, width=DIALOG_BUTTON_WIDTH).pack(pady=(0, 16))
+
+        _center_on_parent(self, parent)
+
+    def destroy(self):
+        if self.on_close:
+            self.on_close()
+            self.on_close = None
+        super().destroy()
 
 
 class ScreenshotFlash(tk.Toplevel):
@@ -986,6 +1038,7 @@ class App:
         ]).pack(side="left")
 
         self._button_group(self._header_actions_row, [
+            (t("app.qr_pairing"), "qr", ACCENT, self._on_qr_pairing),
             (t("app.batch_transfer"), "upload", ACCENT, self._on_batch_transfer),
             (t("app.shortcuts"), "keyboard", FG_MUTED, self._on_show_shortcuts),
             (t("app.settings"), "gear", FG_MUTED, self._open_app_settings),
@@ -1374,6 +1427,16 @@ class App:
                     else:
                         messagebox.showerror("MirrorPanel", t("msg.update_download_failed"))
                     continue
+                if item[0] == "qr_pairing_result":
+                    _, target = item
+                    if getattr(self, "qr_pairing_dialog", None):
+                        self.qr_pairing_dialog.destroy()
+                        self.qr_pairing_dialog = None
+                    if target:
+                        self._log(t("log.qr_pairing_success", target=target), "success")
+                    else:
+                        self._log(t("log.qr_pairing_failed"), "error")
+                    continue
 
                 _, events, snapshot = item
                 if not self.first_tick_done:
@@ -1579,6 +1642,26 @@ class App:
     def _on_check_update(self):
         self._log(t("log.update_checking"), "info")
         threading.Thread(target=self._run_update_check, daemon=True).start()
+
+    def _on_qr_pairing(self):
+        # roda numa thread propria (nao pela fila de acao/thread de fundo
+        # normal) porque pode levar ate mais de 1 minuto esperando o celular
+        # escanear - pela fila normal, isso travaria o tick() de todo mundo
+        # ate terminar.
+        name, password = engine.generate_pairing_credentials()
+        qr_img = qrcode.make(engine.qr_pairing_payload(name, password)).get_image()
+        self.qr_pairing_dialog = QrPairingDialog(
+            self.root, qr_img, on_close=self._on_qr_pairing_dialog_closed)
+        self._log(t("log.qr_pairing_started"), "info")
+
+        def worker():
+            target = self.manager.pair_new_device_via_qr(name, password)
+            self.event_queue.put(("qr_pairing_result", target))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _on_qr_pairing_dialog_closed(self):
+        self.qr_pairing_dialog = None
 
     def _start_update_download(self, info: dict):
         self.download_dialog = DownloadProgressDialog(self.root)
