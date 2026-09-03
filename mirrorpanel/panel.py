@@ -1292,6 +1292,8 @@ class App:
             self.manager.set_always_on_top(action["value"])
         elif kind == "set_minimize_to_tray":
             self.manager.set_minimize_to_tray(action["value"])
+        elif kind == "register_wifi_device":
+            self.manager.add_wifi_device(action["target"])
         elif kind == "set_nickname":
             self.manager.set_nickname(serial, action["nickname"])
             self.event_queue.put(("nickname_result", serial))
@@ -1434,6 +1436,10 @@ class App:
                         self.qr_pairing_dialog = None
                     if target:
                         self._log(t("log.qr_pairing_success", target=target), "success")
+                        # registrar (grava settings.json) e trabalho da thread
+                        # de fundo, nao da thread do pareamento
+                        self.action_queue.put({"type": "register_wifi_device", "target": target})
+                        self.wake_event.set()
                     else:
                         self._log(t("log.qr_pairing_failed"), "error")
                     continue
@@ -1648,20 +1654,35 @@ class App:
         # normal) porque pode levar ate mais de 1 minuto esperando o celular
         # escanear - pela fila normal, isso travaria o tick() de todo mundo
         # ate terminar.
+        if getattr(self, "qr_pairing_dialog", None):  # ja tem um QR aberto
+            return
         name, password = engine.generate_pairing_credentials()
         qr_img = qrcode.make(engine.qr_pairing_payload(name, password)).get_image()
+        cancel_event = threading.Event()
+        self.qr_pairing_cancel = cancel_event
         self.qr_pairing_dialog = QrPairingDialog(
             self.root, qr_img, on_close=self._on_qr_pairing_dialog_closed)
         self._log(t("log.qr_pairing_started"), "info")
 
         def worker():
-            target = self.manager.pair_new_device_via_qr(name, password)
-            self.event_queue.put(("qr_pairing_result", target))
+            # o evento TEM que sair em qualquer caso - se a thread morrer sem
+            # avisar, a janela do QR fica girando pra sempre sem resposta.
+            target = None
+            try:
+                target = self.manager.pair_new_device_via_qr(name, password, cancel_event=cancel_event)
+            except Exception:
+                logging.exception("Erro no pareamento por QR")
+            finally:
+                if not cancel_event.is_set():
+                    self.event_queue.put(("qr_pairing_result", target))
 
         threading.Thread(target=worker, daemon=True).start()
 
     def _on_qr_pairing_dialog_closed(self):
         self.qr_pairing_dialog = None
+        cancel_event = getattr(self, "qr_pairing_cancel", None)
+        if cancel_event:
+            cancel_event.set()
 
     def _start_update_download(self, info: dict):
         self.download_dialog = DownloadProgressDialog(self.root)

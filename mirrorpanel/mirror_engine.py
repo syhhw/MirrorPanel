@@ -293,9 +293,13 @@ def _find_mdns_service(service_type: str, match: str, match_by_ip: bool = False)
     """Le 'adb mdns services' (o adb.exe ja faz a descoberta sozinho) e procura
     uma linha desse tipo de servico cujo nome (ou IP, se match_by_ip) bata com
     'match'. Cada linha vem "instancia\tservico\tip:porta"."""
+    # OSError junto do timeout: se o adb.exe sumir/for bloqueado no meio do
+    # polling, isso e so mais uma rodada sem resultado - nao pode derrubar a
+    # thread de pareamento (ela morreria sem avisar ninguem, deixando a
+    # janela do QR girando pra sempre).
     try:
         result = run_adb("mdns", "services", timeout=5)
-    except subprocess.TimeoutExpired:
+    except (subprocess.TimeoutExpired, OSError):
         return None
     for line in result.stdout.splitlines():
         parts = line.split("\t")
@@ -305,32 +309,40 @@ def _find_mdns_service(service_type: str, match: str, match_by_ip: bool = False)
         if not service.startswith(service_type):
             continue
         ip, _, port = address.rpartition(":")
-        if not port.isdigit():
+        if not ip or not port.isdigit():
             continue
         if (match_by_ip and ip == match) or (not match_by_ip and instance == match):
             return ip, int(port)
     return None
 
 
-def pair_device(name: str, password: str, poll_seconds: int = QR_PAIRING_POLL_SECONDS) -> tuple[str, int] | None:
+def pair_device(name: str, password: str, poll_seconds: int = QR_PAIRING_POLL_SECONDS,
+                cancel_event=None) -> tuple[str, int] | None:
     """Espera o celular escanear o QR e aparecer via mDNS, pareia, e devolve o
     'ip:porta' de CONEXAO (nao o de pareamento - depois de parear, o celular
     passa a anunciar outro servico, de porta diferente, que e o que realmente
-    serve pra 'adb connect'). None se der timeout ou falhar em qualquer etapa."""
+    serve pra 'adb connect'). None se der timeout, falhar ou ser cancelado.
+
+    cancel_event: threading.Event opcional - marcado quando o usuario fecha a
+    janela do QR, pra nao ficar mais um minuto e meio consultando o adb (e
+    parear "fantasma" depois que ninguem mais esta esperando)."""
+    def cancelled() -> bool:
+        return cancel_event is not None and cancel_event.is_set()
+
     deadline = time.monotonic() + poll_seconds
     pairing_addr = None
-    while time.monotonic() < deadline:
+    while time.monotonic() < deadline and not cancelled():
         pairing_addr = _find_mdns_service(_MDNS_PAIRING_SERVICE, name)
         if pairing_addr:
             break
         time.sleep(2)
-    if not pairing_addr:
+    if not pairing_addr or cancelled():
         return None
 
     ip, port = pairing_addr
     try:
         result = run_adb("pair", f"{ip}:{port}", password, timeout=15)
-    except subprocess.TimeoutExpired:
+    except (subprocess.TimeoutExpired, OSError):
         return None
     if result.returncode != 0:
         return None
@@ -340,7 +352,7 @@ def pair_device(name: str, password: str, poll_seconds: int = QR_PAIRING_POLL_SE
     # estar ligada pro celular ter oferecido o QR), mas da uma folga curta
     # pro mDNS atualizar antes de desistir.
     connect_deadline = time.monotonic() + 10
-    while time.monotonic() < connect_deadline:
+    while time.monotonic() < connect_deadline and not cancelled():
         connect_addr = _find_mdns_service(_MDNS_CONNECT_SERVICE, ip, match_by_ip=True)
         if connect_addr:
             return connect_addr
@@ -883,21 +895,24 @@ class MirrorManager:
 
         return target
 
-    def pair_new_device_via_qr(self, name: str, password: str) -> str | None:
+    def pair_new_device_via_qr(self, name: str, password: str, cancel_event=None) -> str | None:
         """Espera o celular escanear o QR (gerado com esse name/password) e
         conecta assim que parear - sem precisar de cabo nenhum. Devolve
-        'ip:porta' se der certo."""
-        connect_addr = pair_device(name, password)
+        'ip:porta' se der certo.
+
+        Roda numa thread propria (o pareamento demora), entao NAO mexe em
+        settings.json aqui - quem registra o aparelho e a thread de fundo,
+        pela fila de acao, pra manter um escritor so no arquivo."""
+        connect_addr = pair_device(name, password, cancel_event=cancel_event)
         if not connect_addr:
             return None
         target = f"{connect_addr[0]}:{connect_addr[1]}"
         try:
             result = run_adb("connect", target, timeout=8)
-        except subprocess.TimeoutExpired:
+        except (subprocess.TimeoutExpired, OSError):
             return None
         if "unable" in result.stdout.lower() or "failed" in result.stdout.lower():
             return None
-        self.add_wifi_device(target)
         return target
 
     def install_or_push_to_device(self, serial: str, path: str) -> bool:
