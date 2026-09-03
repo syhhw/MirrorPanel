@@ -9,7 +9,9 @@ import json
 import logging
 import os
 import re
+import secrets
 import socket
+import string
 import subprocess
 import sys
 import tempfile
@@ -122,6 +124,15 @@ _APK_PUSH_FAILED_RE = re.compile(r"^ERROR: Failed to push (.+?) to .+$")
 _APK_INSTALLING_RE = re.compile(r"^INFO: Installing (.+)\.\.\.\s*$")
 _APK_INSTALLED_RE = re.compile(r"^INFO: (.+) successfully installed\s*$")
 _APK_INSTALL_FAILED_RE = re.compile(r"^ERROR: Failed to install (.+)$")
+
+# Pareamento sem fio por QR code (Android 11+). O celular, depois de escanear
+# o QR, anuncia esses servicos via mDNS - o proprio adb.exe ja sabe descobri-los
+# ("adb mdns services"), a gente so precisa ler a lista e casar pelo nome que
+# a gente mesmo gerou (confirmado no source oficial do adb, client/adb_mdns.h
+# e client/transport_mdns.cpp): cada linha vem "instancia\tservico\tip:porta".
+_MDNS_PAIRING_SERVICE = "_adb-tls-pairing._tcp"
+_MDNS_CONNECT_SERVICE = "_adb-tls-connect._tcp"
+QR_PAIRING_POLL_SECONDS = 90  # tempo pra pegar o celular, abrir a camera e escanear
 
 
 def load_settings() -> dict:
@@ -262,6 +273,79 @@ def run_adb(*args, timeout=10):
         [str(ADB), *args], capture_output=True, text=True, timeout=timeout,
         creationflags=CREATE_NO_WINDOW,
     )
+
+
+def generate_pairing_credentials() -> tuple[str, str]:
+    """Nome e senha aleatorios pro QR de pareamento - o celular le os dois do
+    proprio QR e anuncia o nome via mDNS, entao a gente sabe qual resposta e a
+    nossa (varios QRs escaneados ao mesmo tempo, por exemplo)."""
+    name = "MIRRORPANEL_" + "".join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(8))
+    password = "".join(secrets.choice(string.digits) for _ in range(6))
+    return name, password
+
+
+def qr_pairing_payload(name: str, password: str) -> str:
+    """Formato oficial do QR de pareamento do adb (mesmo que o Android Studio gera)."""
+    return f"WIFI:T:ADB;S:{name};P:{password};;"
+
+
+def _find_mdns_service(service_type: str, match: str, match_by_ip: bool = False) -> tuple[str, int] | None:
+    """Le 'adb mdns services' (o adb.exe ja faz a descoberta sozinho) e procura
+    uma linha desse tipo de servico cujo nome (ou IP, se match_by_ip) bata com
+    'match'. Cada linha vem "instancia\tservico\tip:porta"."""
+    try:
+        result = run_adb("mdns", "services", timeout=5)
+    except subprocess.TimeoutExpired:
+        return None
+    for line in result.stdout.splitlines():
+        parts = line.split("\t")
+        if len(parts) != 3:
+            continue
+        instance, service, address = parts
+        if not service.startswith(service_type):
+            continue
+        ip, _, port = address.rpartition(":")
+        if not port.isdigit():
+            continue
+        if (match_by_ip and ip == match) or (not match_by_ip and instance == match):
+            return ip, int(port)
+    return None
+
+
+def pair_device(name: str, password: str, poll_seconds: int = QR_PAIRING_POLL_SECONDS) -> tuple[str, int] | None:
+    """Espera o celular escanear o QR e aparecer via mDNS, pareia, e devolve o
+    'ip:porta' de CONEXAO (nao o de pareamento - depois de parear, o celular
+    passa a anunciar outro servico, de porta diferente, que e o que realmente
+    serve pra 'adb connect'). None se der timeout ou falhar em qualquer etapa."""
+    deadline = time.monotonic() + poll_seconds
+    pairing_addr = None
+    while time.monotonic() < deadline:
+        pairing_addr = _find_mdns_service(_MDNS_PAIRING_SERVICE, name)
+        if pairing_addr:
+            break
+        time.sleep(2)
+    if not pairing_addr:
+        return None
+
+    ip, port = pairing_addr
+    try:
+        result = run_adb("pair", f"{ip}:{port}", password, timeout=15)
+    except subprocess.TimeoutExpired:
+        return None
+    if result.returncode != 0:
+        return None
+
+    # o servico de pareamento some depois de usado - o de conexao (porta
+    # diferente, efemera) ja deveria estar no ar (depuracao sem fio precisa
+    # estar ligada pro celular ter oferecido o QR), mas da uma folga curta
+    # pro mDNS atualizar antes de desistir.
+    connect_deadline = time.monotonic() + 10
+    while time.monotonic() < connect_deadline:
+        connect_addr = _find_mdns_service(_MDNS_CONNECT_SERVICE, ip, match_by_ip=True)
+        if connect_addr:
+            return connect_addr
+        time.sleep(1)
+    return None
 
 
 def _close_windows_of_pid(pid: int) -> int:
@@ -797,6 +881,23 @@ class MirrorManager:
             save_settings(self.settings)
         self.stop_device(serial)
 
+        return target
+
+    def pair_new_device_via_qr(self, name: str, password: str) -> str | None:
+        """Espera o celular escanear o QR (gerado com esse name/password) e
+        conecta assim que parear - sem precisar de cabo nenhum. Devolve
+        'ip:porta' se der certo."""
+        connect_addr = pair_device(name, password)
+        if not connect_addr:
+            return None
+        target = f"{connect_addr[0]}:{connect_addr[1]}"
+        try:
+            result = run_adb("connect", target, timeout=8)
+        except subprocess.TimeoutExpired:
+            return None
+        if "unable" in result.stdout.lower() or "failed" in result.stdout.lower():
+            return None
+        self.add_wifi_device(target)
         return target
 
     def install_or_push_to_device(self, serial: str, path: str) -> bool:

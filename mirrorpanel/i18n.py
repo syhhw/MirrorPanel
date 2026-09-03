@@ -48,9 +48,33 @@ _STRINGS = {
     "app.shortcuts": {"pt": "Atalhos", "en": "Shortcuts"},
     "app.batch_transfer": {"pt": "Enviar arquivo p/ todos", "en": "Send file to all"},
     "app.settings": {"pt": "Configuracoes", "en": "Settings"},
+    "app.qr_pairing": {"pt": "Parear por QR", "en": "Pair via QR"},
 
     # ------------------------------------------------ transferencia em lote --
     "batch_transfer.pick_file": {"pt": "Escolha um arquivo para enviar", "en": "Choose a file to send"},
+
+    # ----------------------------------------- pareamento sem fio por QR --
+    "qr_pairing.title": {"pt": "Parear novo aparelho", "en": "Pair new device"},
+    "qr_pairing.instructions": {
+        "pt": "No celular: Ajustes > Opcoes do desenvolvedor > Depuracao via Wi-Fi > "
+              "Parear dispositivo com codigo QR. Aponte a camera pra ca.",
+        "en": "On the phone: Settings > Developer options > Wireless debugging > "
+              "Pair device with QR code. Point the camera here.",
+    },
+    "qr_pairing.dev_options_hint": {
+        "pt": "Precisa ja ter Opcoes do desenvolvedor e Depuracao via Wi-Fi ativadas no aparelho.",
+        "en": "Developer options and Wireless debugging need to already be enabled on the phone.",
+    },
+    "qr_pairing.waiting": {"pt": "Aguardando o celular escanear...", "en": "Waiting for the phone to scan..."},
+    "log.qr_pairing_started": {"pt": "Aguardando pareamento por QR...", "en": "Waiting for QR pairing..."},
+    "log.qr_pairing_success": {
+        "pt": "Pareado com sucesso ({target}) - o aparelho deve aparecer na lista em instantes.",
+        "en": "Successfully paired ({target}) - the device should appear in the list shortly.",
+    },
+    "log.qr_pairing_failed": {
+        "pt": "Pareamento por QR falhou ou expirou. Confira se a Depuracao via Wi-Fi esta ativada e tente de novo.",
+        "en": "QR pairing failed or timed out. Check that Wireless debugging is enabled and try again.",
+    },
     "batch_transfer.no_devices": {
         "pt": "Nenhum aparelho detectado no momento.",
         "en": "No device currently detected.",

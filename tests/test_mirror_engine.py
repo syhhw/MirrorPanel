@@ -541,5 +541,142 @@ class SnapshotProblemStateTest(unittest.TestCase):
         self.assertEqual(rows["SERIAL1"]["problem_state"], "unauthorized")
 
 
+class QrPairingCredentialsTest(unittest.TestCase):
+    def test_generates_prefixed_name_and_numeric_password(self):
+        name, password = engine.generate_pairing_credentials()
+        self.assertTrue(name.startswith("MIRRORPANEL_"))
+        self.assertTrue(password.isdigit())
+        self.assertEqual(len(password), 6)
+
+    def test_payload_matches_official_adb_qr_format(self):
+        payload = engine.qr_pairing_payload("MIRRORPANEL_ABC123", "654321")
+        self.assertEqual(payload, "WIFI:T:ADB;S:MIRRORPANEL_ABC123;P:654321;;")
+
+
+class FindMdnsServiceTest(unittest.TestCase):
+    """_find_mdns_service le a saida real do 'adb mdns services' - formato
+    confirmado no source oficial do adb (client/transport_mdns.cpp):
+    "instancia\\tservico\\tip:porta" por linha."""
+
+    def _fake_result(self, stdout):
+        result = MagicMock()
+        result.stdout = stdout
+        return result
+
+    def test_matches_by_instance_name(self):
+        stdout = "List of discovered mdns services\n\nMIRRORPANEL_ABC\t_adb-tls-pairing._tcp\t192.168.1.5:37831\n"
+        with patch.object(engine, "run_adb", return_value=self._fake_result(stdout)):
+            addr = engine._find_mdns_service("_adb-tls-pairing._tcp", "MIRRORPANEL_ABC")
+        self.assertEqual(addr, ("192.168.1.5", 37831))
+
+    def test_matches_by_ip_when_requested(self):
+        stdout = "outro-nome\t_adb-tls-connect._tcp\t192.168.1.5:41000\n"
+        with patch.object(engine, "run_adb", return_value=self._fake_result(stdout)):
+            addr = engine._find_mdns_service("_adb-tls-connect._tcp", "192.168.1.5", match_by_ip=True)
+        self.assertEqual(addr, ("192.168.1.5", 41000))
+
+    def test_no_match_returns_none(self):
+        stdout = "List of discovered mdns services\n\n"
+        with patch.object(engine, "run_adb", return_value=self._fake_result(stdout)):
+            addr = engine._find_mdns_service("_adb-tls-pairing._tcp", "MIRRORPANEL_ABC")
+        self.assertIsNone(addr)
+
+    def test_wrong_service_type_is_ignored(self):
+        """Um aparelho ja parcialmente conectado (_adb-tls-connect) nao pode
+        contar como resposta pro pareamento (_adb-tls-pairing)."""
+        stdout = "MIRRORPANEL_ABC\t_adb-tls-connect._tcp\t192.168.1.5:41000\n"
+        with patch.object(engine, "run_adb", return_value=self._fake_result(stdout)):
+            addr = engine._find_mdns_service("_adb-tls-pairing._tcp", "MIRRORPANEL_ABC")
+        self.assertIsNone(addr)
+
+    def test_malformed_line_is_skipped_not_a_crash(self):
+        stdout = "linha sem tab nenhuma\nMIRRORPANEL_ABC\t_adb-tls-pairing._tcp\t192.168.1.5:37831\n"
+        with patch.object(engine, "run_adb", return_value=self._fake_result(stdout)):
+            addr = engine._find_mdns_service("_adb-tls-pairing._tcp", "MIRRORPANEL_ABC")
+        self.assertEqual(addr, ("192.168.1.5", 37831))
+
+    def test_timeout_returns_none(self):
+        with patch.object(engine, "run_adb", side_effect=subprocess.TimeoutExpired(cmd="adb", timeout=5)):
+            addr = engine._find_mdns_service("_adb-tls-pairing._tcp", "MIRRORPANEL_ABC")
+        self.assertIsNone(addr)
+
+
+class PairDeviceTest(unittest.TestCase):
+    """pair_device orquestra achar o servico de pareamento, rodar 'adb pair',
+    e depois achar o servico de CONEXAO (porta diferente, so aparece apos
+    parear) - so nao mocka time.sleep pra loop nao segurar o teste."""
+
+    def setUp(self):
+        self.sleep_patch = patch.object(engine.time, "sleep")
+        self.sleep_patch.start()
+        # relogio falso que so avanca a cada chamada - os loops de espera usam
+        # time.monotonic() de verdade pra decidir quando desistir; sem mockar
+        # isso tambem, um teste de timeout esperaria o tempo de verdade passar
+        self._fake_clock = 0
+
+    def tearDown(self):
+        self.sleep_patch.stop()
+
+    def _tick(self):
+        self._fake_clock += 1
+        return self._fake_clock
+
+    def test_full_success_flow(self):
+        with patch.object(engine, "_find_mdns_service",
+                           side_effect=[("192.168.1.5", 37831), ("192.168.1.5", 41000)]), \
+                patch.object(engine, "run_adb", return_value=MagicMock(returncode=0)) as mock_run:
+            addr = engine.pair_device("MIRRORPANEL_ABC", "654321")
+        self.assertEqual(addr, ("192.168.1.5", 41000))
+        mock_run.assert_called_once_with("pair", "192.168.1.5:37831", "654321", timeout=15)
+
+    def test_pairing_service_never_found_times_out(self):
+        with patch.object(engine, "_find_mdns_service", return_value=None), \
+                patch.object(engine.time, "monotonic", side_effect=lambda: self._tick() * 10):
+            addr = engine.pair_device("MIRRORPANEL_ABC", "654321", poll_seconds=90)
+        self.assertIsNone(addr)
+
+    def test_adb_pair_failure_returns_none(self):
+        with patch.object(engine, "_find_mdns_service", return_value=("192.168.1.5", 37831)), \
+                patch.object(engine, "run_adb", return_value=MagicMock(returncode=1)):
+            addr = engine.pair_device("MIRRORPANEL_ABC", "654321")
+        self.assertIsNone(addr)
+
+    def test_connect_service_never_appears_after_successful_pair(self):
+        with patch.object(engine, "_find_mdns_service",
+                           side_effect=[("192.168.1.5", 37831)] + [None] * 20), \
+                patch.object(engine, "run_adb", return_value=MagicMock(returncode=0)), \
+                patch.object(engine.time, "monotonic", side_effect=lambda: self._tick() * 2):
+            addr = engine.pair_device("MIRRORPANEL_ABC", "654321")
+        self.assertIsNone(addr)
+
+
+class PairNewDeviceViaQrTest(unittest.TestCase):
+    def setUp(self):
+        self.mgr = engine.MirrorManager.__new__(engine.MirrorManager)
+        self.mgr.wifi_devices = []
+        self.mgr.settings = {}
+
+    def test_success_connects_and_registers_device(self):
+        with patch.object(engine, "pair_device", return_value=("192.168.1.5", 41000)), \
+                patch.object(engine, "run_adb", return_value=MagicMock(stdout="connected to 192.168.1.5:41000")), \
+                patch.object(engine, "save_settings"):
+            target = self.mgr.pair_new_device_via_qr("MIRRORPANEL_ABC", "654321")
+        self.assertEqual(target, "192.168.1.5:41000")
+        self.assertIn("192.168.1.5:41000", self.mgr.wifi_devices)
+
+    def test_pairing_failure_returns_none(self):
+        with patch.object(engine, "pair_device", return_value=None):
+            target = self.mgr.pair_new_device_via_qr("MIRRORPANEL_ABC", "654321")
+        self.assertIsNone(target)
+        self.assertEqual(self.mgr.wifi_devices, [])
+
+    def test_connect_command_failure_returns_none(self):
+        with patch.object(engine, "pair_device", return_value=("192.168.1.5", 41000)), \
+                patch.object(engine, "run_adb", return_value=MagicMock(stdout="failed to connect")):
+            target = self.mgr.pair_new_device_via_qr("MIRRORPANEL_ABC", "654321")
+        self.assertIsNone(target)
+        self.assertEqual(self.mgr.wifi_devices, [])
+
+
 if __name__ == "__main__":
     unittest.main()
