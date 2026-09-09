@@ -569,11 +569,15 @@ class FindMdnsServiceTest(unittest.TestCase):
             addr = engine._find_mdns_service("_adb-tls-pairing._tcp", "MIRRORPANEL_ABC")
         self.assertEqual(addr, ("192.168.1.5", 37831))
 
-    def test_matches_by_ip_when_requested(self):
-        stdout = "outro-nome\t_adb-tls-connect._tcp\t192.168.1.5:41000\n"
+    def test_saida_real_de_aparelho_conectado(self):
+        """Saida capturada de um aparelho de verdade (SM-A057M) - o cabecalho
+        "List of discovered..." e a linha em branco convivem com a linha util,
+        e o nome da instancia nao tem nada a ver com o serial USB."""
+        stdout = ("List of discovered mdns services\n"
+                  "adb-R9QY500BTGE-oQWi8a\t_adb-tls-connect._tcp\t192.168.80.17:32833\n")
         with patch.object(engine, "run_adb", return_value=self._fake_result(stdout)):
-            addr = engine._find_mdns_service("_adb-tls-connect._tcp", "192.168.1.5", match_by_ip=True)
-        self.assertEqual(addr, ("192.168.1.5", 41000))
+            addr = engine._find_mdns_service("_adb-tls-connect._tcp", "adb-R9QY500BTGE-oQWi8a")
+        self.assertEqual(addr, ("192.168.80.17", 32833))
 
     def test_no_match_returns_none(self):
         stdout = "List of discovered mdns services\n\n"
@@ -602,9 +606,9 @@ class FindMdnsServiceTest(unittest.TestCase):
 
 
 class PairDeviceTest(unittest.TestCase):
-    """pair_device orquestra achar o servico de pareamento, rodar 'adb pair',
-    e depois achar o servico de CONEXAO (porta diferente, so aparece apos
-    parear) - so nao mocka time.sleep pra loop nao segurar o teste."""
+    """pair_device espera o servico de pareamento aparecer e roda 'adb pair'.
+    Nao conecta: confirmado com aparelho real que o adb conecta sozinho depois
+    do pareamento. time.sleep e mockado pros loops nao segurarem o teste."""
 
     def setUp(self):
         self.sleep_patch = patch.object(engine.time, "sleep")
@@ -622,11 +626,13 @@ class PairDeviceTest(unittest.TestCase):
         return self._fake_clock
 
     def test_full_success_flow(self):
-        with patch.object(engine, "_find_mdns_service",
-                           side_effect=[("192.168.1.5", 37831), ("192.168.1.5", 41000)]), \
+        """Pareou = sucesso. Nao procura servico de conexao nem chama 'adb
+        connect' - uma versao anterior fazia isso e reportava FALHA quando nao
+        achava em 10s, mesmo com o aparelho ja conectado (visto ao vivo)."""
+        with patch.object(engine, "_find_mdns_service", return_value=("192.168.1.5", 37831)), \
                 patch.object(engine, "run_adb", return_value=MagicMock(returncode=0)) as mock_run:
-            addr = engine.pair_device("MIRRORPANEL_ABC", "654321")
-        self.assertEqual(addr, ("192.168.1.5", 41000))
+            ip = engine.pair_device("MIRRORPANEL_ABC", "654321")
+        self.assertEqual(ip, "192.168.1.5")
         mock_run.assert_called_once_with("pair", "192.168.1.5:37831", "654321", timeout=15)
 
     def test_pairing_service_never_found_times_out(self):
@@ -661,14 +667,6 @@ class PairDeviceTest(unittest.TestCase):
             addr = engine.pair_device("MIRRORPANEL_ABC", "654321", poll_seconds=90)
         self.assertIsNone(addr)
 
-    def test_connect_service_never_appears_after_successful_pair(self):
-        with patch.object(engine, "_find_mdns_service",
-                           side_effect=[("192.168.1.5", 37831)] + [None] * 20), \
-                patch.object(engine, "run_adb", return_value=MagicMock(returncode=0)), \
-                patch.object(engine.time, "monotonic", side_effect=lambda: self._tick() * 2):
-            addr = engine.pair_device("MIRRORPANEL_ABC", "654321")
-        self.assertIsNone(addr)
-
 
 class PairNewDeviceViaQrTest(unittest.TestCase):
     def setUp(self):
@@ -676,18 +674,17 @@ class PairNewDeviceViaQrTest(unittest.TestCase):
         self.mgr.wifi_devices = []
         self.mgr.settings = {}
 
-    def test_success_connects_and_returns_target(self):
-        with patch.object(engine, "pair_device", return_value=("192.168.1.5", 41000)), \
-                patch.object(engine, "run_adb", return_value=MagicMock(stdout="connected to 192.168.1.5:41000")):
-            target = self.mgr.pair_new_device_via_qr("MIRRORPANEL_ABC", "654321")
-        self.assertEqual(target, "192.168.1.5:41000")
+    def test_success_returns_device_ip(self):
+        with patch.object(engine, "pair_device", return_value="192.168.1.5"):
+            ip = self.mgr.pair_new_device_via_qr("MIRRORPANEL_ABC", "654321")
+        self.assertEqual(ip, "192.168.1.5")
 
     def test_does_not_touch_settings_from_the_pairing_thread(self):
-        """Isso roda numa thread propria - registrar o aparelho (que grava o
-        settings.json) e trabalho da thread de fundo, pela fila de acao, senao
-        duas threads escrevem no mesmo arquivo ao mesmo tempo."""
-        with patch.object(engine, "pair_device", return_value=("192.168.1.5", 41000)), \
-                patch.object(engine, "run_adb", return_value=MagicMock(stdout="connected")), \
+        """Isso roda numa thread propria - gravar o settings.json aqui
+        concorreria com a thread de fundo, que e a unica que escreve nele.
+        Nem precisa registrar nada: o adb reconecta o aparelho pareado
+        sozinho, e a porta dele e efemera (guardar viraria lixo)."""
+        with patch.object(engine, "pair_device", return_value="192.168.1.5"), \
                 patch.object(engine, "save_settings") as mock_save:
             self.mgr.pair_new_device_via_qr("MIRRORPANEL_ABC", "654321")
         mock_save.assert_not_called()
@@ -695,16 +692,8 @@ class PairNewDeviceViaQrTest(unittest.TestCase):
 
     def test_pairing_failure_returns_none(self):
         with patch.object(engine, "pair_device", return_value=None):
-            target = self.mgr.pair_new_device_via_qr("MIRRORPANEL_ABC", "654321")
-        self.assertIsNone(target)
-        self.assertEqual(self.mgr.wifi_devices, [])
-
-    def test_connect_command_failure_returns_none(self):
-        with patch.object(engine, "pair_device", return_value=("192.168.1.5", 41000)), \
-                patch.object(engine, "run_adb", return_value=MagicMock(stdout="failed to connect")):
-            target = self.mgr.pair_new_device_via_qr("MIRRORPANEL_ABC", "654321")
-        self.assertIsNone(target)
-        self.assertEqual(self.mgr.wifi_devices, [])
+            ip = self.mgr.pair_new_device_via_qr("MIRRORPANEL_ABC", "654321")
+        self.assertIsNone(ip)
 
 
 if __name__ == "__main__":

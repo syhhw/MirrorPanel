@@ -86,6 +86,7 @@ jobs:
           --add-binary "bin\scrcpy.png;."
           --add-binary "bin\disconnected.png;."
           --collect-data sv_ttk
+          --add-data "mirrorpanel\assets;mirrorpanel\assets"
           --distpath dist --workpath build
 
       - name: Compila o instalador (Inno Setup, ja vem na imagem do runner)

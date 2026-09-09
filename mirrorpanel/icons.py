@@ -121,7 +121,6 @@ def edit(size: int = 16, color: str = "#57606a") -> Image.Image:
         (bottom[0] - ox, bottom[1] - oy), (bottom[0] + ox, bottom[1] + oy),
     ], fill=color)
     tip = (w * 0.20, h * 0.86)
-    tox, toy = math.cos(perp) * body_w * 0.7, math.sin(perp) * body_w * 0.7
     d.polygon([
         (bottom[0] + ox, bottom[1] + oy), (bottom[0] - ox, bottom[1] - oy), tip,
     ], fill=color)
@@ -180,38 +179,41 @@ def qr(size: int = 16, color: str = "#1f6feb") -> Image.Image:
     return _finish(img, size)
 
 
-def app_icon(size: int = 256, bg: str = "#1f6feb", fg: str = "#ffffff") -> Image.Image:
-    """Telefone com um botao de 'play' dentro - representa espelhar/tocar a tela.
+def app_icon(size: int = 256, bg: str = "#1769e0", fg: str = "#ffffff") -> Image.Image:
+    """Duas telas sobrepostas: o aparelho e sua imagem espelhada.
 
-    So formas solidas (sem linha fina de moldura/bezel): o desenho original tinha
-    uma borda do telefone desenhada como uma faixa fininha entre dois retangulos
-    arredondados, que sumia no downscale pros tamanhos pequenos de verdade (16/24px,
-    o que aparece na barra de tarefas/bandeja do Windows) - virava um quadrado azul
-    com uma mancha branca, sem dar pra reconhecer nem o telefone nem o play. Formas
-    solidas e mais grossas sobrevivem ao anti-serrilhado do LANCZOS mesmo pequenas.
+    Silhueta simples, bordas largas e cantos transparentes mantem a marca
+    legivel na bandeja. O detalhe de navegacao aparece so a partir de 24px.
     """
     img, d, w, h = _setup_draw(size)
-    d.rounded_rectangle([0, 0, w, h], radius=w * 0.22, fill=bg)
+    d.rounded_rectangle([0, 0, w - 1, h - 1], radius=w * 0.23, fill=bg)
 
-    pw, ph = w * 0.50, h * 0.76
-    px, py = (w - pw) / 2, (h - ph) / 2
-    d.rounded_rectangle([px, py, px + pw, py + ph], radius=pw * 0.20, fill=fg)
+    # Tela de origem, deslocada para cima/esquerda. A segunda cobre parte
+    # dela; a separacao azul preserva as duas silhuetas em tamanhos pequenos.
+    d.rounded_rectangle([w * .16, h * .16, w * .64, h * .72],
+                        radius=w * .075, fill="#8ee4ff")
+    d.rounded_rectangle([w * .23, h * .24, w * .57, h * .64],
+                        radius=w * .025, fill=bg)
+    d.rounded_rectangle([w * .34, h * .27, w * .88, h * .89],
+                        radius=w * .095, fill=bg)
 
-    cx, cy = px + pw / 2, py + ph / 2
-    # tri grande o bastante pra sobreviver ao downscale de 16px sem virar uma
-    # manchinha ambigua - o primeiro ajuste (pw*0.46) ainda ficava pequeno
-    # demais pra ler como triangulo de verdade nesse tamanho, so um blob.
-    tri = pw * 0.72
-    d.polygon(
-        [(cx - tri * 0.34, cy - tri * 0.50), (cx - tri * 0.34, cy + tri * 0.50), (cx + tri * 0.58, cy)],
-        fill=bg,
-    )
+    # Tela espelhada em primeiro plano, com borda branca de alto contraste.
+    d.rounded_rectangle([w * .39, h * .31, w * .84, h * .85],
+                        radius=w * .075, fill=fg)
+    screen_bottom = .72 if size >= 24 else .77
+    d.rounded_rectangle([w * .46, h * .39, w * .77, h * screen_bottom],
+                        radius=w * .025, fill=bg)
+    if size >= 24:
+        d.rounded_rectangle([w * .56, h * .77, w * .67, h * .795],
+                            radius=w * .0125, fill=bg)
     return _finish(img, size)
 
 
 def save_app_ico(path: Path):
-    base = app_icon(256)
-    base.save(path, format="ICO", sizes=[(16, 16), (24, 24), (32, 32), (48, 48), (128, 128), (256, 256)])
+    sizes = (16, 20, 24, 32, 40, 48, 64, 96, 128, 256)
+    frames = [app_icon(size) for size in sizes]
+    frames[-1].save(path, format="ICO", sizes=[(size, size) for size in sizes],
+                    append_images=frames[:-1])
 
 
 if __name__ == "__main__":

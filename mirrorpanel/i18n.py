@@ -72,8 +72,12 @@ _STRINGS = {
         "en": "Successfully paired ({target}) - the device should appear in the list shortly.",
     },
     "log.qr_pairing_failed": {
-        "pt": "Pareamento por QR falhou ou expirou. Confira se a Depuracao via Wi-Fi esta ativada e tente de novo.",
-        "en": "QR pairing failed or timed out. Check that Wireless debugging is enabled and try again.",
+        "pt": "Pareamento por QR falhou ou expirou. Confira se a Depuracao via Wi-Fi esta ativada, "
+              "e se o celular e o PC estao na MESMA rede (Wi-Fi de visitante e rede de empresa "
+              "costumam bloquear a comunicacao entre aparelhos).",
+        "en": "QR pairing failed or timed out. Check that Wireless debugging is enabled, and that "
+              "the phone and PC are on the SAME network (guest and corporate Wi-Fi often block "
+              "devices from seeing each other).",
     },
     "batch_transfer.no_devices": {
         "pt": "Nenhum aparelho detectado no momento.",
