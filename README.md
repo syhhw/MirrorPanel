@@ -44,6 +44,7 @@ Este projeto usa e distribui os seguintes componentes de terceiros:
 
 - [scrcpy](https://github.com/Genymobile/scrcpy) (Genymobile) — Apache License 2.0
 - [Android Debug Bridge (adb)](https://developer.android.com/tools/adb) (Android Open Source Project) — Apache License 2.0
+- [Inter](https://rsms.me/inter/) (Rasmus Andersson) — SIL Open Font License 1.1. A fonte acompanha o aplicativo; não precisa ser instalada separadamente.
 
 ## Licença
 

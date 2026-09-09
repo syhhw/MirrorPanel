@@ -3,13 +3,15 @@
 ; depois de rodar o PyInstaller em modo --onedir (pasta dist\MirrorPanel).
 
 #define MyAppName "MirrorPanel"
-#define MyAppVersion "1.2.0-4"
+#define MyAppVersion "1.3.0-0"
 #define MyAppPublisher "MirrorPanel"
 #define MyAppExeName "MirrorPanel.exe"
 ; Pasta gerada pelo PyInstaller --onedir (troque se o seu caminho for diferente)
 ; Caminhos daqui pra baixo sao relativos a ESTE arquivo (dentro de installer/agora) -
 ; dist/ e installer_output/ continuam na raiz do projeto, por isso o "..\".
-#define MyDistDir "..\dist\MirrorPanel"
+#ifndef MyDistDir
+  #define MyDistDir "..\dist\MirrorPanel"
+#endif
 
 [Setup]
 AppId={{7C1B2F1A-9B3E-4E5A-9B0E-4C6D6A1B7E10}}

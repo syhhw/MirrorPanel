@@ -13,6 +13,7 @@ import time
 import tkinter as tk
 from pathlib import Path
 from tkinter import ttk, messagebox, filedialog
+from tkinter import font as tkfont
 
 import pystray
 import qrcode
@@ -23,11 +24,12 @@ from mirrorpanel import icons
 from mirrorpanel import i18n
 from mirrorpanel import mirror_engine as engine
 from mirrorpanel import updater
+from mirrorpanel.typography import load_font_family
 from mirrorpanel.i18n import t
 
-# Fonte padrao do app inteiro - Segoe UI e a fonte de sistema do Windows 10/11
-# (limpa, sans-serif, ja instalada em qualquer maquina - sem depender de nada externo)
-FONT_FAMILY = "Segoe UI"
+# Inter acompanha o aplicativo; carrega antes do primeiro Tk e usa Segoe UI
+# como fallback se os arquivos de fonte estiverem indisponiveis.
+FONT_FAMILY = load_font_family()
 FONT_DEFAULT = (FONT_FAMILY, 9)
 FONT_BOLD = (FONT_FAMILY, 9, "bold")
 FONT_MUTED = (FONT_FAMILY, 8)
@@ -355,7 +357,7 @@ class RecordingDialog(tk.Toplevel):
         ).grid(row=1, column=0, columnspan=2, sticky="w", padx=14, pady=(0, 4))
         ttk.Label(
             self, text=t("recording.light_hint"),
-            foreground=FG_MUTED, font=("Segoe UI", 8), justify="left", wraplength=380,
+            foreground=FG_MUTED, font=(FONT_FAMILY, 8), justify="left", wraplength=380,
         ).grid(row=2, column=0, columnspan=2, sticky="w", padx=14, pady=(0, 10))
 
         btns = ttk.Frame(self)
@@ -384,11 +386,11 @@ class UpdateDialog(tk.Toplevel):
         self.on_accept = on_accept
 
         ttk.Label(self, text=t("update.available", version=info['version']),
-                  font=("Segoe UI", 10, "bold")).pack(padx=DIALOG_OUTER_PAD, pady=(16, 4), anchor="w")
+                  font=(FONT_FAMILY, 10, "bold")).pack(padx=DIALOG_OUTER_PAD, pady=(16, 4), anchor="w")
         ttk.Label(self, text=t("update.notes_header"),
                   foreground=FG_MUTED).pack(padx=DIALOG_OUTER_PAD, anchor="w")
 
-        notes = tk.Text(self, width=52, height=10, wrap="word", font=("Segoe UI", 9),
+        notes = tk.Text(self, width=52, height=10, wrap="word", font=(FONT_FAMILY, 9),
                          bg=SURFACE, fg=FG, insertbackground=FG, selectbackground=ACCENT,
                          relief="solid", borderwidth=1, highlightthickness=1,
                          highlightbackground=BORDER, highlightcolor=BORDER)
@@ -746,7 +748,7 @@ class DeviceRow:
 
         name_box = ttk.Frame(self.frame, style="Card.TFrame")
         name_box.grid(row=0, column=1, sticky="w")
-        self.model_label = ttk.Label(name_box, font=("Segoe UI", 10, "bold"), style="Card.TLabel",
+        self.model_label = ttk.Label(name_box, font=(FONT_FAMILY, 10, "bold"), style="Card.TLabel",
                                       cursor="hand2")
         self.model_label.pack(side="left")
         self.model_label.bind("<Button-1>", lambda _e: self._rename())
@@ -755,7 +757,7 @@ class DeviceRow:
         self.rename_btn.pack(side="left", padx=(4, 0))
         Tooltip(self.rename_btn, t("device.tip_rename"))
 
-        self.detail_label = ttk.Label(self.frame, foreground=FG_MUTED, font=("Segoe UI", 8),
+        self.detail_label = ttk.Label(self.frame, foreground=FG_MUTED, font=(FONT_FAMILY, 8),
                                        style="CardMuted.TLabel")
         self.detail_label.grid(row=1, column=1, sticky="w", pady=(2, 0))
 
@@ -912,8 +914,9 @@ class App:
         root.configure(bg=BG)
         _apply_dark_titlebar(root)  # antes de qualquer coisa aparecer na tela
 
-        self._window_icon_img = ImageTk.PhotoImage(icons.app_icon(64))
-        root.iconphoto(True, self._window_icon_img)
+        self._window_icon_images = [ImageTk.PhotoImage(icons.app_icon(size))
+                                    for size in (16, 32, 48, 64, 256)]
+        root.iconphoto(True, *self._window_icon_images)
 
         self._setup_styles()
 
@@ -951,11 +954,12 @@ class App:
         self.root.after(1000, self._tick_timers)
 
     def _setup_styles(self):
-        # Fonte padrao pra TUDO (inclusive widgets tk.* que nao herdam do ttk.Style,
-        # como Label/Text avulsos): "*Font" e um wildcard do Tk que cobre qualquer
-        # widget sem fonte propria explicita. Widgets com font=(...) definido no
-        # proprio construtor continuam mandando (isso aqui e so o padrao/fallback).
-        self.root.option_add("*Font", FONT_DEFAULT)
+        # Fontes nomeadas cobrem os widgets Tk sem sobrescrever os estilos ttk.
+        # Um wildcard *Font colocaria uma fonte local em cada widget, impedindo
+        # os titulos e botoes de usarem os tamanhos/pesos definidos abaixo.
+        for name in ("TkDefaultFont", "TkTextFont", "TkMenuFont", "TkHeadingFont",
+                     "TkCaptionFont", "TkSmallCaptionFont", "TkIconFont", "TkTooltipFont"):
+            tkfont.nametofont(name, root=self.root).configure(family=FONT_FAMILY)
 
         # Tema Sun Valley (sv_ttk) - da o visual Windows 11 moderno (cantos
         # arredondados, hover, cores) a QUALQUER widget ttk existente, sem precisar
@@ -965,21 +969,21 @@ class App:
         style = ttk.Style(self.root)
         style.configure(".", font=FONT_DEFAULT)  # padrao pra todos os widgets ttk
         style.configure("Card.TFrame", background=SURFACE)
-        style.configure("Card.TLabel", background=SURFACE, foreground=FG, font=("Segoe UI", 10, "bold"))
+        style.configure("Card.TLabel", background=SURFACE, foreground=FG, font=(FONT_FAMILY, 10, "bold"))
         style.configure("CardMuted.TLabel", background=SURFACE, foreground=FG_MUTED)
         style.configure("Icon.TButton", padding=5)
-        style.configure("Toggle.TButton", font=("Segoe UI", 9, "bold"))
-        style.configure("Summary.TLabel", font=("Segoe UI", 9, "bold"), foreground=FG)
-        style.configure("Header.TLabel", font=("Segoe UI", 9, "bold"), foreground=FG)
-        style.configure("Title.TLabel", font=("Segoe UI", 13, "bold"), foreground=FG)
+        style.configure("Toggle.TButton", font=(FONT_FAMILY, 9, "bold"))
+        style.configure("Summary.TLabel", font=(FONT_FAMILY, 9, "bold"), foreground=FG)
+        style.configure("Header.TLabel", font=(FONT_FAMILY, 9, "bold"), foreground=FG)
+        style.configure("Title.TLabel", font=(FONT_FAMILY, 16, "bold"), foreground=FG)
 
-        style.configure("Update.TButton", font=("Segoe UI", 8), foreground=ACCENT, padding=(8, 3))
+        style.configure("Update.TButton", font=(FONT_FAMILY, 8), foreground=ACCENT, padding=(8, 3))
         style.map("Update.TButton", foreground=[("disabled", FG_SUBTLE)])
         # Bulk.TButton = botoes de acao em lote no cabecalho (Iniciar/Parar todos,
         # Enviar arquivo, Atalhos) - fonte e padding maiores que antes pra ficarem
         # mais folgados/faceis de acertar com o mouse, deixando de parecer botoes
         # "espremidos" numa fileira.
-        style.configure("Bulk.TButton", font=("Segoe UI", 9), padding=(11, 7))
+        style.configure("Bulk.TButton", font=(FONT_FAMILY, 9), padding=(11, 7))
 
     def _button_group(self, parent, buttons):
         """Cartao com um grupo de botoes de acao em lote (borda fina + fundo
@@ -1008,7 +1012,7 @@ class App:
         self.summary_label.pack(side="right")
 
         ttk.Label(top, text=t("app.subtitle"),
-                  foreground=FG_MUTED, font=("Segoe UI", 8)).pack(anchor="w", pady=(2, 0))
+                  foreground=FG_MUTED, font=(FONT_FAMILY, 8)).pack(anchor="w", pady=(2, 0))
 
         # As preferencias gerais (manter tela ligada, janelas sempre visiveis,
         # minimizar pra bandeja) nao ficam mais soltas aqui no cabecalho como
@@ -1055,7 +1059,7 @@ class App:
         loading_box = ttk.Frame(self.loading_frame)
         loading_box.place(relx=0.5, rely=0.45, anchor="center")
         ttk.Label(loading_box, text=t("app.loading_devices"),
-                  font=("Segoe UI", 10)).pack(pady=(0, 10))
+                  font=(FONT_FAMILY, 10)).pack(pady=(0, 10))
         self.loading_bar = ttk.Progressbar(loading_box, mode="indeterminate", length=220)
         self.loading_bar.pack()
         self.loading_bar.start(12)
@@ -1292,8 +1296,6 @@ class App:
             self.manager.set_always_on_top(action["value"])
         elif kind == "set_minimize_to_tray":
             self.manager.set_minimize_to_tray(action["value"])
-        elif kind == "register_wifi_device":
-            self.manager.add_wifi_device(action["target"])
         elif kind == "set_nickname":
             self.manager.set_nickname(serial, action["nickname"])
             self.event_queue.put(("nickname_result", serial))
@@ -1436,10 +1438,6 @@ class App:
                         self.qr_pairing_dialog = None
                     if target:
                         self._log(t("log.qr_pairing_success", target=target), "success")
-                        # registrar (grava settings.json) e trabalho da thread
-                        # de fundo, nao da thread do pareamento
-                        self.action_queue.put({"type": "register_wifi_device", "target": target})
-                        self.wake_event.set()
                     else:
                         self._log(t("log.qr_pairing_failed"), "error")
                     continue
