@@ -72,6 +72,13 @@ class CheckForUpdateDetailedTest(unittest.TestCase):
         return resp
 
     @patch("mirrorpanel.updater.requests.get")
+    def test_unexpected_response_shape_returns_error(self, mock_get):
+        for payload in ([], None, {"tag_name": 123}, {"tag_name": "v99.0.0", "assets": None}):
+            with self.subTest(payload=payload):
+                mock_get.return_value = self._mock_response(payload)
+                self.assertEqual(updater.check_for_update_detailed()["status"], "error")
+
+    @patch("mirrorpanel.updater.requests.get")
     def test_update_available(self, mock_get):
         mock_get.return_value = self._mock_response({
             "tag_name": "v99.0.0",
@@ -119,6 +126,17 @@ class DownloadUpdateTest(unittest.TestCase):
     """O download passou a conferir o tamanho informado pela API contra o que
     realmente chegou - antes, um download truncado (conexao caiu no meio)
     virava "sucesso" so por nao ter lancado excecao."""
+
+    @patch("mirrorpanel.updater.requests.get")
+    def test_content_length_detects_truncation_without_api_size(self, mock_get):
+        resp = MagicMock()
+        resp.headers = {"content-length": "100"}
+        resp.iter_content.return_value = [b"short"]
+        mock_get.return_value.__enter__.return_value = resp
+        with tempfile.TemporaryDirectory() as tmp:
+            dest = str(Path(tmp) / "out.exe")
+            self.assertFalse(updater.download_update("http://x/y.exe", dest))
+            self.assertFalse(Path(dest).exists())
 
     @patch("mirrorpanel.updater.requests.get")
     def test_size_mismatch_fails_and_deletes_partial_file(self, mock_get):

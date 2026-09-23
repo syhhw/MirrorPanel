@@ -6,7 +6,7 @@
 [![Última versão](https://img.shields.io/github/v/release/syhhw/MirrorPanel?label=vers%C3%A3o&color=1f6feb)](https://github.com/syhhw/MirrorPanel/releases/latest)
 [![Testes](https://github.com/syhhw/MirrorPanel/actions/workflows/tests.yml/badge.svg)](https://github.com/syhhw/MirrorPanel/actions/workflows/tests.yml)
 
-![MirrorPanel espelhando um celular Android](docs/screenshot.png)
+![Interface do MirrorPanel com aparelhos de demonstração](docs/ui-polish/panel-pt.png)
 
 </div>
 
@@ -23,8 +23,10 @@ Painel para gerenciar o espelhamento e a gravação de vários aparelhos Android
 - Grava a tela e tira prints, salvando tudo organizado em **Vídeos\MirrorPanel Media**, com um modo leve (bitrate/fps/resolução reduzidos) pra aparelhos mais antigos não travarem durante a gravação.
 - Ajusta qualidade (codec, bitrate, taxa de quadros, áudio) individualmente por aparelho, direto pela interface.
 - Mantém a tela do celular sempre ligada enquanto está espelhando.
-- Interface em modo escuro, com a mesma cara de aplicativo moderno do Windows 11.
-- Minimiza para a bandeja do Windows; fechar o painel encerra tudo de forma organizada (scrcpy e o servidor do adb), sem deixar processo solto nem pasta bloqueada.
+- Interface escura com Segoe UI nativa do Windows, lista rolável e controles organizados por aparelho.
+- Atividade recente com horários alinhados, filtro de avisos/erros, cópia e limpeza. Novos eventos preservam a posição de leitura.
+- Minimiza para a bandeja do Windows; fechar o painel encerra as sessões que ele abriu, preservando sessões externas de scrcpy e o servidor ADB compartilhado.
+- Cada gravação usa um arquivo exclusivo. Parar, desconectar ou reiniciar o espelhamento encerra a gravação; para continuar, inicie uma nova.
 - Verifica atualizações automaticamente ao abrir (e tem um botão pra checar na hora que quiser).
 
 ## Como instalar
@@ -44,7 +46,7 @@ Este projeto usa e distribui os seguintes componentes de terceiros:
 
 - [scrcpy](https://github.com/Genymobile/scrcpy) (Genymobile) — Apache License 2.0
 - [Android Debug Bridge (adb)](https://developer.android.com/tools/adb) (Android Open Source Project) — Apache License 2.0
-- [Inter](https://rsms.me/inter/) (Rasmus Andersson) — SIL Open Font License 1.1. A fonte acompanha o aplicativo; não precisa ser instalada separadamente.
+- A interface usa as fontes Segoe UI e Consolas disponíveis no Windows. Os arquivos históricos de Inter em `assets/fonts` mantêm sua licença SIL Open Font License 1.1 e não são carregados pela interface.
 
 ## Licença
 

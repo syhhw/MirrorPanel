@@ -11,6 +11,7 @@ import queue
 import threading
 import time
 import tkinter as tk
+from collections import deque
 from pathlib import Path
 from tkinter import ttk, messagebox, filedialog
 from tkinter import font as tkfont
@@ -27,28 +28,25 @@ from mirrorpanel import updater
 from mirrorpanel.typography import load_font_family
 from mirrorpanel.i18n import t
 
-# Inter acompanha o aplicativo; carrega antes do primeiro Tk e usa Segoe UI
-# como fallback se os arquivos de fonte estiverem indisponiveis.
+# Native Windows typography; monospace is reserved for time and shortcuts.
 FONT_FAMILY = load_font_family()
-FONT_DEFAULT = (FONT_FAMILY, 9)
-FONT_BOLD = (FONT_FAMILY, 9, "bold")
-FONT_MUTED = (FONT_FAMILY, 8)
+FONT_DEFAULT = (FONT_FAMILY, 10)
+FONT_BOLD = (FONT_FAMILY, 10, "bold")
+FONT_MUTED = (FONT_FAMILY, 9)
 
-# Paleta Dark Mode. BG/FG/ACCENT usam os mesmos tons do tema sv_ttk "sun-valley-dark"
-# (pra nao ter nenhuma costura visivel entre widgets ttk padrao e os estilos custom
-# abaixo); os tons de status (verde/ambar/vermelho) vem da paleta Primer Dark do
-# GitHub - testada e pensada especificamente pra contraste/acessibilidade em fundo
-# escuro, e ja e a mesma familia de cores que o app usava no modo claro antes.
-BG = "#1c1c1c"          # fundo da janela
-SURFACE = "#282828"     # cartoes de aparelho, barra de log - uma camada acima do fundo
-BORDER = "#3a3a3a"      # bordas sutis de cartoes/divisores
-FG = "#fafafa"          # texto principal
-FG_MUTED = "#9a9a9a"    # texto secundario/detalhes
-FG_SUBTLE = "#6e7681"   # texto ainda mais discreto (rodape, estados desativados)
-ACCENT = "#57c8ff"      # cor de destaque - mesma do tema, mantem tudo consistente
-GREEN = "#3fb950"       # espelhando / sucesso
-AMBER = "#d29922"       # atencao
-RED = "#f85149"         # bloqueado / erro / gravando
+BG = "#1c1c1c"
+SURFACE = "#25272a"
+BORDER = "#3b3e43"
+FG = "#f1f2f4"
+FG_MUTED = "#b0b5be"
+FG_SUBTLE = "#9299a5"
+ACCENT = "#9bbcf2"
+GREEN = "#8ac6a3"
+AMBER = "#e2bc7d"
+RED = "#ee9b9f"
+LOG_BG = "#202225"
+HOVER = "#34383e"
+
 
 LOG_MAX_LINES = 500      # nao deixa a Atividade recente crescer pra sempre numa sessao longa
 
@@ -96,9 +94,9 @@ _icon_cache: dict = {}
 
 # Espacamentos e regras padrao de TODAS as janelas de dialogo (pop-ups) - os
 # mesmos valores em todo lugar da um ar desenhado, nao remendado.
-DIALOG_OUTER_PAD = 20                        # margem externa ao redor do conteudo do dialogo
+DIALOG_OUTER_PAD = 24                        # margem externa ao redor do conteudo do dialogo
 DIALOG_FORM_PAD = {"padx": 14, "pady": 6}    # espaco entre linhas de formulario (rotulo + campo)
-DIALOG_MESSAGE_WRAPLENGTH = 300              # quebra de linha automatica de textos de aviso/mensagem
+DIALOG_MESSAGE_WRAPLENGTH = 380              # quebra de linha automatica de textos de aviso/mensagem
 DIALOG_BUTTON_WIDTH = 12                     # largura minima dos botoes de acao, pra ficarem parelhos
 
 
@@ -155,6 +153,7 @@ def _center_on_parent(win: tk.Toplevel, parent: tk.Misc):
     que fazia os dialogos nascerem grudados no canto superior esquerdo em vez
     do meio da janela.
     """
+    win.configure(bg=BG)
     parent.update_idletasks()
     win.update_idletasks()
     _apply_dark_titlebar(win)  # antes do deiconify() - senao a moldura clara pisca por um instante
@@ -240,8 +239,26 @@ class Tooltip:
             self._label = None
 
 
+def _dialog_heading(window, title, subtitle):
+    header = ttk.Frame(window, padding=(DIALOG_OUTER_PAD, 22, DIALOG_OUTER_PAD, 20))
+    header.pack(fill="x")
+    ttk.Label(header, text=title, style="DialogTitle.TLabel").pack(anchor="w")
+    ttk.Label(header, text=subtitle, foreground=FG_MUTED, wraplength=420,
+              justify="left").pack(anchor="w", pady=(6, 0))
+
+
+def _dialog_actions(window, label, command, cancel=True):
+    footer = ttk.Frame(window, padding=(DIALOG_OUTER_PAD, 20, DIALOG_OUTER_PAD, 20))
+    footer.pack(fill="x")
+    ttk.Button(footer, text=label, command=command, style="Accent.TButton",
+               width=DIALOG_BUTTON_WIDTH).pack(side="right")
+    if cancel:
+        ttk.Button(footer, text=t("btn.cancel"), command=window.destroy,
+                   width=DIALOG_BUTTON_WIDTH).pack(side="right", padx=(0, 8))
+
+
 class SettingsDialog(tk.Toplevel):
-    """Ajuste de qualidade por aparelho - so opcoes prontas, sem digitar nada tecnico."""
+    """Ajuste de qualidade por aparelho, com hierarquia de video e audio."""
 
     def __init__(self, parent, serial, model, current, on_save):
         super().__init__(parent)
@@ -250,41 +267,35 @@ class SettingsDialog(tk.Toplevel):
         self.resizable(False, False)
         self.transient(parent)
         self.on_save = on_save
-        pad = DIALOG_FORM_PAD
+        _dialog_heading(self, t("device.quality"), model)
+        form = ttk.Frame(self, padding=16, style="Card.TFrame")
+        form.pack(fill="x", padx=DIALOG_OUTER_PAD)
         bitrate_options = _bitrate_options()
         fps_options = _fps_options()
-
-        ttk.Label(self, text=t("settings.codec")).grid(row=0, column=0, sticky="w", **pad)
+        bitrate_by_value = {v: label for label, v in bitrate_options}
+        fps_by_value = {v: label for label, v in fps_options}
         self.codec_var = tk.StringVar(value=current.get("video_codec", "h264"))
-        ttk.Combobox(self, textvariable=self.codec_var, values=["h264", "h265"],
-                     state="readonly", width=24).grid(row=0, column=1, **pad)
-
-        bitrate_by_value = {v: l for l, v in bitrate_options}
-        ttk.Label(self, text=t("settings.quality")).grid(row=1, column=0, sticky="w", **pad)
-        self.bitrate_var = tk.StringVar(
-            value=bitrate_by_value.get(current.get("bitrate", "8M"), bitrate_options[2][0]))
-        ttk.Combobox(self, textvariable=self.bitrate_var, values=[l for l, _ in bitrate_options],
-                     state="readonly", width=24).grid(row=1, column=1, **pad)
-
-        fps_by_value = {v: l for l, v in fps_options}
-        ttk.Label(self, text=t("settings.fps")).grid(row=2, column=0, sticky="w", **pad)
-        self.fps_var = tk.StringVar(
-            value=fps_by_value.get(current.get("max_fps", 60), fps_options[1][0]))
-        ttk.Combobox(self, textvariable=self.fps_var, values=[l for l, _ in fps_options],
-                     state="readonly", width=24).grid(row=2, column=1, **pad)
-
+        self.bitrate_var = tk.StringVar(value=bitrate_by_value.get(current.get("bitrate", "8M"), bitrate_options[2][0]))
+        self.fps_var = tk.StringVar(value=fps_by_value.get(current.get("max_fps", 60), fps_options[1][0]))
+        fields = (("settings.quality", self.bitrate_var, [label for label, _ in bitrate_options]),
+                  ("settings.fps", self.fps_var, [label for label, _ in fps_options]),
+                  ("settings.codec", self.codec_var, ["h264", "h265"]))
+        for row, (key, variable, values) in enumerate(fields):
+            ttk.Label(form, text=t(key), style="Card.TLabel").grid(
+                row=row, column=0, sticky="w", padx=(0, 28), pady=8)
+            field = ttk.Combobox(form, textvariable=variable, values=values, state="readonly", width=27)
+            field.grid(row=row, column=1, sticky="ew", pady=8)
         self.audio_var = tk.BooleanVar(value=current.get("audio", True))
-        ttk.Checkbutton(self, text=t("settings.audio"),
-                         variable=self.audio_var).grid(row=3, column=0, columnspan=2,
-                                                        sticky="w", padx=14, pady=(6, 14))
-
-        btns = ttk.Frame(self)
-        btns.grid(row=4, column=0, columnspan=2, pady=(0, 14))
-        ttk.Button(btns, text=t("btn.cancel"), command=self.destroy, width=DIALOG_BUTTON_WIDTH).pack(side="left", padx=6)
-        ttk.Button(btns, text=t("btn.save"), command=self._save, width=DIALOG_BUTTON_WIDTH).pack(side="left", padx=6)
-
+        tk.Frame(form, bg=BORDER, height=1).grid(row=3, column=0, columnspan=2, sticky="ew", pady=12)
+        ttk.Checkbutton(form, text=t("settings.audio"), variable=self.audio_var,
+                        style="Card.TCheckbutton").grid(row=4, column=0, columnspan=2, sticky="w", pady=(0, 4))
+        ttk.Label(self, text=t("settings.restart_hint"), foreground=FG_MUTED, font=FONT_MUTED,
+                  wraplength=430, justify="left").pack(padx=DIALOG_OUTER_PAD, pady=(12, 0), anchor="w")
+        _dialog_actions(self, t("btn.save"), self._save)
+        self.bind("<Escape>", lambda _e: self.destroy())
         _center_on_parent(self, parent)
         self.grab_set()
+
 
     def _save(self):
         bitrate_by_label = {l: v for l, v in _bitrate_options()}
@@ -311,16 +322,16 @@ class RenameDialog(tk.Toplevel):
         self.transient(parent)
         self.on_save = on_save
 
-        ttk.Label(self, text=t("rename.label")).pack(padx=DIALOG_OUTER_PAD, pady=(16, 6), anchor="w")
+        _dialog_heading(self, t("device.tip_rename"), model)
+        ttk.Label(self, text=t("rename.label"), foreground=FG_MUTED).pack(
+            padx=DIALOG_OUTER_PAD, pady=(0, 8), anchor="w")
         self.name_var = tk.StringVar(value=current_nickname or "")
-        entry = ttk.Entry(self, textvariable=self.name_var, width=30)
-        entry.pack(padx=DIALOG_OUTER_PAD, pady=(0, 16))
+        entry = ttk.Entry(self, textvariable=self.name_var, width=38)
+        entry.pack(padx=DIALOG_OUTER_PAD, fill="x")
         entry.bind("<Return>", lambda _e: self._save())
+        self.bind("<Escape>", lambda _e: self.destroy())
+        _dialog_actions(self, t("btn.save"), self._save)
 
-        btns = ttk.Frame(self)
-        btns.pack(pady=(0, 16))
-        ttk.Button(btns, text=t("btn.cancel"), command=self.destroy, width=DIALOG_BUTTON_WIDTH).pack(side="left", padx=6)
-        ttk.Button(btns, text=t("btn.save"), command=self._save, width=DIALOG_BUTTON_WIDTH).pack(side="left", padx=6)
 
         _center_on_parent(self, parent)
         self.grab_set()
@@ -344,29 +355,23 @@ class RecordingDialog(tk.Toplevel):
         self.resizable(False, False)
         self.transient(parent)
         self.on_start = on_start
-        pad = DIALOG_FORM_PAD
-
-        ttk.Label(self, text=t("recording.save_to")).grid(row=0, column=0, sticky="w", **pad)
-        ttk.Label(self, text=str(recordings_dir), foreground=FG_MUTED).grid(
-            row=0, column=1, sticky="w", padx=(0, 14), pady=6)
-
+        _dialog_heading(self, t("device.tip_record"), model)
+        form = ttk.Frame(self, padding=16, style="Card.TFrame")
+        form.pack(fill="x", padx=DIALOG_OUTER_PAD)
+        ttk.Label(form, text=t("recording.save_to"), style="Card.TLabel").pack(anchor="w")
+        ttk.Label(form, text=str(recordings_dir), style="CardMuted.TLabel", font=FONT_MUTED,
+                  wraplength=400, justify="left").pack(anchor="w", pady=(6, 16))
+        tk.Frame(form, bg=BORDER, height=1).pack(fill="x", pady=(0, 16))
         self.light_var = tk.BooleanVar(value=False)
-        ttk.Checkbutton(
-            self, text=t("recording.light"),
-            variable=self.light_var,
-        ).grid(row=1, column=0, columnspan=2, sticky="w", padx=14, pady=(0, 4))
-        ttk.Label(
-            self, text=t("recording.light_hint"),
-            foreground=FG_MUTED, font=(FONT_FAMILY, 8), justify="left", wraplength=380,
-        ).grid(row=2, column=0, columnspan=2, sticky="w", padx=14, pady=(0, 10))
-
-        btns = ttk.Frame(self)
-        btns.grid(row=3, column=0, columnspan=2, pady=(0, 14))
-        ttk.Button(btns, text=t("btn.cancel"), command=self.destroy, width=DIALOG_BUTTON_WIDTH).pack(side="left", padx=6)
-        ttk.Button(btns, text=t("btn.record"), command=self._start, width=DIALOG_BUTTON_WIDTH).pack(side="left", padx=6)
-
+        ttk.Checkbutton(form, text=t("recording.light"), variable=self.light_var,
+                        style="Card.TCheckbutton").pack(anchor="w")
+        ttk.Label(form, text=t("recording.light_hint"), style="CardMuted.TLabel", font=FONT_MUTED,
+                  wraplength=400, justify="left").pack(anchor="w", padx=(28, 0), pady=(6, 0))
+        _dialog_actions(self, t("btn.record"), self._start)
+        self.bind("<Escape>", lambda _e: self.destroy())
         _center_on_parent(self, parent)
         self.grab_set()
+
 
     def _start(self):
         self.on_start(self.light_var.get())
@@ -465,10 +470,7 @@ class QrPairingDialog(tk.Toplevel):
         self.configure(bg=BG)
         self.on_close = on_close
 
-        ttk.Label(
-            self, text=t("qr_pairing.instructions"), foreground=FG_MUTED,
-            justify="center", wraplength=280,
-        ).pack(padx=DIALOG_OUTER_PAD, pady=(16, 12))
+        _dialog_heading(self, t("qr_pairing.title"), t("qr_pairing.instructions"))
 
         # fundo branco ao redor do QR - "zona de silencio" que camera de
         # celular precisa pra ler direito, mesmo no tema escuro do painel
@@ -652,12 +654,7 @@ class ConfirmActionDialog(tk.Toplevel):
 
 
 class AppSettingsDialog(tk.Toplevel):
-    """Preferencias gerais do painel (nao e por aparelho - isso e o
-    SettingsDialog mais acima). Cada opcao aplica na hora, igual sempre
-    funcionou quando eram checkbox soltos no cabecalho - so a localizacao
-    mudou, o comportamento e identico (sem botao Salvar/Cancelar de proposito).
-
-    'items' e uma lista de (var, label_key, hint_key_ou_None, command)."""
+    """Preferencias aplicadas imediatamente, com descricoes legiveis."""
 
     def __init__(self, parent, items):
         super().__init__(parent)
@@ -665,18 +662,25 @@ class AppSettingsDialog(tk.Toplevel):
         self.title(t("settings.app_title"))
         self.resizable(False, False)
         self.transient(parent)
-
-        for i, (var, label_key, hint_key, command) in enumerate(items):
-            ttk.Checkbutton(self, text=t(label_key), variable=var, command=command).pack(
-                padx=DIALOG_OUTER_PAD, pady=(18 if i == 0 else 10, 0 if hint_key else 10), anchor="w")
+        _dialog_heading(self, t("app.settings"), t("settings.app_hint"))
+        form = ttk.Frame(self, padding=(16, 4), style="Card.TFrame")
+        form.pack(fill="x", padx=DIALOG_OUTER_PAD)
+        for index, (var, label_key, hint_key, command) in enumerate(items):
+            if index:
+                tk.Frame(form, bg=BORDER, height=1).pack(fill="x")
+            row = ttk.Frame(form, padding=(0, 12), style="Card.TFrame")
+            row.pack(fill="x")
+            ttk.Checkbutton(row, text=t(label_key), variable=var, command=command,
+                            style="Card.TCheckbutton").pack(anchor="w")
             if hint_key:
-                ttk.Label(self, text=t(hint_key), foreground=FG_MUTED, font=FONT_MUTED).pack(
-                    padx=(DIALOG_OUTER_PAD + 20, DIALOG_OUTER_PAD), pady=(0, 10), anchor="w")
-
-        ttk.Button(self, text=t("btn.close"), command=self.destroy, width=DIALOG_BUTTON_WIDTH).pack(pady=(8, 16))
-
+                ttk.Label(row, text=t(hint_key), style="CardMuted.TLabel", font=FONT_MUTED,
+                          wraplength=380, justify="left").pack(padx=(28, 0), pady=(4, 0), anchor="w")
+        _dialog_actions(self, t("btn.close"), self.destroy, cancel=False)
+        self.bind("<Escape>", lambda _e: self.destroy())
         _center_on_parent(self, parent)
         self.grab_set()
+
+
 
 
 class ShortcutsDialog(tk.Toplevel):
@@ -691,10 +695,7 @@ class ShortcutsDialog(tk.Toplevel):
         self.resizable(False, False)
         self.transient(parent)
 
-        ttk.Label(self, text=t("shortcuts.title"), font=FONT_BOLD).pack(
-            padx=DIALOG_OUTER_PAD, pady=(16, 4), anchor="w")
-        ttk.Label(self, text=t("shortcuts.hint"), foreground=FG_MUTED).pack(
-            padx=DIALOG_OUTER_PAD, anchor="w", pady=(0, 10))
+        _dialog_heading(self, t("shortcuts.title"), t("shortcuts.hint"))
 
         rows = [
             ("MOD+r", t("shortcuts.rotate")),
@@ -709,18 +710,20 @@ class ShortcutsDialog(tk.Toplevel):
             ("MOD+g", t("shortcuts.resize")),
             (".apk", t("shortcuts.drop_apk")),
         ]
-        grid = ttk.Frame(self)
+        grid = ttk.Frame(self, padding=16, style="Card.TFrame")
         grid.pack(padx=DIALOG_OUTER_PAD, pady=(0, 8))
         for i, (key, desc) in enumerate(rows):
-            ttk.Label(grid, text=key, font=("Consolas", 9, "bold"), foreground=ACCENT).grid(
-                row=i, column=0, sticky="w", padx=(0, 14), pady=3)
-            ttk.Label(grid, text=desc, foreground=FG, wraplength=260, justify="left").grid(
-                row=i, column=1, sticky="w", pady=3)
+            tk.Label(grid, text=key, font=("Consolas", 9), foreground=FG,
+                     background=HOVER, padx=8, pady=4).grid(
+                         row=i, column=0, sticky="w", padx=(0, 16), pady=4)
+            ttk.Label(grid, text=desc, style="CardMuted.TLabel", wraplength=320, justify="left").grid(
+                row=i, column=1, sticky="w", pady=4)
 
         ttk.Label(self, text=t("shortcuts.mod_hint"), foreground=FG_SUBTLE, font=FONT_MUTED).pack(
             padx=DIALOG_OUTER_PAD, pady=(4, 0), anchor="w")
 
-        ttk.Button(self, text=t("btn.close"), command=self.destroy, width=DIALOG_BUTTON_WIDTH).pack(pady=16)
+        _dialog_actions(self, t("btn.close"), self.destroy, cancel=False)
+        self.bind("<Escape>", lambda _e: self.destroy())
 
         _center_on_parent(self, parent)
         self.grab_set()
@@ -735,69 +738,65 @@ class DeviceRow:
         self.recording_anchor: float | None = None  # time.monotonic() de referencia local
         self.display_name = serial
 
-        # borda fina (1px) ao redor de cada linha, pra parecer um "cartao" separado
         self.border = tk.Frame(parent, bg=BORDER)
-        self.frame = ttk.Frame(self.border, padding=(12, 10), style="Card.TFrame")
+        self.frame = ttk.Frame(self.border, padding=(16, 12), style="Card.TFrame")
         self.frame.pack(fill="both", expand=True, padx=1, pady=1)
         self.frame.columnconfigure(1, weight=1)
 
-        self.dot = tk.Canvas(self.frame, width=12, height=12, highlightthickness=0,
-                              bg=SURFACE, bd=0)
-        self.dot.grid(row=0, column=0, rowspan=2, padx=(0, 12))
-        self.dot_id = self.dot.create_oval(1, 1, 11, 11, fill=FG_MUTED, outline="")
-
+        ttk.Label(self.frame, image=get_icon("phone", 30, FG_MUTED),
+                  style="Card.TLabel").grid(row=0, column=0, rowspan=2, padx=(0, 14))
         name_box = ttk.Frame(self.frame, style="Card.TFrame")
-        name_box.grid(row=0, column=1, sticky="w")
-        self.model_label = ttk.Label(name_box, font=(FONT_FAMILY, 10, "bold"), style="Card.TLabel",
-                                      cursor="hand2")
-        self.model_label.pack(side="left")
+        name_box.grid(row=0, column=1, sticky="ew")
+        name_box.columnconfigure(0, weight=1)
+        self.model_label = ttk.Label(name_box, font=(FONT_FAMILY, 12), style="Card.TLabel",
+                                     cursor="hand2", anchor="w", width=1)
+        self.model_label.grid(row=0, column=0, sticky="ew")
         self.model_label.bind("<Button-1>", lambda _e: self._rename())
-        self.rename_btn = ttk.Button(name_box, image=get_icon("edit", 11, FG_MUTED),
-                                      command=self._rename, style="Icon.TButton")
-        self.rename_btn.pack(side="left", padx=(4, 0))
+        self.rename_btn = ttk.Button(name_box, image=get_icon("edit", 12, FG_SUBTLE),
+                                     command=self._rename, style="Icon.TButton")
+        self.rename_btn.grid(row=0, column=1, padx=(6, 8))
         Tooltip(self.rename_btn, t("device.tip_rename"))
+        self.detail_label = ttk.Label(self.frame, foreground=FG_MUTED, font=FONT_MUTED,
+                                      style="CardMuted.TLabel", width=1, anchor="w")
+        self.detail_label.grid(row=1, column=1, sticky="ew", pady=(2, 0))
 
-        self.detail_label = ttk.Label(self.frame, foreground=FG_MUTED, font=(FONT_FAMILY, 8),
-                                       style="CardMuted.TLabel")
-        self.detail_label.grid(row=1, column=1, sticky="w", pady=(2, 0))
+        state_box = ttk.Frame(self.frame, style="Card.TFrame")
+        state_box.grid(row=0, column=2, rowspan=2, padx=(16, 14))
+        self.status_label = ttk.Label(state_box, style="CardMuted.TLabel", font=FONT_MUTED)
+        self.status_label.pack(anchor="e")
+        self.recording_label = ttk.Label(state_box, style="Card.TLabel", foreground=RED, font=FONT_MUTED)
+        self.recording_label.pack(anchor="e", pady=(3, 0))
+        self.toggle_btn = ttk.Button(self.frame, command=self._toggle, width=9,
+                                     compound="left", style="Toggle.TButton")
+        self.toggle_btn.grid(row=0, column=3, rowspan=2)
 
+        tk.Frame(self.frame, bg=BORDER, height=1).grid(row=2, column=0, columnspan=4,
+                                                     sticky="ew", pady=(10, 6))
         actions = ttk.Frame(self.frame, style="Card.TFrame")
-        actions.grid(row=0, column=2, rowspan=2, padx=(10, 0))
-
-        self.toggle_btn = ttk.Button(actions, command=self._toggle, width=9, compound="left",
-                                      style="Toggle.TButton")
-        self.toggle_btn.pack(side="left", padx=(0, 8))
-
-        # Icones agrupados por proposito (com um respiro maior entre grupos, em
-        # vez de um espacamento uniforme que fazia tudo parecer uma fileira so
-        # de botoes soltos): conectar/transferir, depois capturar, depois
-        # ajustar - a mesma ordem que faz sentido usar num aparelho novo.
-        icons_box = ttk.Frame(actions, style="Card.TFrame")
-        icons_box.pack(side="left")
-
-        self.wifi_btn = ttk.Button(icons_box, image=get_icon("wifi", 15, ACCENT),
-                                    command=self._wifi, style="Icon.TButton")
-        self.wifi_btn.pack(side="left", padx=1)
+        actions.grid(row=3, column=0, columnspan=4, sticky="ew")
+        self.wifi_btn = ttk.Button(actions, text=t("device.wifi"), image=get_icon("wifi", 14, FG_MUTED),
+                                  compound="left", command=self._wifi, style="CardAction.TButton")
+        self.wifi_btn.pack(side="left")
         Tooltip(self.wifi_btn, t("device.tip_wifi"))
-
-        self.send_file_btn = ttk.Button(icons_box, image=get_icon("upload", 15, ACCENT),
-                                         command=self._send_file, style="Icon.TButton")
-        self.send_file_btn.pack(side="left", padx=(1, 6))
+        self.send_file_btn = ttk.Button(actions, text=t("device.send"), image=get_icon("upload", 14, FG_MUTED),
+                                       compound="left", command=self._send_file, style="CardAction.TButton")
+        self.send_file_btn.pack(side="left", padx=(4, 0))
         Tooltip(self.send_file_btn, t("device.tip_send_file"))
-
-        self.screenshot_btn = ttk.Button(icons_box, image=get_icon("camera", 15, FG_MUTED),
-                                          command=self._screenshot, style="Icon.TButton")
-        self.screenshot_btn.pack(side="left", padx=1)
+        self.screenshot_btn = ttk.Button(actions, text=t("device.capture"), image=get_icon("camera", 14, FG_MUTED),
+                                        compound="left", command=self._screenshot, style="CardAction.TButton")
+        self.screenshot_btn.pack(side="left", padx=(4, 0))
         Tooltip(self.screenshot_btn, t("device.tip_screenshot"))
-
-        self.record_btn = ttk.Button(icons_box, command=self._record, style="Icon.TButton")
-        self.record_btn.pack(side="left", padx=(1, 6))
+        self.record_btn = ttk.Button(actions, text=t("btn.record"), compound="left",
+                                    command=self._record, style="CardAction.TButton")
+        self.record_btn.pack(side="left", padx=(4, 0))
         self.record_tip = Tooltip(self.record_btn, t("device.tip_record"))
-
-        self.settings_btn = ttk.Button(icons_box, image=get_icon("gear", 15, FG_MUTED),
-                                        command=self._settings, style="Icon.TButton")
-        self.settings_btn.pack(side="left", padx=1)
+        self.settings_btn = ttk.Button(actions, text=t("device.quality"), image=get_icon("gear", 14, FG_MUTED),
+                                      compound="left", command=self._settings, style="CardAction.TButton")
+        self.settings_btn.pack(side="right")
         Tooltip(self.settings_btn, t("device.tip_settings"))
+        self._detail_tip = Tooltip(self.detail_label)
+        self._name_tip = Tooltip(self.model_label)
+
 
     def _toggle(self):
         self.callbacks["toggle"](self.serial, self.status)
@@ -821,11 +820,14 @@ class DeviceRow:
         self.callbacks["rename"](self.serial)
 
     def _render_model_text(self):
-        text = self.display_name
+        self.model_label.config(text=self.display_name)
+        self._name_tip.set_text(self.display_name)
+        recording_text = ""
         if self.recording_anchor is not None:
-            secs = int(time.monotonic() - self.recording_anchor)
-            text += f"   ● {t('device.recording')} {secs // 60:02d}:{secs % 60:02d}"
-        self.model_label.config(text=text, foreground=RED if self.recording_anchor is not None else "")
+            secs = max(0, int(time.monotonic() - self.recording_anchor))
+            recording_text = f"● {t('device.recording')} {secs // 60:02d}:{secs % 60:02d}"
+        self.recording_label.config(text=recording_text)
+
 
     def refresh_timer(self):
         """Chamado a cada 1s pela janela principal - atualiza so o cronometro, sem
@@ -838,7 +840,7 @@ class DeviceRow:
         self.recording = info.get("recording", False)
         self.display_name = info["display_name"]
         label, color = _status_labels().get(self.status, (self.status, FG))
-        self.dot.itemconfig(self.dot_id, fill=color)
+        self.status_label.config(text="●  " + label, foreground=color)
 
         if self.recording:
             if self.recording_anchor is None:
@@ -847,21 +849,21 @@ class DeviceRow:
             self.recording_anchor = None
         self._render_model_text()
 
-        detail = f"{self.serial}"
-        if info["status"] == "mirroring" and info.get("port"):
-            detail += f"  |  {t('device.port')} {info['port']}  |  {label}"
-        elif info["status"] == "problem" and info.get("problem_state"):
-            detail += f"  |  {_problem_hint_text(info['problem_state'])}"
-        else:
-            detail += f"  |  {label}"
+        connection = "Wi-Fi" if ":" in self.serial else "USB"
+        detail = f"{connection}   /   {self.serial}"
+        if self.status == "problem" and info.get("problem_state"):
+            detail = _problem_hint_text(info["problem_state"])
         self.detail_label.config(text=detail)
+        self._detail_tip.set_text(detail)
 
         if self.status == "mirroring":
-            self.toggle_btn.config(text=t("btn.stop"), image=get_icon("stop", 13, RED), state="normal")
-        elif self.status in ("ready", "blocked"):
-            self.toggle_btn.config(text=t("btn.start"), image=get_icon("play", 13, GREEN), state="normal")
+            self.toggle_btn.config(text=t("btn.stop"), image=get_icon("stop", 13, FG),
+                                   state="normal", style="Toggle.TButton")
         else:
-            self.toggle_btn.config(text=t("btn.start"), image=get_icon("play", 13, GREEN), state="disabled")
+            self.toggle_btn.config(text=t("btn.start"), image=get_icon("play", 13, BG),
+                                   state="normal" if self.status in ("ready", "blocked") else "disabled",
+                                   style="Accent.TButton")
+
 
         is_wireless = ":" in self.serial
         can_touch = self.status in ("mirroring", "ready", "blocked")
@@ -871,11 +873,11 @@ class DeviceRow:
         self.send_file_btn.config(state="normal" if can_touch else "disabled")
 
         if self.recording:
-            self.record_btn.config(image=get_icon("stop", 13, RED),
+            self.record_btn.config(text=t("device.stop_record"), image=get_icon("stop", 13, RED),
                                     state="normal" if self.status == "mirroring" else "disabled")
             self.record_tip.set_text(t("device.tip_stop_recording"))
         else:
-            self.record_btn.config(image=get_icon("record", 13, RED),
+            self.record_btn.config(text=t("btn.record"), image=get_icon("record", 13, FG_MUTED),
                                     state="normal" if self.status == "mirroring" else "disabled")
             self.record_tip.set_text(t("device.tip_record"))
 
@@ -910,7 +912,7 @@ class App:
 
         self.root = root
         root.title(t("app.title"))
-        root.geometry("740x620")
+        root.geometry("900x780")
         root.configure(bg=BG)
         _apply_dark_titlebar(root)  # antes de qualquer coisa aparecer na tela
 
@@ -936,7 +938,7 @@ class App:
         # botoes do cabecalho pode ficar espremida de novo (sem erro nenhum)
         # numa fonte/DPI/traducao diferente da que foi testada.
         self.root.update_idletasks()
-        self.root.minsize(self._header_actions_row.winfo_reqwidth() + 60, 400)
+        self.root.minsize(max(760, self._header_actions_row.winfo_reqwidth() + 48), 620)
         self._log(t("log.started"))
         self._setup_tray()
 
@@ -954,160 +956,206 @@ class App:
         self.root.after(1000, self._tick_timers)
 
     def _setup_styles(self):
-        # Fontes nomeadas cobrem os widgets Tk sem sobrescrever os estilos ttk.
-        # Um wildcard *Font colocaria uma fonte local em cada widget, impedindo
-        # os titulos e botoes de usarem os tamanhos/pesos definidos abaixo.
+        sv_ttk.set_theme("dark", self.root)
         for name in ("TkDefaultFont", "TkTextFont", "TkMenuFont", "TkHeadingFont",
                      "TkCaptionFont", "TkSmallCaptionFont", "TkIconFont", "TkTooltipFont"):
-            tkfont.nametofont(name, root=self.root).configure(family=FONT_FAMILY)
-
-        # Tema Sun Valley (sv_ttk) - da o visual Windows 11 moderno (cantos
-        # arredondados, hover, cores) a QUALQUER widget ttk existente, sem precisar
-        # trocar nenhum widget de lugar. Os estilos customizados abaixo (Card.*,
-        # Header.*, etc.) so ajustam cor/fonte especificos por cima dele.
-        sv_ttk.set_theme("dark", self.root)
+            tkfont.nametofont(name, root=self.root).configure(family=FONT_FAMILY, size=10)
         style = ttk.Style(self.root)
-        style.configure(".", font=FONT_DEFAULT)  # padrao pra todos os widgets ttk
+        style.configure(".", font=FONT_DEFAULT)
+        style.configure("TFrame", background=BG)
+        style.configure("TLabel", background=BG, foreground=FG)
+        style.configure("TButton", font=FONT_DEFAULT, padding=(12, 7))
+        style.configure("TCheckbutton", font=FONT_DEFAULT)
+        style.configure("TCombobox", font=FONT_DEFAULT, padding=(8, 6))
+        self.root.option_add("*TCombobox*Listbox.font", FONT_DEFAULT)
+        self.root.option_add("*TCombobox*Listbox.background", SURFACE)
+        self.root.option_add("*TCombobox*Listbox.foreground", FG)
+        self.root.option_add("*TCombobox*Listbox.selectBackground", HOVER)
+        self.root.option_add("*TCombobox*Listbox.selectForeground", FG)
         style.configure("Card.TFrame", background=SURFACE)
-        style.configure("Card.TLabel", background=SURFACE, foreground=FG, font=(FONT_FAMILY, 10, "bold"))
+        # Sun Valley already defines Card.TFrame with an image border; inner
+        # groups must use the plain layout to avoid boxes around every label.
+        style.layout("Card.TFrame", style.layout("TFrame"))
+        style.configure("Card.TLabel", background=SURFACE, foreground=FG)
         style.configure("CardMuted.TLabel", background=SURFACE, foreground=FG_MUTED)
-        style.configure("Icon.TButton", padding=5)
-        style.configure("Toggle.TButton", font=(FONT_FAMILY, 9, "bold"))
-        style.configure("Summary.TLabel", font=(FONT_FAMILY, 9, "bold"), foreground=FG)
-        style.configure("Header.TLabel", font=(FONT_FAMILY, 9, "bold"), foreground=FG)
-        style.configure("Title.TLabel", font=(FONT_FAMILY, 16, "bold"), foreground=FG)
+        style.configure("Card.TCheckbutton", background=SURFACE, font=FONT_DEFAULT)
+        style.map("Card.TCheckbutton", background=[("active", SURFACE)])
+        style.configure("Summary.TLabel", font=FONT_MUTED, foreground=FG_MUTED)
+        style.configure("Header.TLabel", font=FONT_BOLD, foreground=FG)
+        style.configure("Title.TLabel", font=(FONT_FAMILY, 20), foreground=FG)
+        style.configure("DialogTitle.TLabel", font=(FONT_FAMILY, 16), foreground=FG)
+        style.configure("Toggle.TButton", padding=(16, 7), font=FONT_DEFAULT)
+        style.configure("Accent.TButton", padding=(16, 7), font=FONT_DEFAULT)
+        # Native focus outline, quiet background. Secondary actions no longer
+        # look like a wall of boxed primary buttons.
+        quiet_layout = [("Button.focus", {"sticky": "nswe", "children": [
+            ("Button.padding", {"sticky": "nswe", "children": [
+                ("Button.label", {"sticky": "nswe"})]})]})]
+        for name, background, padding in (
+                ("Quiet.TButton", BG, (10, 7)),
+                ("CardAction.TButton", SURFACE, (9, 6)),
+                ("Icon.TButton", SURFACE, (6, 5)),
+                ("Update.TButton", BG, (6, 3))):
+            style.layout(name, quiet_layout)
+            style.configure(name, background=background, foreground=FG_MUTED,
+                            padding=padding, font=FONT_MUTED, borderwidth=0,
+                            focusthickness=1, focuscolor=ACCENT, anchor="center")
+            style.map(name, background=[("pressed", BORDER), ("active", HOVER)],
+                      foreground=[("disabled", "#777e89"), ("active", FG)])
 
-        style.configure("Update.TButton", font=(FONT_FAMILY, 8), foreground=ACCENT, padding=(8, 3))
-        style.map("Update.TButton", foreground=[("disabled", FG_SUBTLE)])
-        # Bulk.TButton = botoes de acao em lote no cabecalho (Iniciar/Parar todos,
-        # Enviar arquivo, Atalhos) - fonte e padding maiores que antes pra ficarem
-        # mais folgados/faceis de acertar com o mouse, deixando de parecer botoes
-        # "espremidos" numa fileira.
-        style.configure("Bulk.TButton", font=(FONT_FAMILY, 9), padding=(11, 7))
+        self._primary_surfaces = [ImageTk.PhotoImage(icons.button_surface(color, outline))
+                                  for color, outline in ((ACCENT, ACCENT), ("#b3cbf3", "#b3cbf3"),
+                                                         ("#83a7dd", "#83a7dd"), ("#34383e", BORDER),
+                                                         (ACCENT, FG))]
+        normal, hover, pressed, disabled, focus = self._primary_surfaces
+        style.element_create("Panel.primary", "image", normal, ("disabled", disabled),
+                             ("pressed", pressed), ("active", hover), ("focus", focus),
+                             border=6, sticky="nswe")
+        style.layout("Accent.TButton", [("Panel.primary", {"sticky": "nswe", "children": [
+            ("Button.padding", {"sticky": "nswe", "children": [("Button.label", {"sticky": "nswe"})]})]})])
+        style.configure("Accent.TButton", foreground=BG)
+        style.map("Accent.TButton", foreground=[("disabled", FG_SUBTLE), ("!disabled", BG)])
 
     def _button_group(self, parent, buttons):
-        """Cartao com um grupo de botoes de acao em lote (borda fina + fundo
-        SURFACE elevado, mesma linguagem visual dos cartoes de aparelho) -
-        cada item de 'buttons' e (texto, nome_do_icone, cor_do_icone, comando)."""
-        border = tk.Frame(parent, bg=BORDER)
-        card = ttk.Frame(border, style="Card.TFrame", padding=(8, 6))
-        card.pack(padx=1, pady=1)
+        group = ttk.Frame(parent)
         for i, (text, icon_name, icon_color, command) in enumerate(buttons):
-            ttk.Button(card, text=text, image=get_icon(icon_name, 14, icon_color), compound="left",
-                       style="Bulk.TButton", command=command).pack(side="left", padx=(0 if i == 0 else 6, 0))
-        return border
+            ttk.Button(group, text=text, image=get_icon(icon_name, 14, icon_color),
+                       compound="left", style="Quiet.TButton", command=command).pack(
+                           side="left", padx=(0 if i == 0 else 4, 0))
+        return group
+
 
     # ---------------------------------------------------------------- UI --
     def _build_ui(self):
-        # Cabecalho: chrome escuro unificado com o resto da janela (nada de bloco
-        # solido colorido) - a identidade azul do app fica so no icone e nos
-        # destaques (nome do app, botao de atualizar, icones de acao).
-        top = ttk.Frame(self.root, padding=(16, 14, 16, 12))
+        top = ttk.Frame(self.root, padding=(24, 20, 24, 16))
         top.pack(fill="x")
+        heading = ttk.Frame(top)
+        heading.pack(fill="x")
+        self._brand_icon = ImageTk.PhotoImage(icons.app_icon(34))
+        ttk.Label(heading, image=self._brand_icon).pack(side="left", padx=(0, 12))
+        ttk.Label(heading, text=t("app.title"), style="Title.TLabel").pack(side="left")
+        ttk.Button(heading, text=t("app.settings"), image=get_icon("gear", 15, FG_MUTED),
+                   compound="left", style="Quiet.TButton", command=self._open_app_settings).pack(side="right")
+        ttk.Label(top, text=t("app.subtitle"), foreground=FG_MUTED,
+                  font=FONT_MUTED).pack(anchor="w", pady=(6, 0))
 
-        row1 = ttk.Frame(top)
-        row1.pack(fill="x")
-        ttk.Label(row1, text=t("app.title"), style="Title.TLabel").pack(side="left")
-        self.summary_label = ttk.Label(row1, text=t("app.loading"), style="Summary.TLabel")
-        self.summary_label.pack(side="right")
-
-        ttk.Label(top, text=t("app.subtitle"),
-                  foreground=FG_MUTED, font=(FONT_FAMILY, 8)).pack(anchor="w", pady=(2, 0))
-
-        # As preferencias gerais (manter tela ligada, janelas sempre visiveis,
-        # minimizar pra bandeja) nao ficam mais soltas aqui no cabecalho como
-        # checkbox - cresceram demais pra caber numa linha so (3 caixas de
-        # texto longo espremidas ficava feio e ainda cortava fora da janela
-        # no tamanho padrao). Moram no dialogo AppSettingsDialog agora, atras
-        # do botao "Configuracoes" no cartao de utilitarios logo abaixo. As
-        # variaveis continuam vivendo aqui no App porque _toggle_* le direto
-        # delas - so a apresentacao (onde o Checkbutton e desenhado) mudou.
         self.stay_awake_var = tk.BooleanVar(value=self.manager.stay_awake)
         self.always_on_top_var = tk.BooleanVar(value=self.manager.always_on_top)
         self.minimize_to_tray_var = tk.BooleanVar(value=self.manager.minimize_to_tray)
-
-        # Duas turmas de botao, cada uma dentro do seu proprio "cartao" (mesma
-        # linguagem visual dos cartoes de aparelho: borda fina + fundo SURFACE
-        # elevado) - controle de SESSAO (liga/desliga todo mundo, o par mais
-        # usado) separado dos UTILITARIOS (enviar arquivo, ver atalhos, usados
-        # bem menos). Um separador fino de linha (testado antes) ficava discreto
-        # demais pra notar a diferenca; dois cartoes lado a lado com um vao
-        # entre eles fica bem mais claro e "arrumado".
         self._header_actions_row = ttk.Frame(top)
-        self._header_actions_row.pack(fill="x", pady=(10, 0))
-
+        self._header_actions_row.pack(fill="x", pady=(16, 0))
+        self.start_all_btn = ttk.Button(self._header_actions_row, text=t("app.start_all"),
+                                       image=get_icon("play", 13, FG), compound="left",
+                                       command=self._on_start_all)
+        self.start_all_btn.pack(side="left")
+        self.stop_all_btn = ttk.Button(self._header_actions_row, text=t("app.stop_all"),
+                                      style="Quiet.TButton", command=self._on_stop_all)
+        self.stop_all_btn.pack(side="left", padx=(6, 0))
         self._button_group(self._header_actions_row, [
-            (t("app.start_all"), "play", GREEN, self._on_start_all),
-            (t("app.stop_all"), "stop", RED, self._on_stop_all),
-        ]).pack(side="left")
-
-        self._button_group(self._header_actions_row, [
-            (t("app.qr_pairing"), "qr", ACCENT, self._on_qr_pairing),
-            (t("app.batch_transfer"), "upload", ACCENT, self._on_batch_transfer),
+            (t("app.qr_pairing"), "qr", FG_MUTED, self._on_qr_pairing),
+            (t("app.batch_transfer"), "upload", FG_MUTED, self._on_batch_transfer),
             (t("app.shortcuts"), "keyboard", FG_MUTED, self._on_show_shortcuts),
-            (t("app.settings"), "gear", FG_MUTED, self._open_app_settings),
-        ]).pack(side="left", padx=(10, 0))
+        ]).pack(side="right")
+        tk.Frame(self.root, bg=BORDER, height=1).pack(fill="x", padx=24)
 
-        divider = tk.Frame(self.root, bg=BORDER, height=1)
-        divider.pack(fill="x")
+        section = ttk.Frame(self.root, padding=(24, 16, 24, 8))
+        section.pack(fill="x")
+        ttk.Label(section, text=t("app.devices"), style="Header.TLabel").pack(side="left")
+        self.summary_label = ttk.Label(section, text=t("app.loading"), style="Summary.TLabel")
+        self.summary_label.pack(side="right")
+
+        # Reserve the activity/footer before the expanding list, including at
+        # the minimum window height. The list alone takes the remaining space.
+        footer = ttk.Frame(self.root, padding=(24, 6, 24, 12))
+        footer.pack(side="bottom", fill="x")
+        ttk.Label(footer, text=f"MirrorPanel  {updater.APP_VERSION}",
+                  foreground=FG_SUBTLE, font=FONT_MUTED).pack(side="left")
+        ttk.Button(footer, text=t("app.check_update"), style="Update.TButton",
+                   command=self._on_check_update).pack(side="right")
+
+        activity = ttk.Frame(self.root, padding=(24, 10, 24, 0))
+        activity.pack(side="bottom", fill="x")
+        toolbar = ttk.Frame(activity)
+        toolbar.pack(fill="x", pady=(0, 8))
+        ttk.Label(toolbar, text=t("app.activity"), style="Header.TLabel").pack(side="left")
+        self.log_filter = tk.StringVar(value=t("activity.all"))
+        filters = ttk.Combobox(toolbar, textvariable=self.log_filter, state="readonly",
+                               values=(t("activity.all"), t("activity.problems")), width=18)
+        filters.pack(side="left", padx=14)
+        filters.bind("<<ComboboxSelected>>", lambda _e: self._refresh_log(reset_view=True))
+        ttk.Button(toolbar, text=t("activity.clear"), style="Quiet.TButton",
+                   command=self._clear_log).pack(side="right")
+        ttk.Button(toolbar, text=t("activity.copy"), style="Quiet.TButton",
+                   command=self._copy_log).pack(side="right", padx=(0, 4))
+        log_border = tk.Frame(activity, bg=LOG_BG, highlightthickness=1,
+                              highlightbackground=BORDER)
+        log_border.pack(fill="x")
+        self.apk_progress = ttk.Progressbar(log_border, mode="indeterminate")
+        self.log_body = tk.Frame(log_border, bg=LOG_BG)
+        self.log_body.pack(fill="both", expand=True)
+        scrollbar = ttk.Scrollbar(self.log_body, orient="vertical")
+        scrollbar.pack(side="right", fill="y", padx=(0, 4), pady=8)
+        self.log_text = tk.Text(self.log_body, height=5, state="disabled", font=FONT_MUTED,
+                               bg=LOG_BG, fg=FG_MUTED, insertbackground=FG,
+                               selectbackground="#405778", selectforeground=FG,
+                               relief="flat", highlightthickness=0, padx=14, pady=10,
+                               spacing1=4, spacing3=4, wrap="word", cursor="arrow",
+                               yscrollcommand=scrollbar.set)
+        self.log_text.pack(fill="both", expand=True)
+        scrollbar.configure(command=self.log_text.yview)
+        timestamp_width = tkfont.Font(root=self.root, font=("Consolas", 9)).measure("00:00:00  ")
+        level_width = max(tkfont.Font(root=self.root, font=FONT_MUTED).measure(t(f"activity.{level}"))
+                          for level in ("info", "success", "warning", "error")) + 22
+        self.log_text.configure(tabs=(timestamp_width, timestamp_width + level_width))
+        self.log_text.tag_configure("timestamp", foreground=FG_SUBTLE, font=("Consolas", 9))
+        self.log_text.tag_configure("message", foreground=FG_MUTED,
+                                    lmargin2=timestamp_width + level_width)
+        for level, color in (("info", FG_SUBTLE), ("success", GREEN), ("warning", AMBER), ("error", RED)):
+            self.log_text.tag_configure(level, foreground=color)
+        self._log_records = deque(maxlen=LOG_MAX_LINES)
+        self._log_sequence = 0
 
         self.content = ttk.Frame(self.root)
         self.content.pack(fill="both", expand=True)
-
         self.loading_frame = ttk.Frame(self.content)
         self.loading_frame.pack(fill="both", expand=True)
         loading_box = ttk.Frame(self.loading_frame)
         loading_box.place(relx=0.5, rely=0.45, anchor="center")
-        ttk.Label(loading_box, text=t("app.loading_devices"),
-                  font=(FONT_FAMILY, 10)).pack(pady=(0, 10))
-        self.loading_bar = ttk.Progressbar(loading_box, mode="indeterminate", length=220)
+        ttk.Label(loading_box, text=t("app.loading_devices"), foreground=FG_MUTED).pack(pady=(0, 12))
+        self.loading_bar = ttk.Progressbar(loading_box, mode="indeterminate", length=180)
         self.loading_bar.pack()
         self.loading_bar.start(12)
 
-        self.list_frame = ttk.Frame(self.content, padding=(14, 10))
-        self.empty_label = ttk.Label(
-            self.list_frame, text=t("app.empty"),
-            foreground=FG_MUTED, justify="center",
-        )
-        self.empty_label.pack(pady=40)
+        self.device_view = ttk.Frame(self.content, padding=(24, 0, 12, 0))
+        self.device_canvas = tk.Canvas(self.device_view, bg=BG, highlightthickness=0, bd=0)
+        device_scroll = ttk.Scrollbar(self.device_view, orient="vertical", command=self.device_canvas.yview)
+        device_scroll.pack(side="right", fill="y")
+        self.device_canvas.pack(side="left", fill="both", expand=True)
+        self.device_canvas.configure(yscrollcommand=device_scroll.set)
+        self.list_frame = ttk.Frame(self.device_canvas)
+        self._list_window = self.device_canvas.create_window(0, 0, anchor="nw", window=self.list_frame)
+        self.list_frame.bind("<Configure>", lambda _e: self.device_canvas.configure(
+            scrollregion=self.device_canvas.bbox("all")))
+        self.device_canvas.bind("<Configure>", lambda e: self.device_canvas.itemconfigure(
+            self._list_window, width=e.width))
+        self.root.bind("<MouseWheel>", self._scroll_devices, add="+")
+        self.empty_label = ttk.Frame(self.list_frame, padding=(24, 32))
+        ttk.Label(self.empty_label, image=get_icon("phone", 44, FG_SUBTLE)).pack(pady=(0, 14))
+        ttk.Label(self.empty_label, text=t("app.empty_title"), font=(FONT_FAMILY, 13)).pack()
+        ttk.Label(self.empty_label, text=t("app.empty"), foreground=FG_MUTED,
+                  justify="center").pack(pady=(8, 16))
+        ttk.Button(self.empty_label, text=t("app.qr_pairing"), command=self._on_qr_pairing).pack()
+        self.empty_label.pack(fill="x")
 
-        bottom = ttk.Frame(self.root, padding=(14, 6))
-        bottom.pack(fill="x")
-        ttk.Label(bottom, text=t("app.activity"), style="Header.TLabel").pack(side="left")
-        ttk.Button(
-            bottom, text=t("app.check_update"), image=get_icon("refresh", 13, ACCENT),
-            compound="left", style="Update.TButton", command=self._on_check_update,
-        ).pack(side="right")
+    def _scroll_devices(self, event):
+        widget = event.widget
+        while widget is not None:
+            if widget is self.device_view:
+                if self.device_canvas.yview() != (0.0, 1.0):
+                    self.device_canvas.yview_scroll(-int(event.delta / 120), "units")
+                return "break"
+            widget = getattr(widget, "master", None)
 
-        log_border = tk.Frame(self.root, bg=BORDER)
-        log_border.pack(fill="x", padx=14, pady=(0, 8))
-
-        # Barra indeterminada (sem %): o "adb install" usado por tras do
-        # arrastar-e-soltar do scrcpy nao informa progresso incremental, so
-        # sucesso/falha no final - uma % de verdade aqui seria inventada. So
-        # aparece enquanto ha alguma instalacao de APK em andamento.
-        self.apk_progress = ttk.Progressbar(log_border, mode="indeterminate")
-
-        self.log_text = tk.Text(log_border, height=6, state="disabled", font=("Consolas", 9),
-                                 bg=SURFACE, fg=FG_MUTED, insertbackground=FG,
-                                 selectbackground=ACCENT, relief="flat", padx=10, pady=8,
-                                 spacing1=1, spacing3=1)
-        self.log_text.pack(fill="x", padx=1, pady=1)
-        # Uma cor por gravidade - da pra bater o olho e achar um erro no meio do
-        # historico sem ler linha por linha. O timestamp fica sempre discreto,
-        # so a mensagem em si muda de cor.
-        self.log_text.tag_configure("timestamp", foreground=FG_SUBTLE)
-        self.log_text.tag_configure("info", foreground=FG_MUTED)
-        self.log_text.tag_configure("success", foreground=GREEN)
-        self.log_text.tag_configure("warning", foreground=AMBER)
-        self.log_text.tag_configure("error", foreground=RED)
-
-        footer = ttk.Frame(self.root, padding=(14, 0, 14, 10))
-        footer.pack(fill="x")
-        ttk.Label(footer, text=t("app.footer_hint"),
-                  foreground=FG_MUTED, font=FONT_MUTED).pack(side="left")
-        ttk.Label(footer, text=f"v{updater.APP_VERSION}",
-                  foreground=FG_SUBTLE, font=FONT_MUTED).pack(side="right")
 
     def _toggle_setting(self, action_type: str, var: tk.BooleanVar):
         self.action_queue.put({"type": action_type, "value": var.get()})
@@ -1116,7 +1164,7 @@ class App:
     def _set_apk_progress_visible(self, visible: bool):
         if visible:
             if not self.apk_progress.winfo_ismapped():
-                self.apk_progress.pack(fill="x", padx=1, pady=(1, 0), before=self.log_text)
+                self.apk_progress.pack(fill="x", padx=1, pady=(1, 0), before=self.log_body)
                 self.apk_progress.start(12)
         else:
             self.apk_progress.stop()
@@ -1137,21 +1185,60 @@ class App:
             self._set_apk_progress_visible(False)
 
     def _log(self, msg: str, level: str = "info"):
-        """Adiciona uma linha na Atividade recente, com hora e cor por gravidade
-        (info/success/warning/error) - level decide so a cor, a mensagem em si
-        continua descrevendo o que aconteceu por extenso."""
-        timestamp = time.strftime("%H:%M:%S")
-        self.log_text.config(state="normal")
-        self.log_text.insert("end", f"{timestamp}  ", "timestamp")
-        self.log_text.insert("end", f"{msg}\n", level)
-        # nao deixa crescer pra sempre numa sessao longa (o app pode ficar dias
-        # aberto na bandeja) - cada linha ocupa memoria e deixa o widget mais
-        # pesado pra redesenhar/rolar
-        total_lines = int(self.log_text.index("end-1c").split(".")[0])
-        if total_lines > LOG_MAX_LINES:
-            self.log_text.delete("1.0", f"{total_lines - LOG_MAX_LINES + 1}.0")
-        self.log_text.see("end")
-        self.log_text.config(state="disabled")
+        if level not in ("info", "success", "warning", "error"):
+            level = "info"
+        self._log_sequence += 1
+        # Store records, not rendered lines: multiline messages stay intact.
+        self._log_records.append((self._log_sequence, time.strftime("%H:%M:%S"), level, msg))
+        self._refresh_log()
+
+    def _visible_log_records(self):
+        problems_only = self.log_filter.get() == t("activity.problems")
+        return [record for record in self._log_records
+                if not problems_only or record[2] in ("warning", "error")]
+
+    def _refresh_log(self, reset_view=False):
+        text = self.log_text
+        at_bottom = text.yview()[1] >= 0.995
+        top = text.index("@0,0")
+        anchor = next((tag for tag in text.tag_names(top) if tag.startswith("entry-")), None)
+        offset = 0
+        if anchor:
+            offset = text.count(text.tag_ranges(anchor)[0], top, "chars")[0] if str(text.tag_ranges(anchor)[0]) != top else 0
+        text.configure(state="normal")
+        text.delete("1.0", "end")
+        for tag in text.tag_names():
+            if tag.startswith("entry-"):
+                text.tag_delete(tag)
+        records = self._visible_log_records()
+        for sequence, timestamp, level, message in records:
+            start = text.index("end-1c")
+            text.insert("end", timestamp + "\t", "timestamp")
+            text.insert("end", t(f"activity.{level}") + "\t", level)
+            text.insert("end", message + "\n", "message")
+            text.tag_add(f"entry-{sequence}", start, "end-1c")
+        if not records:
+            text.insert("end", t("activity.no_problems") if self._log_records else t("activity.empty"), "info")
+        text.configure(state="disabled")
+        if reset_view or at_bottom:
+            text.see("end")
+        elif anchor and text.tag_ranges(anchor):
+            text.yview(f"{text.tag_ranges(anchor)[0]} + {offset} chars")
+        else:
+            text.yview("1.0")
+
+    def _clear_log(self):
+        self._log_records.clear()
+        self._refresh_log(reset_view=True)
+
+    def _copy_log(self):
+        records = self._visible_log_records()
+        if records:
+            self.root.clipboard_clear()
+            self.root.clipboard_append("\n".join(
+                f"{timestamp}  {t('activity.' + level)}  {message}"
+                for _, timestamp, level, message in records))
+
 
     # ------------------------------------------------------------- tray --
     def _setup_tray(self):
@@ -1237,15 +1324,16 @@ class App:
             engine.run_adb("start-server", timeout=15)
         except Exception:
             pass
-        engine.kill_existing_scrcpy()
 
         self._run_update_check()
 
         while not self.stop_event.is_set():
             try:
-                while not self.action_queue.empty():
+                while not self.stop_event.is_set() and not self.action_queue.empty():
                     self._handle_action(self.action_queue.get())
 
+                if self.stop_event.is_set():
+                    break
                 events = self.manager.tick()
                 self.event_queue.put(("tick", events, self.manager.snapshot()))
             except Exception:
@@ -1278,6 +1366,7 @@ class App:
         elif kind == "stop":
             self.manager.stop_device(serial)
         elif kind == "restart":
+            self._notify_recording_restart(serial)
             self.manager.stop_device(serial)
             time.sleep(1)
             self.manager.start_device(serial)
@@ -1287,6 +1376,7 @@ class App:
         elif kind == "save_settings":
             self.manager.set_device_settings(serial, action["settings"])
             if serial in self.manager.active:
+                self._notify_recording_restart(serial)
                 self.manager.stop_device(serial)
                 time.sleep(1)
                 self.manager.start_device(serial)
@@ -1316,12 +1406,19 @@ class App:
             serials = list(self.manager.last_ready)
             self.event_queue.put(("batch_transfer_started", Path(path).name, len(serials)))
             for target_serial in serials:
+                if self.stop_event.is_set():
+                    break
                 self._transfer_file_to_device(target_serial, path)
         elif kind == "single_transfer":
             # mesmo caminho do batch_transfer acima, so que pra UM aparelho so
             # (reaproveita o mesmo evento batch_transfer_progress - a UI nao
             # precisa saber se veio do botao em lote ou do botao por aparelho).
             self._transfer_file_to_device(serial, action["path"])
+
+    def _notify_recording_restart(self, serial: str):
+        path = self.manager.recording.get(serial)
+        if path:
+            self.event_queue.put(("recording_interrupted", serial, path))
 
     def _transfer_file_to_device(self, serial: str, path: str):
         """Passo de UM aparelho da transferencia (lote ou individual) -
@@ -1355,10 +1452,16 @@ class App:
                 if item[0] == "record_result":
                     _, serial, started, path = item
                     model = self.manager.display_name(serial)
-                    if started:
+                    if started and not path:
+                        self._log(t("log.recording_failed", model=model), "error")
+                    elif started:
                         self._log(t("log.recording_started", model=model, path=path), "success")
                     else:
                         self._log(t("log.recording_saved", model=model), "success")
+                    continue
+                if item[0] == "recording_interrupted":
+                    _, serial, path = item
+                    self._log(t("log.recording_interrupted", model=self.manager.display_name(serial), path=path), "warning")
                     continue
                 if item[0] == "screenshot_result":
                     _, serial, path = item
@@ -1447,7 +1550,7 @@ class App:
                     self.first_tick_done = True
                     self.loading_bar.stop()
                     self.loading_frame.pack_forget()
-                    self.list_frame.pack(fill="both", expand=True)
+                    self.device_view.pack(fill="both", expand=True)
                 self._handle_events(events)
                 self._render(snapshot)
         except queue.Empty:
@@ -1457,7 +1560,9 @@ class App:
     def _handle_events(self, events):
         for ev in events:
             t_ = ev.get("type")
-            if t_ == "arrived":
+            if t_ == "recording_interrupted":
+                self._log(t("log.recording_interrupted", model=ev["model"], path=ev["path"]), "warning")
+            elif t_ == "arrived":
                 self._log(t("log.device_arrived", model=ev['model'], port=ev['port']), "success")
             elif t_ == "reconnected":
                 self._log(t("log.device_reconnected", model=ev['model']), "success")
@@ -1508,11 +1613,15 @@ class App:
 
     def _render(self, snapshot: dict):
         self.summary_label.config(text=t("app.summary", n=len(snapshot)))
+        self.start_all_btn.configure(state="normal" if any(
+            info["status"] in ("ready", "blocked") for info in snapshot.values()) else "disabled")
+        self.stop_all_btn.configure(state="normal" if any(
+            info["status"] == "mirroring" for info in snapshot.values()) else "disabled")
 
         if snapshot:
             self.empty_label.pack_forget()
         else:
-            self.empty_label.pack(pady=40)
+            self.empty_label.pack(fill="x")
 
         for serial in list(self.rows):
             if serial not in snapshot:
@@ -1525,7 +1634,7 @@ class App:
         for serial, info in sorted(snapshot.items(), key=lambda kv: kv[1]["display_name"]):
             if serial not in self.rows:
                 row = DeviceRow(self.list_frame, serial, callbacks)
-                row.border.pack(fill="x", pady=(0, 6))
+                row.border.pack(fill="x", pady=(0, 10))
                 self.rows[serial] = row
             self.rows[serial].update(info)
 
@@ -1726,11 +1835,9 @@ class App:
     def _shutdown_and_apply_update(self, installer_path: str):
         self.stop_event.set()
         self.wake_event.set()
-        self.worker.join(timeout=5)
-        # encerra os espelhamentos/gravacoes com calma (pra nao corromper um
-        # arquivo de gravacao em andamento) e mata o servidor do adb - esse
-        # mesmo shutdown() e usado ao fechar o painel normalmente, e e o que
-        # evita o instalador travar com "arquivo em uso" no adb.exe.
+        self.worker.join()
+        # Aguarda a fila parar antes de encerrar as sessoes rastreadas.
+        # O servidor ADB compartilhado permanece disponivel a outras ferramentas.
         self.manager.shutdown()
         # se tudo der certo, apply_update_and_restart encerra o processo (os._exit)
         # e o codigo abaixo nunca roda. So chega aqui se algo falhar de forma
@@ -1744,7 +1851,7 @@ class App:
     def _recover_from_failed_update(self, error_text: str):
         """apply_update_and_restart falhou de forma detectavel (instalador
         sumiu, nao abriu, saiu com erro) - a essa altura ja paramos a thread
-        de fundo, o servidor adb e o icone da bandeja, pra nao deixar um
+        de fundo e o icone da bandeja, pra nao deixar um
         icone fantasma na bandeja caso a atualizacao desse certo e o
         processo encerrasse na hora (os._exit). Como nao deu certo, o
         programa continua rodando de verdade - sem reconstruir tudo isso do
@@ -1826,7 +1933,7 @@ class App:
         # antes de mexer em self.active - senao as duas threads tocam no mesmo
         # estado (aparelhos ativos, handles de log) ao mesmo tempo no instante
         # do fechamento.
-        self.worker.join(timeout=5)
+        self.worker.join()
         self.manager.shutdown()
         self.root.after(0, self.root.destroy)
 
