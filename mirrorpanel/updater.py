@@ -14,7 +14,7 @@ from pathlib import Path
 
 import requests
 
-APP_VERSION = "1.3.0-0"  # mantenha igual ao MyAppVersion do installer.iss ao lancar uma nova versao
+APP_VERSION = "1.3.1"  # mantenha igual ao MyAppVersion do installer.iss ao lancar uma nova versao
 GITHUB_REPO = "syhhw/MirrorPanel"
 API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
 REQUEST_HEADERS = {"Accept": "application/vnd.github+json", "User-Agent": "MirrorPanel-updater"}
@@ -63,7 +63,11 @@ def check_for_update_detailed(timeout: float = 6.0) -> dict:
         logging.info("Verificacao de atualizacao falhou (sem internet, rate limit ou sem releases ainda)")
         return {"status": "error", "info": None}
 
+    if not isinstance(data, dict):
+        return {"status": "error", "info": None}
     tag = data.get("tag_name") or ""
+    if not isinstance(tag, str):
+        return {"status": "error", "info": None}
     if not tag:
         return {"status": "error", "info": None}
     if _parse_version(tag) <= _parse_version(APP_VERSION):
@@ -71,9 +75,14 @@ def check_for_update_detailed(timeout: float = 6.0) -> dict:
 
     asset_url = asset_name = None
     asset_size = 0
-    for asset in data.get("assets", []):
+    assets = data.get("assets")
+    if not isinstance(assets, list):
+        return {"status": "error", "info": None}
+    for asset in assets:
+        if not isinstance(asset, dict):
+            continue
         name = asset.get("name", "")
-        if name.lower().endswith(".exe"):
+        if isinstance(name, str) and name.lower().endswith(".exe"):
             asset_url = asset.get("browser_download_url")
             asset_name = name
             asset_size = asset.get("size") or 0
@@ -123,8 +132,9 @@ def download_update(url: str, dest_path: str, on_progress=None, chunk_size: int 
                     if on_progress:
                         on_progress(downloaded, total)
 
-        if expected_size and downloaded != expected_size:
-            logging.error("Download incompleto: esperava %s bytes, veio %s", expected_size, downloaded)
+        required_size = expected_size or total
+        if required_size and downloaded != required_size:
+            logging.error("Download incompleto: esperava %s bytes, veio %s", required_size, downloaded)
             Path(dest_path).unlink(missing_ok=True)
             return False
         return True

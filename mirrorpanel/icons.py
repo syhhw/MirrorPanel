@@ -25,6 +25,25 @@ def _setup_draw(size: int):
     return img, ImageDraw.Draw(img), *img.size
 
 
+def phone(size: int = 32, color: str = "#b0b5be") -> Image.Image:
+    """Silhueta de aparelho discreta para lista e estado vazio."""
+    img, d, w, h = _setup_draw(size)
+    stroke = max(SUPERSAMPLE, int(w * 0.055))
+    d.rounded_rectangle([w * 0.24, h * 0.07, w * 0.76, h * 0.93],
+                        radius=w * 0.10, outline=color, width=stroke)
+    d.line([(w * 0.42, h * 0.17), (w * 0.58, h * 0.17)], fill=color, width=stroke)
+    d.line([(w * 0.42, h * 0.83), (w * 0.58, h * 0.83)], fill=color, width=stroke)
+    return _finish(img, size)
+
+
+def button_surface(color: str, outline: str) -> Image.Image:
+    """Nine-slice surface for ttk primary actions; corners stay six pixels."""
+    img = _canvas(32)
+    ImageDraw.Draw(img).rounded_rectangle((0, 0, 127, 127), radius=24,
+                                          fill=color, outline=outline, width=4)
+    return _finish(img, 32)
+
+
 def play(size: int = 16, color: str = "#1a7f37") -> Image.Image:
     img, d, w, h = _setup_draw(size)
     pad = w * 0.24

@@ -76,6 +76,7 @@ class StartDeviceAlwaysUsesPrimaryMonitorTest(unittest.TestCase):
         self.mgr.model_cache = {}
         self.mgr.recording = {}
         self.mgr.recording_light = {}
+        self.mgr.pending_reconnect = {}
         self.mgr.device_overrides = {}
         self.mgr.blocked = set()
         self.mgr.crash_counts = {}
@@ -386,6 +387,9 @@ class ClosedByUserVsCrashTest(unittest.TestCase):
         self.mgr.crash_counts = {}
         self.mgr.blocked = set()
         self.mgr.pending_reconnect = {}
+        self.mgr.recording = {}
+        self.mgr.recording_light = {}
+        self.mgr.recording_started_at = {}
         self.mgr.model_cache = {"SERIAL1": "TestPhone"}
         self.mgr.hw_serial_cache = {"SERIAL1": "SERIAL1"}  # evita chamada real de adb no dedupe
         self.mgr.last_ready = {"SERIAL1"}

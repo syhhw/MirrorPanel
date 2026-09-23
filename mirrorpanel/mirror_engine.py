@@ -396,6 +396,8 @@ def get_window_rect_of_pid(pid: int):
 def graceful_stop(proc: subprocess.Popen, timeout: float = 3.0):
     """Fecha a janela do scrcpy (equivalente a clicar no X) pra ele finalizar sozinho
     qualquer gravacao em andamento, antes de partir pra um kill bruto como ultimo recurso."""
+    if proc.poll() is not None:
+        return
     try:
         if _close_windows_of_pid(proc.pid):
             proc.wait(timeout=timeout)
@@ -404,6 +406,13 @@ def graceful_stop(proc: subprocess.Popen, timeout: float = 3.0):
         pass
     try:
         proc.terminate()
+        proc.wait(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        try:
+            proc.kill()
+            proc.wait(timeout=timeout)
+        except (OSError, subprocess.TimeoutExpired):
+            logging.exception("Falha ao encerrar o processo rastreado %s", proc.pid)
     except Exception:
         pass
 
@@ -460,22 +469,6 @@ def get_all_monitors() -> list[tuple[int, int, int, int]]:
 
     found.sort(key=lambda m: not m[0])  # principal (True) primeiro
     return [(x, y, w, h) for _, x, y, w, h in found]
-
-
-def kill_existing_scrcpy():
-    """Limpeza unica na inicializacao (processos orfaos de uma execucao anterior)."""
-    result = subprocess.run(
-        ["tasklist", "/FI", "IMAGENAME eq scrcpy.exe", "/FO", "CSV", "/NH"],
-        capture_output=True, text=True, creationflags=CREATE_NO_WINDOW,
-    )
-    running = [l for l in result.stdout.splitlines() if "scrcpy.exe" in l.lower()]
-    if running:
-        subprocess.run(
-            ["taskkill", "/F", "/IM", "scrcpy.exe"],
-            capture_output=True, text=True, creationflags=CREATE_NO_WINDOW,
-        )
-        time.sleep(2)
-    return len(running)
 
 
 def port_is_free(port: int) -> bool:
@@ -546,6 +539,7 @@ def get_screen_resolution(serial: str):
 def launch_device(serial: str, num_hint: str, slots: SlotManager, used_ports: set[int], flags: str,
                    stay_awake: bool = DEFAULT_STAY_AWAKE, record_path: str | None = None,
                    always_on_top: bool = ALWAYS_ON_TOP, monitor_idx: int = 0) -> ActiveDevice | None:
+    port = slot = log_fh = proc = None
     try:
         model = get_model(serial, num_hint)
         port = next_free_port(BASE_PORT, used_ports)
@@ -578,7 +572,11 @@ def launch_device(serial: str, num_hint: str, slots: SlotManager, used_ports: se
             win_y = cell_y + (cell_h - win_h) // 2
             window_args += [f"--window-x={win_x}", f"--window-y={win_y}", f"--window-width={win_w}", f"--window-height={win_h}"]
 
-        log_path = LOG_DIR / f"scrcpy_{serial}.log"
+        # ':' in Wi-Fi serials opens an NTFS alternate data stream instead
+        # of a normal log file; other transports can contain separators too.
+        safe_serial = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", serial)
+        LOG_DIR.mkdir(parents=True, exist_ok=True)
+        log_path = LOG_DIR / f"scrcpy_{safe_serial}.log"
         log_fh = open(log_path, "a", encoding="utf-8")
         log_fh.write(f"\n===== {datetime.now():%Y-%m-%d %H:%M:%S} iniciando =====\n")
         log_fh.flush()
@@ -605,6 +603,14 @@ def launch_device(serial: str, num_hint: str, slots: SlotManager, used_ports: se
                              monitor_idx=monitor_idx)
     except Exception:
         logging.exception("Falha ao iniciar %s", serial)
+        if proc is not None:
+            graceful_stop(proc)
+        if log_fh is not None:
+            log_fh.close()
+        if slot is not None:
+            slots.release(slot)
+        if port is not None:
+            used_ports.discard(port)
         return None
 
 
@@ -744,7 +750,12 @@ class MirrorManager:
         self.settings["language"] = lang
         save_settings(self.settings)
 
-    def start_recording(self, serial: str, light: bool = False) -> str:
+    def _clear_recording(self, serial: str):
+        self.recording.pop(serial, None)
+        self.recording_light.pop(serial, None)
+        self.recording_started_at.pop(serial, None)
+
+    def start_recording(self, serial: str, light: bool = False) -> str | None:
         """Botao de gravar. Reinicia o espelhamento desse aparelho incluindo o arquivo.
         Sempre salva em RECORDINGS_DIR (pasta fixa e dedicada) - sem pedir pra
         escolher, pra manter tudo sempre organizado no mesmo lugar.
@@ -752,28 +763,42 @@ class MirrorManager:
         light: usa flags leves (bitrate/fps/resolucao reduzidos) para nao travar
         aparelhos antigos enquanto gravam.
         """
+        if serial not in self.active:
+            return None
+        if serial in self.recording:
+            return self.recording[serial]
         model = self.model_cache.get(serial, serial)
         safe_model = "".join(c if c.isalnum() or c in "-_" else "_" for c in model)
 
-        RECORDINGS_DIR.mkdir(parents=True, exist_ok=True)
-        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        path = str(RECORDINGS_DIR / f"{safe_model}_{timestamp}.mp4")
+        try:
+            RECORDINGS_DIR.mkdir(parents=True, exist_ok=True)
+            timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            # Reserve a unique path even for two identical phones started in
+            # the same second. scrcpy can write into the empty reserved file.
+            fd, path = tempfile.mkstemp(prefix=f"{safe_model}_{timestamp}_",
+                                        suffix=".mp4", dir=RECORDINGS_DIR)
+            os.close(fd)
+        except OSError:
+            logging.exception("Falha ao criar destino da gravacao para %s", serial)
+            return None
 
+        self.stop_device(serial)
         self.recording[serial] = path
         self.recording_light[serial] = light
+        if not self.start_device(serial):
+            self._clear_recording(serial)
+            try:
+                if Path(path).stat().st_size == 0:
+                    Path(path).unlink(missing_ok=True)
+            except OSError:
+                logging.warning("Nao foi possivel remover gravacao vazia: %s", path)
+            return None
         self.recording_started_at[serial] = time.monotonic()
-
-        if serial in self.active:
-            self.stop_device(serial)
-            time.sleep(1)
-            self.start_device(serial)
         return path
 
     def stop_recording(self, serial: str):
         """Desliga a gravacao e reinicia o espelhamento sem gravar mais."""
-        self.recording.pop(serial, None)
-        self.recording_light.pop(serial, None)
-        self.recording_started_at.pop(serial, None)
+        self._clear_recording(serial)
         if serial in self.active:
             self.stop_device(serial)
             time.sleep(1)
@@ -956,7 +981,7 @@ class MirrorManager:
 
             return True
 
-    def start_device(self, serial: str) -> bool:
+    def start_device(self, serial: str, *, automatic: bool = False) -> bool:
         """Lanca manualmente o espelhamento de um aparelho ja detectado (botao 'Iniciar').
 
         Sempre abre no monitor PRINCIPAL ([0] em get_all_monitors, garantido
@@ -968,6 +993,10 @@ class MirrorManager:
         """
         if serial in self.active:
             return True
+        if not automatic:
+            self.crash_counts.pop(serial, None)
+            self.blocked.discard(serial)
+            self.pending_reconnect.pop(serial, None)
         fallback = self.model_cache.get(serial, f"Device_{serial[-4:]}")
         monitor_idx = 0
         slots = self.slot_managers[monitor_idx]
@@ -980,12 +1009,13 @@ class MirrorManager:
             self.active[serial] = new_dev
             self.model_cache[serial] = new_dev.model
             self.blocked.discard(serial)
-            self.crash_counts.pop(serial, None)
             return True
         return False
 
     def stop_device(self, serial: str) -> bool:
         """Encerra manualmente o espelhamento de um aparelho (botao 'Parar')."""
+        self.pending_reconnect.pop(serial, None)
+        self._clear_recording(serial)
         dev = self.active.pop(serial, None)
         if not dev:
             return False
@@ -1069,12 +1099,20 @@ class MirrorManager:
             returncode = None if unplugged else dev.proc.poll()
             crashed = (not unplugged) and returncode is not None
             if not (unplugged or crashed):
+                if time.monotonic() - dev.started_at > 10:
+                    self.crash_counts.pop(serial, None)
                 continue
 
+            if unplugged:
+                graceful_stop(dev.proc)
             self.slot_managers[dev.monitor_idx].release(dev.slot)
             self.used_ports.discard(dev.port)
             dev.log_fh.close()
             del self.active[serial]
+            if serial in self.recording:
+                events.append({"type": "recording_interrupted", "serial": serial,
+                               "model": dev.model, "path": self.recording[serial]})
+            self._clear_recording(serial)
 
             # O proprio scrcpy sabe quando o aparelho foi desconectado de verdade -
             # ele detecta isso por evento (fim do stream USB/video), nao ficando
@@ -1107,6 +1145,18 @@ class MirrorManager:
                 continue
             else:
                 logging.warning("scrcpy caiu: %s (%s) codigo=%s", dev.model, serial, returncode)
+                if time.monotonic() - dev.started_at > 10:
+                    self.crash_counts[serial] = 0
+                self.crash_counts[serial] = self.crash_counts.get(serial, 0) + 1
+                if self.crash_counts[serial] >= MAX_CRASH_RETRIES:
+                    self.blocked.add(serial)
+                    events.extend([
+                        {"type": "crashed", "serial": serial, "model": dev.model,
+                         "attempt": self.crash_counts[serial]},
+                        {"type": "blocked", "serial": serial, "model": dev.model},
+                    ])
+                    self.pending_reconnect.pop(serial, None)
+                    continue
 
             # nao avisa na hora - guarda pra tentar reconectar sozinho, em silencio,
             # algumas vezes primeiro (ver bloco logo abaixo). Cabo com mau contato
@@ -1114,9 +1164,6 @@ class MirrorManager:
             self.pending_reconnect[serial] = {
                 "attempts": 0, "next_attempt_at": time.monotonic(),
                 "model": dev.model, "kind": "departed" if really_disconnected else "crashed",
-                # sessao que rodou de boa por um tempo antes de cair conta menos
-                # contra o aparelho do que uma que morre logo de cara toda vez
-                "long_uptime": (time.monotonic() - dev.started_at) > 10,
             }
 
         # --- progresso de instalacao de APK via arrastar-e-soltar (recurso do scrcpy) ---
@@ -1131,7 +1178,7 @@ class MirrorManager:
             if time.monotonic() < entry["next_attempt_at"]:
                 continue
 
-            if serial in ready and self.start_device(serial):
+            if serial in ready and self.start_device(serial, automatic=True):
                 logging.info("Reconectado sozinho: %s (%s)", entry["model"], serial)
                 events.append({"type": "reconnected", "serial": serial, "model": entry["model"]})
                 self.pending_reconnect.pop(serial)
@@ -1145,9 +1192,6 @@ class MirrorManager:
             # esgotou as tentativas silenciosas - agora sim avisa o usuario
             self.pending_reconnect.pop(serial)
             if entry["kind"] == "crashed":
-                if entry["long_uptime"]:
-                    self.crash_counts[serial] = 0
-                self.crash_counts[serial] = self.crash_counts.get(serial, 0) + 1
                 events.append({"type": "crashed", "serial": serial, "model": entry["model"],
                                 "attempt": self.crash_counts[serial]})
                 if self.crash_counts[serial] >= MAX_CRASH_RETRIES:
@@ -1200,34 +1244,10 @@ class MirrorManager:
         return rows
 
     def shutdown(self):
-        """Fecha o painel E encerra tudo que ele abriu ou deixou rodando em segundo
-        plano - scrcpy (dando chance de qualquer gravacao em andamento terminar o
-        arquivo direito) e o servidor do adb.
-
-        O servidor do adb roda como um processo PROPRIO, independente do processo
-        que o iniciou (e ate sobrevive a ele, se so matarmos o processo em vez de
-        pedir pra ele encerrar via protocolo) - se ele continuar de pe depois que o
-        painel fechar, ele mantem um lock nos arquivos da pasta de instalacao, e o
-        usuario nem consegue apagar/mover essa pasta ("arquivo em uso"). "adb
-        kill-server" e a forma correta de parar esse processo (pede pra ele mesmo
-        se desligar, em vez de so matar um PID que pode nem ser o processo certo).
-        """
-        for dev in self.active.values():
-            graceful_stop(dev.proc)
-            try:
-                dev.log_fh.close()
-            except Exception:
-                pass
-        self.active.clear()
-
-        # varredura final - garante que nenhum scrcpy orfao sobreviva ao fechamento
-        # (ex: um processo que nao respondeu a tempo ao WM_CLOSE nem ao terminate)
-        try:
-            kill_existing_scrcpy()
-        except Exception:
-            logging.exception("Falha ao varrer processos scrcpy orfaos no fechamento")
-
-        try:
-            run_adb("kill-server", timeout=10)
-        except Exception:
-            logging.exception("Falha ao encerrar o servidor adb no fechamento")
+        """Encerra apenas processos rastreados; ADB pode servir outras ferramentas."""
+        for serial in list(self.active):
+            self.stop_device(serial)
+        self.pending_reconnect.clear()
+        self.recording.clear()
+        self.recording_light.clear()
+        self.recording_started_at.clear()

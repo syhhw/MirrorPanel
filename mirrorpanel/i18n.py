@@ -20,18 +20,20 @@ _STRINGS = {
     # ---------------------------------------------------------------- app --
     "app.title": {"pt": "MirrorPanel", "en": "MirrorPanel"},
     "app.subtitle": {
-        "pt": "Clique Iniciar para espelhar um aparelho especifico.",
-        "en": "Click Start to mirror a specific device.",
+        "pt": "Seus aparelhos, conectados ao seu espaço de trabalho.",
+        "en": "Your devices, connected to your workspace.",
     },
     "app.loading": {"pt": "Carregando...", "en": "Loading..."},
     "app.loading_devices": {"pt": "Carregando dispositivos ADB...", "en": "Loading ADB devices..."},
-    "app.summary": {"pt": "{n} dispositivo(s)", "en": "{n} device(s)"},
+    "app.summary": {"pt": "Conectados: {n}", "en": "Connected: {n}"},
+    "app.devices": {"pt": "Aparelhos", "en": "Devices"},
+    "app.empty_title": {"pt": "Conecte seu primeiro aparelho", "en": "Connect your first device"},
     "app.empty": {
-        "pt": "Nenhum dispositivo detectado ainda.\nConecte um celular por USB.",
-        "en": "No device detected yet.\nConnect a phone via USB.",
+        "pt": "Conecte por USB e permita a depuração no celular.\nPara conectar sem cabo, use o pareamento por QR.",
+        "en": "Connect via USB and allow debugging on your phone.\nTo connect wirelessly, use QR pairing.",
     },
     "app.activity": {"pt": "Atividade recente", "en": "Recent activity"},
-    "app.check_update": {"pt": " Verificar atualizacoes", "en": " Check for updates"},
+    "app.check_update": {"pt": "Verificar atualizações", "en": "Check for updates"},
     "app.footer_hint": {
         "pt": "Fechar encerra os espelhamentos abertos.",
         "en": "Closing stops any open mirrors.",
@@ -46,9 +48,20 @@ _STRINGS = {
     "app.start_all": {"pt": "Iniciar todos", "en": "Start all"},
     "app.stop_all": {"pt": "Parar todos", "en": "Stop all"},
     "app.shortcuts": {"pt": "Atalhos", "en": "Shortcuts"},
-    "app.batch_transfer": {"pt": "Enviar arquivo p/ todos", "en": "Send file to all"},
-    "app.settings": {"pt": "Configuracoes", "en": "Settings"},
+    "app.batch_transfer": {"pt": "Enviar para todos", "en": "Send to all"},
+    "app.settings": {"pt": "Configurações", "en": "Settings"},
     "app.qr_pairing": {"pt": "Parear por QR", "en": "Pair via QR"},
+
+    "activity.all": {"pt": "Todos os eventos", "en": "All events"},
+    "activity.problems": {"pt": "Avisos e erros", "en": "Warnings and errors"},
+    "activity.copy": {"pt": "Copiar", "en": "Copy"},
+    "activity.clear": {"pt": "Limpar", "en": "Clear"},
+    "activity.info": {"pt": "Info", "en": "Info"},
+    "activity.success": {"pt": "Concluído", "en": "Done"},
+    "activity.warning": {"pt": "Aviso", "en": "Warning"},
+    "activity.error": {"pt": "Erro", "en": "Error"},
+    "activity.no_problems": {"pt": "Nenhum aviso ou erro nesta sessão.", "en": "No warnings or errors in this session."},
+    "activity.empty": {"pt": "Os próximos eventos aparecerão aqui.", "en": "New events will appear here."},
 
     # ------------------------------------------------ transferencia em lote --
     "batch_transfer.pick_file": {"pt": "Escolha um arquivo para enviar", "en": "Choose a file to send"},
@@ -91,8 +104,8 @@ _STRINGS = {
     # ------------------------------------------------------------ status --
     "status.mirroring": {"pt": "Espelhando", "en": "Mirroring"},
     "status.ready": {"pt": "Pronto para espelhar", "en": "Ready to mirror"},
-    "status.problem": {"pt": "Atencao", "en": "Attention"},
-    "status.blocked": {"pt": "Falhou varias vezes", "en": "Failed repeatedly"},
+    "status.problem": {"pt": "Atenção", "en": "Attention"},
+    "status.blocked": {"pt": "Conexão interrompida", "en": "Connection interrupted"},
 
     # ------------------------------------------------------------- botoes --
     "btn.start": {"pt": "Iniciar", "en": "Start"},
@@ -111,6 +124,11 @@ _STRINGS = {
     # -------------------------------------------------- device row/timer --
     "device.recording": {"pt": "Gravando", "en": "Recording"},
     "device.port": {"pt": "porta", "en": "port"},
+    "device.wifi": {"pt": "Wi-Fi", "en": "Wi-Fi"},
+    "device.send": {"pt": "Enviar arquivo", "en": "Send file"},
+    "device.capture": {"pt": "Capturar tela", "en": "Screenshot"},
+    "device.quality": {"pt": "Qualidade", "en": "Quality"},
+    "device.stop_record": {"pt": "Parar gravação", "en": "Stop recording"},
 
     # ---------------------------------------------- dicas dos botoes-icone --
     # Os botoes do cartao de aparelho sao so icone (sem texto, pra nao alargar
@@ -124,7 +142,20 @@ _STRINGS = {
     "device.tip_settings": {"pt": "Ajustes de qualidade", "en": "Quality settings"},
 
     # -------------------------------------------------------- ajustes --
-    "settings.app_title": {"pt": "Configuracoes do MirrorPanel", "en": "MirrorPanel settings"},
+    "settings.app_title": {"pt": "Configurações do MirrorPanel", "en": "MirrorPanel settings"},
+    "settings.app_hint": {"pt": "As alterações são aplicadas automaticamente.", "en": "Changes are applied automatically."},
+    "settings.restart_hint": {
+        "pt": "Salvar reinicia o espelhamento e encerra a gravação em andamento.",
+        "en": "Saving restarts mirroring and ends any current recording.",
+    },
+    "log.recording_failed": {
+        "pt": "Não foi possível iniciar a gravação de {model}. Confira a conexão e tente novamente.",
+        "en": "Could not start recording {model}. Check the connection and try again.",
+    },
+    "log.recording_interrupted": {
+        "pt": "A gravação de {model} terminou com a sessão. Para continuar, inicie uma nova gravação. Arquivo: {path}",
+        "en": "Recording on {model} ended with the session. Start a new recording to continue. File: {path}",
+    },
     "settings.title": {"pt": "Ajustes - {model}", "en": "Settings - {model}"},
     "settings.codec": {"pt": "Codec de video:", "en": "Video codec:"},
     "settings.quality": {"pt": "Qualidade:", "en": "Quality:"},
