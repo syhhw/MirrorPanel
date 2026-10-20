@@ -17,6 +17,8 @@ import { MirrorSession, Quality, DEFAULT_QUALITY, quality } from './session';
 import { Packet, validateControl } from './protocol';
 import {
   accommodatedBounds,
+  initialMirrorSize,
+  parseDisplayRatio,
   RESIZE_SETTLE_MS,
   MIRROR_BARS,
   MIRROR_MIN_WIDTH,
@@ -69,6 +71,27 @@ const sessions = new Map<string, Entry>();
 // Windows outlive a failed connection; their controls must remain authorized.
 const mirrorWindows = new Map<string, BrowserWindow>();
 const videoRatios = new WeakMap<BrowserWindow, number>();
+/** Screen shape of each device, so a new mirror window can open with its final size. */
+const displayRatios = new Map<string, number>();
+const ratioRequests = new Map<string, Promise<number | undefined>>();
+function displayRatio(serial: string): Promise<number | undefined> {
+  const known = displayRatios.get(serial);
+  if (known) return Promise.resolve(known);
+  let request = ratioRequests.get(serial);
+  if (!request) {
+    request = adb
+      .shell(serial, ['wm', 'size'], 3000)
+      .then((output) => {
+        const ratio = parseDisplayRatio(output);
+        if (ratio && !displayRatios.has(serial)) displayRatios.set(serial, ratio);
+        return displayRatios.get(serial);
+      })
+      .catch(() => undefined)
+      .finally(() => ratioRequests.delete(serial));
+    ratioRequests.set(serial, request);
+  }
+  return request;
+}
 const logs: { time: string; message: string; level: string }[] = [];
 const identity = new Map<string, string>();
 let blocker: number | undefined;
@@ -178,8 +201,8 @@ function broadcast(): void {
 }
 function secureWindow(options: Electron.BrowserWindowConstructorOptions): BrowserWindow {
   const window = new BrowserWindow({
-    ...options,
     backgroundColor: '#f5f6f8',
+    ...options,
     frame: false,
     autoHideMenuBar: true,
     webPreferences: {
@@ -271,6 +294,7 @@ async function refresh(): Promise<void> {
         preferred.set(id, device);
     }
     devices = [...preferred.values()];
+    for (const device of devices) if (device.state === 'device') void displayRatio(device.serial);
     broadcast();
   } catch (e) {
     log('ADB: ' + String(e), 'error');
@@ -310,17 +334,26 @@ async function startSession(serial: string, attempt = 0, existing?: Entry): Prom
   const device = devices.find((d) => d.serial === serial);
   const previousWindow = existing?.window ?? mirrorWindows.get(serial);
   const fresh = !previousWindow || previousWindow.isDestroyed();
+  // Open with the phone's shape (like Vysor) instead of resizing when the first frame arrives.
+  const ratio = fresh
+    ? await Promise.race([displayRatio(serial), pause(1500).then(() => undefined)])
+    : undefined;
+  if (fresh && (quitting || sessions.has(serial))) return;
+  const size = ratio ? initialMirrorSize(ratio, screen.getPrimaryDisplay().workArea) : undefined;
   const window = fresh
     ? secureWindow({
-        width: 440,
-        height: 850,
+        width: size?.width ?? 440,
+        height: size?.height ?? 850,
+        useContentSize: Boolean(size),
         minWidth: MIRROR_MIN_WIDTH,
         minHeight: 200,
         title: settings.nicknames[serial] || device?.model || serial,
         alwaysOnTop: settings.alwaysOnTop,
+        backgroundColor: '#151821',
         show: true,
       })
     : previousWindow!;
+  if (fresh && ratio) videoRatios.set(window, ratio);
   mirrorWindows.set(serial, window);
   if (!existing) {
     window.restore();
@@ -370,11 +403,18 @@ async function startSession(serial: string, attempt = 0, existing?: Entry): Prom
         const minimum = Math.min(MIRROR_MIN_WIDTH, Math.floor((area.height - MIRROR_BARS) * ratio));
         window.setMinimumSize(minimum, Math.round(minimum / ratio) + MIRROR_BARS);
         if (previousRatio !== ratio) {
-          const desired = previousRatio
-            ? window.getContentSize()[1] - MIRROR_BARS
-            : ratio > 1
-              ? 960
-              : 440;
+          // A rotation keeps the long side; a same-orientation correction (the opening
+          // guess vs. the encoder's rounded size) keeps the width and moves a few pixels.
+          const rotated = previousRatio !== undefined && previousRatio > 1 !== ratio > 1;
+          const [contentWidth, contentHeight] = window.getContentSize();
+          const desired =
+            previousRatio === undefined
+              ? ratio > 1
+                ? 960
+                : 440
+              : rotated
+                ? contentHeight - MIRROR_BARS
+                : contentWidth;
           const width = Math.floor(
             Math.min(desired, area.width - 40, (area.height - 64 - MIRROR_BARS) * ratio),
           );
@@ -387,6 +427,7 @@ async function startSession(serial: string, attempt = 0, existing?: Entry): Prom
         }
       }
       videoRatios.set(window, info.width / info.height);
+      displayRatios.set(serial, info.width / info.height);
       sendMirror(entry, 'video-info', info);
     }
   });
