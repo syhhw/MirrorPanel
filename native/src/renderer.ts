@@ -1,6 +1,7 @@
 import { AudioPlayer } from './audio-player';
 import { Gestures } from './gestures';
 import { bindRipple } from './ripple';
+import { html } from './html';
 interface DeviceRow {
   serial: string;
   state: string;
@@ -122,7 +123,24 @@ function bindWindowButtons(): void {
 }
 function showHelp(): void {
   ask(
-    `<h2>${tr('Controlar seu Android', 'Control your Android')}</h2><div class="settings-section"><h3>${tr('Mouse e teclado', 'Mouse and keyboard')}</h3><p>Alt + clique ${tr('fixa um dedo. Arraste o segundo ponto para multitoque.', 'anchors one finger. Drag the second point for multitouch.')}<br>Esc · ${tr('Voltar ou soltar os contatos', 'Back or release contacts')}<br>Ctrl + V · ${tr('Colar texto', 'Paste text')}<br>F11 · ${tr('Tela cheia', 'Fullscreen')}</p></div><div class="settings-section"><h3>${tr('Conexão USB', 'USB connection')}</h3><p>${tr('Ative a depuração USB nas Opções do desenvolvedor e autorize este computador no aparelho. Para áudio, aceite a autorização de captura no Android.', 'Enable USB debugging in Developer options and authorize this computer on your device. For audio, accept Android capture permission.')}</p></div>`,
+    html`
+      <h2>${tr('Controlar seu Android', 'Control your Android')}</h2>
+      <div class="settings-section">
+        <h3>${tr('Mouse e teclado', 'Mouse and keyboard')}</h3>
+        <p>
+          Alt + clique ${tr('fixa um dedo. Arraste o segundo ponto para multitoque.', 'anchors one finger. Drag the second point for multitouch.')}<br>
+          Esc · ${tr('Voltar ou soltar os contatos', 'Back or release contacts')}<br>
+          Ctrl + V · ${tr('Colar texto', 'Paste text')}<br>
+          F11 · ${tr('Tela cheia', 'Fullscreen')}
+        </p>
+      </div>
+      <div class="settings-section">
+        <h3>${tr('Conexão USB', 'USB connection')}</h3>
+        <p>
+          ${tr('Ative a depuração USB nas Opções do desenvolvedor e autorize este computador no aparelho. Para áudio, aceite a autorização de captura no Android.', 'Enable USB debugging in Developer options and authorize this computer on your device. For audio, accept Android capture permission.')}
+        </p>
+      </div>
+    `,
     async () => {},
     'OK',
   );
@@ -130,7 +148,60 @@ function showHelp(): void {
 function showDeviceSettings(d: DeviceRow): void {
   if (dialog.open) dialog.close();
   ask(
-    `<h2>${tr('Configurações do aparelho', 'Device settings')}</h2><div class="settings-section"><h3>${tr('Janela', 'Window')}</h3><label>${tr('Nome do aparelho', 'Device name')}<input name="name" maxlength="80" value="${escape(d.name)}"></label><small>${escape(d.serial)}</small></div><div class="settings-section"><h3>${tr('Qualidade da imagem', 'Image quality')}</h3><fieldset ${d.session ? 'disabled' : ''}><div class="quality-fields"><label>${tr('Resolução máxima', 'Maximum resolution')}<select name="maxSize">${[720, 1080, 1280, 1920, 2560, 3840].map((v) => `<option ${v === d.quality.maxSize ? 'selected' : ''}>${v}</option>`).join('')}</select></label><label>FPS<select name="fps">${[15, 24, 30, 60, 90, 120].map((v) => `<option ${v === d.quality.fps ? 'selected' : ''}>${v}</option>`).join('')}</select></label><label>Mbps<input name="bitrate" type="number" min="0.5" max="50" step="0.5" value="${d.quality.bitrate / 1000000}"></label></div><div class="presets">${[tr('Leve', 'Low'), tr('Equilibrada', 'Balanced'), tr('Alta', 'High')].map((s, i) => `<button type="button" data-preset="${i}">${s}</button>`).join('')}</div></fieldset><p class="field-hint">${d.session ? tr('Pare o espelhamento para alterar a qualidade.', 'Stop mirroring to change quality.') : tr('A qualidade escolhida será usada na próxima conexão.', 'The selected quality applies on the next connection.')}</p></div><div class="settings-section"><h3>${tr('Aparelho', 'Device')}</h3><div class="device-settings-actions"><button type="button" data-device-tool="usbWifi" ${d.serial.includes(':') || d.state !== 'device' ? 'disabled' : ''}>${icon('wifi')} ${tr('Usar Wi-Fi', 'Use Wi-Fi')}</button><button type="button" data-device-tool="installApk" ${d.state !== 'device' ? 'disabled' : ''}>${tr('Instalar APK', 'Install APK')}</button>${d.session ? `<button type="button" class="danger" data-device-tool="stop">${tr('Parar espelhamento', 'Stop mirroring')}</button>` : ''}</div></div>`,
+    html`
+      <h2>${tr('Configurações do aparelho', 'Device settings')}</h2>
+      <div class="settings-section">
+        <h3>${tr('Janela', 'Window')}</h3>
+        <label>
+          ${tr('Nome do aparelho', 'Device name')}
+          <input name="name" maxlength="80" value="${escape(d.name)}">
+        </label>
+        <small>${escape(d.serial)}</small>
+      </div>
+      <div class="settings-section">
+        <h3>${tr('Qualidade da imagem', 'Image quality')}</h3>
+        <fieldset ${d.session ? 'disabled' : ''}>
+          <div class="quality-fields">
+            <label>
+              ${tr('Resolução máxima', 'Maximum resolution')}
+              <select name="maxSize">
+                ${[720, 1080, 1280, 1920, 2560, 3840].map((v) => `<option ${v === d.quality.maxSize ? 'selected' : ''}>${v}</option>`).join('')}
+              </select>
+            </label>
+            <label>
+              FPS
+              <select name="fps">
+                ${[15, 24, 30, 60, 90, 120].map((v) => `<option ${v === d.quality.fps ? 'selected' : ''}>${v}</option>`).join('')}
+              </select>
+            </label>
+            <label>
+              Mbps
+              <input name="bitrate" type="number" min="0.5" max="50" step="0.5"
+                value="${d.quality.bitrate / 1000000}">
+            </label>
+          </div>
+          <div class="presets">
+            ${[tr('Leve', 'Low'), tr('Equilibrada', 'Balanced'), tr('Alta', 'High')].map((s, i) => `<button type="button" data-preset="${i}">${s}</button>`).join('')}
+          </div>
+        </fieldset>
+        <p class="field-hint">
+          ${d.session ? tr('Pare o espelhamento para alterar a qualidade.', 'Stop mirroring to change quality.') : tr('A qualidade escolhida será usada na próxima conexão.', 'The selected quality applies on the next connection.')}
+        </p>
+      </div>
+      <div class="settings-section">
+        <h3>${tr('Aparelho', 'Device')}</h3>
+        <div class="device-settings-actions">
+          <button type="button" data-device-tool="usbWifi"
+            ${d.serial.includes(':') || d.state !== 'device' ? 'disabled' : ''}>
+            ${icon('wifi')} ${tr('Usar Wi-Fi', 'Use Wi-Fi')}
+          </button>
+          <button type="button" data-device-tool="installApk" ${d.state !== 'device' ? 'disabled' : ''}>
+            ${tr('Instalar APK', 'Install APK')}
+          </button>
+          ${d.session ? `<button type="button" class="danger" data-device-tool="stop">${tr('Parar espelhamento', 'Stop mirroring')}</button>` : ''}
+        </div>
+      </div>
+    `,
     async (data) => {
       await api.rename(d.serial, String(data.get('name')));
       if (!d.session)
@@ -170,7 +241,96 @@ function showDeviceSettings(d: DeviceRow): void {
 function renderPanel(next: unknown): void {
   state = next as PanelState;
   if (!$('panel')) {
-    root.innerHTML = `<section id="panel"><header class="app-titlebar"><div class="title-drag"><span class="brand-mark">${icon('phone')}</span><h1>MirrorPanel</h1><span class="version">2.0</span></div>${windowButtons()}</header><div class="panel-scroll"><div class="connection-grid"><section class="android-card"><header class="card-heading"><h2 id="devices-title"></h2>${iconButton('refresh', 'Atualizar aparelhos', 'refresh')}</header><div id="device-list" class="device-list"></div><div class="connection-help"><strong id="usb-title"></strong><p id="usb-help"></p><span class="connection-count" id="count"></span></div></section><section class="network-card"><div class="network-symbol">${icon('wifi')}</div><h2 id="network-title"></h2><p id="network-help"></p><button id="wifi" class="surface-button"></button><p class="network-note" id="network-note"></p></section></div><section class="surface-card preferences-card"><header><h2 id="preferences-title"></h2><span class="section-caption" id="preferences-caption"></span></header><div class="switch-grid"><label class="switch-row"><input id="show-serial" type="checkbox" data-setting="showSerial"><span class="switch-track"></span><span id="serial-label"></span></label><label class="switch-row"><input id="always-top" type="checkbox" data-setting="alwaysOnTop"><span class="switch-track"></span><span id="top-label"></span></label><label class="switch-row"><input id="stay-awake" type="checkbox" data-setting="stayAwake"><span class="switch-track"></span><span id="awake-label"></span></label></div><div class="preferences-bottom"><label><span id="language-label"></span> <select id="language"><option value="pt">Português</option><option value="en">English</option></select></label><button id="media" class="text-button"></button></div></section><section class="surface-card about-card"><h2>MirrorPanel <span class="version">2.0 preview 5</span></h2><p id="about-copy"></p><button class="text-button" id="help"></button></section><details class="surface-card activity" id="activity"><summary><span id="activity-title"></span><span id="activity-summary"></span></summary><div class="activity-tools"><button id="filter" class="text-button"></button><button id="copy" class="text-button"></button><button id="clear" class="text-button"></button></div><div id="logs" class="logs" role="log" aria-live="polite"></div></details></div><footer class="panel-footer"><button id="footer-home">${icon('home')}<span>MirrorPanel</span></button><button id="footer-help"></button><button id="footer-activity"></button><span id="footer-status"></span></footer></section>`;
+    root.innerHTML = html`
+      <section id="panel">
+        <header class="app-titlebar">
+          <div class="title-drag">
+            <span class="brand-mark">${icon('phone')}</span>
+            <h1>MirrorPanel</h1>
+            <span class="version">2.0</span>
+          </div>
+          ${windowButtons()}
+        </header>
+        <div class="panel-scroll">
+          <div class="connection-grid">
+            <section class="android-card">
+              <header class="card-heading">
+                <h2 id="devices-title"></h2>
+                ${iconButton('refresh', 'Atualizar aparelhos', 'refresh')}
+              </header>
+              <div id="device-list" class="device-list"></div>
+              <div class="connection-help">
+                <strong id="usb-title"></strong>
+                <p id="usb-help"></p>
+                <span class="connection-count" id="count"></span>
+              </div>
+            </section>
+            <section class="network-card">
+              <div class="network-symbol">${icon('wifi')}</div>
+              <h2 id="network-title"></h2>
+              <p id="network-help"></p>
+              <button id="wifi" class="surface-button"></button>
+              <p class="network-note" id="network-note"></p>
+            </section>
+          </div>
+          <section class="surface-card preferences-card">
+            <header>
+              <h2 id="preferences-title"></h2>
+              <span class="section-caption" id="preferences-caption"></span>
+            </header>
+            <div class="switch-grid">
+              <label class="switch-row">
+                <input id="show-serial" type="checkbox" data-setting="showSerial">
+                <span class="switch-track"></span>
+                <span id="serial-label"></span>
+              </label>
+              <label class="switch-row">
+                <input id="always-top" type="checkbox" data-setting="alwaysOnTop">
+                <span class="switch-track"></span>
+                <span id="top-label"></span>
+              </label>
+              <label class="switch-row">
+                <input id="stay-awake" type="checkbox" data-setting="stayAwake">
+                <span class="switch-track"></span>
+                <span id="awake-label"></span>
+              </label>
+            </div>
+            <div class="preferences-bottom">
+              <label>
+                <span id="language-label"></span> <select id="language">
+                  <option value="pt">Português</option>
+                  <option value="en">English</option>
+                </select>
+              </label>
+              <button id="media" class="text-button"></button>
+            </div>
+          </section>
+          <section class="surface-card about-card">
+            <h2>MirrorPanel <span class="version">2.0 preview 5</span></h2>
+            <p id="about-copy"></p>
+            <button class="text-button" id="help"></button>
+          </section>
+          <details class="surface-card activity" id="activity">
+            <summary>
+              <span id="activity-title"></span>
+              <span id="activity-summary"></span>
+            </summary>
+            <div class="activity-tools">
+              <button id="filter" class="text-button"></button>
+              <button id="copy" class="text-button"></button>
+              <button id="clear" class="text-button"></button>
+            </div>
+            <div id="logs" class="logs" role="log" aria-live="polite"></div>
+          </details>
+        </div>
+        <footer class="panel-footer">
+          <button id="footer-home">${icon('home')}<span>MirrorPanel</span></button>
+          <button id="footer-help"></button>
+          <button id="footer-activity"></button>
+          <span id="footer-status"></span>
+        </footer>
+      </section>
+    `;
     bindWindowButtons();
     $('media').onclick = () => act(api.openMedia());
     $('refresh').onclick = () => act(api.refresh());
@@ -199,7 +359,22 @@ function renderPanel(next: unknown): void {
       act(api.preferences({ ...state.settings, language: $<HTMLSelectElement>('language').value }));
     $('wifi').onclick = () =>
       ask(
-        `<h2>${tr('Conectar pela rede', 'Connect over network')}</h2><div class="settings-section"><p>${tr('Use o endereço de conexão mostrado em Depuração sem fio no Android. Para o primeiro pareamento, informe o endereço de pareamento e o código.', 'Use the connection address shown in Android Wireless debugging. To pair for the first time, enter the pairing address and code.')}</p><label>IP:${tr('porta', 'port')}<input required name="address" placeholder="192.168.1.10:5555"></label><label>${tr('Código de pareamento (opcional)', 'Pairing code (optional)')}<input name="code" inputmode="numeric" maxlength="6"></label></div>`,
+        html`
+          <h2>${tr('Conectar pela rede', 'Connect over network')}</h2>
+          <div class="settings-section">
+            <p>
+              ${tr('Use o endereço de conexão mostrado em Depuração sem fio no Android. Para o primeiro pareamento, informe o endereço de pareamento e o código.', 'Use the connection address shown in Android Wireless debugging. To pair for the first time, enter the pairing address and code.')}
+            </p>
+            <label>
+              IP:${tr('porta', 'port')}
+              <input required name="address" placeholder="192.168.1.10:5555">
+            </label>
+            <label>
+              ${tr('Código de pareamento (opcional)', 'Pairing code (optional)')}
+              <input name="code" inputmode="numeric" maxlength="6">
+            </label>
+          </div>
+        `,
         (data) =>
           String(data.get('code')).trim()
             ? api.pair(data.get('address'), data.get('code'))
@@ -280,7 +455,36 @@ function renderPanel(next: unknown): void {
                   : d.state === 'unauthorized'
                     ? tr('Autorize no aparelho', 'Authorize on your device')
                     : d.state;
-          return `<article class="device ${active ? 'device-live' : ''}" data-index="${index}" data-serial="${escape(d.serial)}"><div class="device-symbol">${icon('phone')}</div><div class="device-name"><strong title="${escape(d.name)}">${escape(d.name)}</strong><small class="status ${d.recording ? 'recording' : ''}">${escape(status)}${state.settings.showSerial ? ' · ' + escape(d.serial) : ''}</small></div><div class="device-actions"><button class="round-action" data-action="settings" title="${tr('Configurações', 'Settings')}" aria-label="${tr('Configurações', 'Settings')}" ${!authorized ? 'disabled' : ''}>${icon('settings')}</button><button class="round-action" data-action="usbWifi" title="${tr('Usar Wi-Fi', 'Use Wi-Fi')}" aria-label="${tr('Usar Wi-Fi', 'Use Wi-Fi')}" ${!authorized || d.serial.includes(':') ? 'disabled' : ''}>${icon('wifi')}</button><button class="round-action start-action" data-action="start" title="${active ? tr('Abrir tela', 'Open screen') : tr('Espelhar', 'Mirror')}" aria-label="${active ? tr('Abrir tela', 'Open screen') : tr('Espelhar', 'Mirror')}" ${!authorized || busy ? 'disabled' : ''}>${busy ? '<span class="spinner"></span>' : icon(active ? 'fullscreen' : 'play')}</button></div></article>`;
+          return html`
+            <article class="device ${active ? 'device-live' : ''}" data-index="${index}"
+              data-serial="${escape(d.serial)}">
+              <div class="device-symbol">${icon('phone')}</div>
+              <div class="device-name">
+                <strong title="${escape(d.name)}">${escape(d.name)}</strong>
+                <small class="status ${d.recording ? 'recording' : ''}">${escape(status)}${state.settings.showSerial ? ' · ' + escape(d.serial) : ''}</small>
+              </div>
+              <div class="device-actions">
+                <button class="round-action" data-action="settings"
+                  title="${tr('Configurações', 'Settings')}"
+                  aria-label="${tr('Configurações', 'Settings')}"
+                  ${!authorized ? 'disabled' : ''}>
+                  ${icon('settings')}
+                </button>
+                <button class="round-action" data-action="usbWifi"
+                  title="${tr('Usar Wi-Fi', 'Use Wi-Fi')}"
+                  aria-label="${tr('Usar Wi-Fi', 'Use Wi-Fi')}"
+                  ${!authorized || d.serial.includes(':') ? 'disabled' : ''}>
+                  ${icon('wifi')}
+                </button>
+                <button class="round-action start-action" data-action="start"
+                  title="${active ? tr('Abrir tela', 'Open screen') : tr('Espelhar', 'Mirror')}"
+                  aria-label="${active ? tr('Abrir tela', 'Open screen') : tr('Espelhar', 'Mirror')}"
+                  ${!authorized || busy ? 'disabled' : ''}>
+                  ${busy ? '<span class="spinner"></span>' : icon(active ? 'fullscreen' : 'play')}
+                </button>
+              </div>
+            </article>
+          `;
         })
         .join('')
     : `<div class="empty">${icon('phone')}<h3>${tr('Seu Android aparece aqui', 'Your Android will appear here')}</h3><p>${tr('Conecte o aparelho para começar.', 'Connect your device to get started.')}</p></div>`;
@@ -332,7 +536,45 @@ function mirror(): void {
       ),
     )
     .join('');
-  root.innerHTML = `<section class="mirror"><header class="mirror-titlebar"><div class="mirror-device title-drag"><button id="device-home" title="Voltar ao painel" aria-label="Voltar ao painel"><span id="mirror-name"></span></button></div><div class="mirror-actions">${toolbar}</div>${windowButtons()}</header><div id="mirror-menu" class="mirror-menu" hidden><button id="device-settings">${icon('settings')} Configurações do aparelho</button><button id="paste-text">${icon('paste')} Colar no aparelho <kbd>Ctrl+V</kbd></button><button id="screen-power">${icon('power')} Ligar / desligar tela</button><button id="pin-window" aria-pressed="false">${icon('pin')} Sempre no topo</button><div class="volume-control">${icon('audio')}<label for="volume">Volume no PC</label><input id="volume" type="range" min="0" max="100" value="100" aria-label="Volume no computador"></div><button id="mirror-help">${icon('help')} Mouse e atalhos</button></div><div id="apk-drop" class="apk-drop" hidden role="status">Solte o APK para instalar neste aparelho</div><div class="viewport"><canvas id="video" tabindex="0" aria-label="Tela do aparelho: controle com mouse e teclado"></canvas><span id="touch-anchor" hidden aria-hidden="true"></span><textarea id="text-input" aria-label="Digite para enviar texto ao aparelho" autocapitalize="off" autocomplete="off" spellcheck="false"></textarea><div id="video-status" class="video-status"><span id="status-message">Conectando ao aparelho…</span><button id="reconnect" hidden>Reconectar</button></div></div><nav class="android-navigation" aria-label="Navegação Android">${iconButton('back', 'Voltar (Esc)')}${iconButton('home', 'Início')}${iconButton('recent', 'Apps recentes')}</nav></section>`;
+  root.innerHTML = html`
+    <section class="mirror">
+      <header class="mirror-titlebar">
+        <div class="mirror-device title-drag">
+          <button id="device-home" title="Voltar ao painel" aria-label="Voltar ao painel">
+            <span id="mirror-name"></span>
+          </button>
+        </div>
+        <div class="mirror-actions">${toolbar}</div>
+        ${windowButtons()}
+      </header>
+      <div id="mirror-menu" class="mirror-menu" hidden>
+        <button id="device-settings">${icon('settings')} Configurações do aparelho</button>
+        <button id="paste-text">${icon('paste')} Colar no aparelho <kbd>Ctrl+V</kbd></button>
+        <button id="screen-power">${icon('power')} Ligar / desligar tela</button>
+        <button id="pin-window" aria-pressed="false">${icon('pin')} Sempre no topo</button>
+        <div class="volume-control">
+          ${icon('audio')}
+          <label for="volume">Volume no PC</label>
+          <input id="volume" type="range" min="0" max="100" value="100" aria-label="Volume no computador">
+        </div>
+        <button id="mirror-help">${icon('help')} Mouse e atalhos</button>
+      </div>
+      <div id="apk-drop" class="apk-drop" hidden role="status">Solte o APK para instalar neste aparelho</div>
+      <div class="viewport">
+        <canvas id="video" tabindex="0" aria-label="Tela do aparelho: controle com mouse e teclado"></canvas>
+        <span id="touch-anchor" hidden aria-hidden="true"></span>
+        <textarea id="text-input" aria-label="Digite para enviar texto ao aparelho" autocapitalize="off"
+          autocomplete="off" spellcheck="false"></textarea>
+        <div id="video-status" class="video-status">
+          <span id="status-message">Conectando ao aparelho…</span>
+          <button id="reconnect" hidden>Reconectar</button>
+        </div>
+      </div>
+      <nav class="android-navigation" aria-label="Navegação Android">
+        ${iconButton('back', 'Voltar (Esc)')}${iconButton('home', 'Início')}${iconButton('recent', 'Apps recentes')}
+      </nav>
+    </section>
+  `;
   const name = new URLSearchParams(location.search).get('name') ?? 'Android';
   $('mirror-name').textContent = name;
   $('device-home').title = name + ' · Voltar ao painel';
