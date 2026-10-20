@@ -260,10 +260,13 @@ function showDeviceSettings(d: DeviceRow): void {
         )),
   );
 }
-/** What reads under a phone: its state, or how it is connected when idle, and the tone. */
+/**
+ * What reads under a phone and the tone that colours it. A live phone keeps reading how it is
+ * connected: the drawing already shows it is live, so the text does not jump.
+ */
 function deviceState(d: DeviceRow): { text: string; tone: string } {
   if (d.recording) return { text: t('Gravando', 'Recording'), tone: 'recording' };
-  if (d.session === 'mirroring') return { text: t('Ao vivo', 'Live'), tone: 'live' };
+  if (d.session === 'mirroring') return { text: connectionLabel(d), tone: 'live' };
   if (d.session === 'starting') return { text: t('Abrindo…', 'Opening…'), tone: 'busy' };
   if (d.state === 'device') return { text: connectionLabel(d), tone: 'ready' };
   if (d.state === 'unauthorized')
@@ -592,7 +595,8 @@ function mirror(): void {
   let deviceName = params.get('name') ?? 'Android',
     recording = false,
     audioState = 'off';
-  const toolbar = ['capture', 'record', 'audio', 'fullscreen', 'more']
+  // Fullscreen lives in the menu (and on F11) so the device name keeps room in a narrow window.
+  const toolbar = ['capture', 'record', 'audio', 'more']
     .map((id) =>
       iconButton(
         id,
@@ -609,18 +613,18 @@ function mirror(): void {
   root.innerHTML = html`
     <section class="mirror">
       <header class="mirror-titlebar">
-        <div class="mirror-device title-drag">
-          <button id="device-home">
-            <span class="live-dot" aria-hidden="true"></span><span id="mirror-name"></span>
-          </button>
+        <div class="mirror-device title-drag" id="mirror-title">
+          <span class="live-dot" aria-hidden="true"></span><span id="mirror-name"></span>
         </div>
         <div class="mirror-actions">${toolbar}</div>
         ${windowButtons()}
       </header>
       <div id="mirror-menu" class="mirror-menu" hidden>
+        <button id="show-panel">${icon('phone')} <span id="show-panel-text"></span></button>
         <button id="device-settings">${icon('sliders')} <span id="device-settings-text"></span></button>
         <button id="paste-text">${icon('paste')} <span id="paste-text-label"></span> <kbd>Ctrl+V</kbd></button>
         <button id="screen-power">${icon('power')} <span id="screen-power-text"></span></button>
+        <button id="fullscreen">${icon('fullscreen')} <span id="fullscreen-text"></span> <kbd>F11</kbd></button>
         <button id="pin-window" aria-pressed="false">${icon('pin')} <span id="pin-window-text"></span></button>
         <div class="volume-control">
           ${icon('audio')}
@@ -630,14 +634,31 @@ function mirror(): void {
         <button id="mirror-help">${icon('help')} <span id="mirror-help-text"></span></button>
       </div>
       <div id="apk-drop" class="apk-drop" hidden role="status"></div>
+      <div id="shot" class="shot" role="dialog" aria-modal="true" aria-labelledby="shot-title" hidden>
+        <div class="shot-card">
+          <h2 id="shot-title"></h2>
+          <div id="shot-frame" class="shot-frame"></div>
+          <div class="shot-actions">
+            <button id="shot-discard" class="text-button"></button>
+            <button id="shot-save" class="secondary"></button>
+            <button id="shot-copy" class="primary"></button>
+          </div>
+        </div>
+      </div>
       <div class="viewport">
         <canvas id="video" tabindex="0"></canvas>
         <span id="touch-anchor" hidden aria-hidden="true"></span>
         <textarea id="text-input" autocapitalize="off" autocomplete="off" spellcheck="false"></textarea>
         <div id="video-status" class="video-status">
-          <span id="status-spinner" class="spinner" aria-hidden="true"></span>
-          <span id="status-message"></span>
-          <button id="reconnect" hidden></button>
+          <div class="status-card">
+            <span id="status-spinner" class="spinner" aria-hidden="true"></span>
+            <h2 id="status-title" hidden></h2>
+            <p id="status-message"></p>
+            <div id="status-actions" class="status-actions" hidden>
+              <button id="close-mirror"></button>
+              <button id="reconnect"></button>
+            </div>
+          </div>
         </div>
       </div>
       <nav class="android-navigation">
@@ -655,14 +676,17 @@ function mirror(): void {
         : t('Ativar áudio', 'Turn audio on');
   /** Every fixed text of the mirror window; runs again when the language changes. */
   const applyTexts = () => {
-    const back = t('Voltar ao painel', 'Back to panel');
     $('mirror-name').textContent = deviceName;
-    $('device-home').title = deviceName + ' · ' + back;
-    $('device-home').setAttribute('aria-label', back);
+    $('mirror-title').title = deviceName;
+    $('show-panel-text').textContent = t('Mostrar o painel', 'Show the panel');
+    $('shot-title').textContent = t('Captura de tela', 'Screenshot');
+    $('shot-discard').textContent = t('Descartar', 'Discard');
+    $('shot-save').textContent = t('Salvar', 'Save');
+    $('shot-copy').textContent = t('Copiar', 'Copy');
     label($('capture'), t('Capturar tela', 'Take screenshot'));
     label($('record'), recordLabel());
     label($('audio'), audioLabel());
-    label($('fullscreen'), t('Tela cheia (F11)', 'Fullscreen (F11)'));
+    $('fullscreen-text').textContent = t('Tela cheia', 'Fullscreen');
     label($('more'), t('Mais controles', 'More controls'));
     $('device-settings-text').textContent = t('Configurações do aparelho', 'Device settings');
     $('paste-text-label').textContent = t('Colar no aparelho', 'Paste on device');
@@ -686,7 +710,8 @@ function mirror(): void {
       'aria-label',
       t('Digite para enviar texto ao aparelho', 'Type to send text to the device'),
     );
-    $('reconnect').textContent = t('Reconectar', 'Reconnect');
+    $('reconnect').textContent = t('Tentar de novo', 'Try again');
+    $('close-mirror').textContent = t('Fechar', 'Close');
     document
       .querySelector('.android-navigation')!
       .setAttribute('aria-label', t('Navegação Android', 'Android navigation'));
@@ -818,7 +843,10 @@ function mirror(): void {
     if (!menu.contains(event.target as Node) && !$('more').contains(event.target as Node))
       closeMenu();
   });
-  $('device-home').onclick = () => act(api.windowAction('panel'));
+  $('show-panel').onclick = () => {
+    closeMenu();
+    act(api.windowAction('panel'));
+  };
   $('device-settings').onclick = () => {
     closeMenu();
     act(api.windowAction('settings'));
@@ -876,11 +904,7 @@ function mirror(): void {
     failures = 0,
     lastSyncRequest = 0;
   const status = $('video-status');
-  /**
-   * With the picture already on screen a passing status is a small note over it;
-   * before the first frame, or when the user has to act, it covers the video.
-   */
-  /** The one orchestrated moment: a sweep of light across the first frame of a session. */
+  /** The first frame of a session fades in over the cover instead of cutting to it. */
   const reveal = () => {
     const viewport = document.querySelector<HTMLElement>('.viewport')!;
     viewport.classList.add('is-revealing');
@@ -888,13 +912,25 @@ function mirror(): void {
       once: true,
     });
   };
+  /**
+   * With the picture already on screen a passing status is a small note over it. When the
+   * person has to decide (try again or close), a card asks over the last picture, dimmed,
+   * or over the cover if no frame ever arrived.
+   */
   const showStatus = (message: string, retry = false) => {
     $('status-message').textContent = message;
     status.hidden = !message;
     if (message) document.body.classList.remove('is-live');
     status.classList.toggle('is-notice', Boolean(message) && frames > 0 && !retry);
+    status.classList.toggle('is-asking', retry);
+    status.classList.toggle('is-over-picture', retry && frames > 0);
+    $('status-title').textContent =
+      frames > 0
+        ? t('Espelhamento interrompido', 'Mirroring stopped')
+        : t('Não foi possível espelhar', 'Mirroring could not start');
+    $('status-title').hidden = !retry;
     $('status-spinner').hidden = retry;
-    $('reconnect').hidden = !retry;
+    $('status-actions').hidden = !retry;
   };
   let inputReady = false;
   const control = (value: unknown) => (inputReady ? api.control(value) : Promise.resolve());
@@ -1069,6 +1105,7 @@ function mirror(): void {
     }
   });
   $('reconnect').onclick = () => act(api.windowAction('reconnect'));
+  $('close-mirror').onclick = () => act(api.windowAction('close'));
   api.onStatus((value: unknown) => {
     const update =
       typeof value === 'string'
@@ -1088,7 +1125,10 @@ function mirror(): void {
     document.fullscreenElement
       ? document.exitFullscreen()
       : document.documentElement.requestFullscreen();
-  $('fullscreen').onclick = () => act(fullscreen());
+  $('fullscreen').onclick = () => {
+    closeMenu();
+    act(fullscreen());
+  };
   $('back').onclick = () => act(control({ type: 'key', code: 4 }));
   $('home').onclick = () => act(control({ type: 'key', code: 3 }));
   $('recent').onclick = () => act(control({ type: 'key', code: 187 }));
@@ -1098,20 +1138,63 @@ function mirror(): void {
         recordingState(path);
       }),
     );
+  // A screenshot freezes the current frame into a preview; the person then copies, saves or
+  // discards it. The preview owns the keyboard while open, so nothing reaches the phone.
+  let shot: HTMLCanvasElement | null = null;
+  const closeShot = () => {
+    $('shot').hidden = true;
+    $('shot-frame').replaceChildren();
+    shot = null;
+    canvas.focus({ preventScroll: true });
+  };
+  const finishShot = (action: 'copy' | 'save') => {
+    if (!shot) return;
+    const png = new Promise<Uint8Array>((resolve, reject) =>
+      shot!.toBlob(
+        (blob) =>
+          blob
+            ? blob.arrayBuffer().then((buffer) => resolve(new Uint8Array(buffer)), reject)
+            : reject(Error(t('Não foi possível gerar a imagem', 'Could not create the image'))),
+        'image/png',
+      ),
+    );
+    closeShot();
+    act(
+      png
+        .then((bytes) =>
+          action === 'copy'
+            ? api.copyPng(bytes).then(() => t('Captura copiada', 'Screenshot copied'))
+            : api
+                .savePng(bytes)
+                .then(() =>
+                  t('Captura salva em MirrorPanel Media', 'Screenshot saved to MirrorPanel Media'),
+                ),
+        )
+        .then(toast),
+    );
+  };
   const screenshot = () => {
     if (!frames) {
       toast(t('Aguarde o primeiro quadro', 'Wait for the first frame'));
       return;
     }
-    canvas.toBlob((blob) => {
-      if (blob)
-        act(
-          blob
-            .arrayBuffer()
-            .then((buffer) => api.savePng(new Uint8Array(buffer)))
-            .then(() => toast(t('Captura salva', 'Screenshot saved'))),
-        );
-    }, 'image/png');
+    if (shot) return;
+    closeMenu();
+    shot = document.createElement('canvas');
+    shot.width = canvas.width;
+    shot.height = canvas.height;
+    shot.getContext('2d')!.drawImage(canvas, 0, 0);
+    shot.setAttribute('role', 'img');
+    shot.setAttribute('aria-label', t('Prévia da captura', 'Screenshot preview'));
+    $('shot-frame').replaceChildren(shot);
+    $('shot').hidden = false;
+    $('shot-copy').focus();
+  };
+  $('shot-copy').onclick = () => finishShot('copy');
+  $('shot-save').onclick = () => finishShot('save');
+  $('shot-discard').onclick = closeShot;
+  $('shot').onclick = (event) => {
+    if (event.target === $('shot')) closeShot();
   };
   $('capture').onclick = screenshot;
   api.onScreenshot(screenshot);
@@ -1211,6 +1294,15 @@ function mirror(): void {
   };
   window.onkeydown = (event) => {
     if (dialog.open || composing || event.isComposing) return;
+    if (!$('shot').hidden) {
+      const key = event.key.toLowerCase();
+      if (event.key === 'Escape') closeShot();
+      else if (event.ctrlKey && key === 'c') finishShot('copy');
+      else if (event.ctrlKey && key === 's') finishShot('save');
+      else return; // Tab, Enter and Space keep working on the preview's own buttons
+      event.preventDefault();
+      return;
+    }
     if (event.key === 'F11') {
       event.preventDefault();
       act(fullscreen());

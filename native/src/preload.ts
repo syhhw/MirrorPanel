@@ -35,6 +35,7 @@ contextBridge.exposeInMainWorld('mirrorpanel', {
   record: invoke('record'),
   screenshot: invoke('screenshot'),
   savePng: invoke('save-png'),
+  copyPng: invoke('copy-png'),
   paste: invoke('paste'),
   openMedia: invoke('open-media'),
   copyLogs: invoke('copy-logs'),

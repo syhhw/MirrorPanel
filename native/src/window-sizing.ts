@@ -4,7 +4,8 @@ export interface Bounds {
   width: number;
   height: number;
 }
-export const MIRROR_BARS = 86;
+/** Mirror window chrome around the video: title bar (44) plus Android navigation (48). */
+export const MIRROR_BARS = 92;
 export const MIRROR_MIN_WIDTH = 240;
 export const RESIZE_SETTLE_MS = 500;
 /** Share of the free screen height a new portrait mirror takes. */

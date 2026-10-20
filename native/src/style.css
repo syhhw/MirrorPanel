@@ -110,6 +110,9 @@ body {
   color: var(--text);
   background: var(--bg);
   overflow: hidden;
+  /* An app, not a page: only the activity log can be selected and copied. */
+  user-select: none;
+  cursor: default;
 }
 [hidden] {
   display: none !important;
@@ -197,6 +200,7 @@ button:disabled {
 }
 
 .primary,
+.secondary,
 dialog footer button {
   display: inline-flex;
   align-items: center;
@@ -220,13 +224,16 @@ dialog footer button {
 .primary:hover:not(:disabled) {
   opacity: 0.88;
 }
+.secondary,
 dialog footer button:not(.primary) {
   border: 1px solid var(--line-strong);
 }
+.secondary:hover,
 dialog footer button:not(.primary):hover {
   background: var(--hover);
 }
 .primary:active:not(:disabled),
+.secondary:active,
 dialog footer button:active {
   scale: 0.96;
 }
@@ -564,9 +571,14 @@ fieldset {
   background: var(--bg);
   color: var(--text);
   user-select: none;
+  /* The whole bar moves the window, like a native title bar; only its buttons do not. */
+  -webkit-app-region: drag;
+}
+.app-titlebar button,
+.mirror-titlebar button {
+  -webkit-app-region: no-drag;
 }
 .title-drag {
-  -webkit-app-region: drag;
   display: flex;
   align-items: center;
   flex: 1;
@@ -577,7 +589,6 @@ fieldset {
   display: flex;
   height: 100%;
   flex-shrink: 0;
-  -webkit-app-region: no-drag;
 }
 .window-buttons button {
   display: grid;
@@ -617,7 +628,6 @@ fieldset {
   font: 400 12px var(--font-small);
 }
 .app-titlebar > .icon-button {
-  -webkit-app-region: no-drag;
   width: 40px;
   height: 32px;
   margin-right: 2px;
@@ -786,10 +796,6 @@ fieldset {
   font: 12px/1.4 var(--font-small);
   color: var(--text-2);
 }
-.is-live .device-state,
-.is-recording .device-state {
-  color: var(--live);
-}
 .is-recording .device-state {
   color: var(--rec);
 }
@@ -894,6 +900,8 @@ label.pref-row {
   font-variant-numeric: tabular-nums;
 }
 .logs {
+  user-select: text;
+  cursor: text;
   display: grid;
   max-height: 220px;
   overflow-y: auto;
@@ -938,29 +946,18 @@ label.pref-row {
   flex-direction: column;
   height: 100vh;
 }
+/* 44 px tall (window-sizing.ts MIRROR_BARS counts it). The name is plain text inside the
+   drag area, so the whole left side moves the window. */
 .mirror-titlebar {
-  height: 38px;
-  min-height: 38px;
+  height: 44px;
+  min-height: 44px;
   border-bottom: 1px solid var(--line);
 }
 .mirror-device {
-  padding-left: 4px;
-}
-#device-home {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  max-width: 100%;
-  height: 28px;
-  padding: 0 6px;
-  border-radius: var(--r-control);
+  gap: 8px;
+  padding: 0 10px 0 14px;
   font: 600 12px var(--font-small);
   white-space: nowrap;
-  -webkit-app-region: no-drag;
-  transition: background-color var(--fast) var(--ease-out);
-}
-#device-home:hover {
-  background: var(--hover);
 }
 #mirror-name {
   overflow: hidden;
@@ -981,16 +978,15 @@ label.pref-row {
   display: flex;
   align-items: center;
   flex-shrink: 0;
-  -webkit-app-region: no-drag;
 }
 .mirror-actions .icon-button {
-  width: 28px;
-  height: 30px;
+  width: 30px;
+  height: 32px;
   color: var(--text);
 }
 .mirror-actions .icon-button .icon {
-  width: 17px;
-  height: 17px;
+  width: 16px;
+  height: 16px;
 }
 .mirror-actions .icon-button[aria-expanded='true'] {
   background: var(--press);
@@ -1003,16 +999,16 @@ label.pref-row {
   margin-left: 2px;
 }
 .mirror-titlebar .window-buttons button {
-  width: 30px;
+  width: 34px;
 }
 .mirror-titlebar .window-buttons .icon {
-  width: 12px;
-  height: 12px;
+  width: 11px;
+  height: 11px;
 }
 
 .mirror-menu {
   position: absolute;
-  top: 42px;
+  top: 48px;
   right: 8px;
   z-index: 8;
   width: 252px;
@@ -1072,7 +1068,7 @@ label.pref-row {
 
 .apk-drop {
   position: absolute;
-  top: 38px;
+  top: 44px;
   left: 0;
   right: 0;
   z-index: 6;
@@ -1083,6 +1079,56 @@ label.pref-row {
   line-height: 1.4;
   pointer-events: none;
   animation: drop-banner var(--fast) var(--ease-out);
+}
+
+.shot {
+  position: absolute;
+  inset: 44px 0 48px;
+  z-index: 7;
+  display: grid;
+  place-items: center;
+  padding: 14px;
+  background: rgb(10 12 13 / 0.55);
+  animation: fade-in var(--fast) var(--ease-out);
+}
+.shot-card {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  width: min(100%, 340px);
+  max-height: 100%;
+  padding: 14px 14px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-overlay);
+  background: var(--surface);
+  box-shadow: var(--shadow-pop);
+  animation: sheet-in var(--medium) var(--ease-out);
+}
+.shot-card h2 {
+  font: 600 15px/1.3 var(--font-display);
+}
+.shot-frame {
+  display: grid;
+  place-items: center;
+  min-height: 0;
+}
+.shot-frame canvas {
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 6px;
+  outline: 1px solid rgb(0 0 0 / 0.1);
+}
+.shot-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.shot-actions .text-button {
+  margin-right: auto;
+}
+.shot-actions .primary,
+.shot-actions .secondary {
+  min-width: 0;
 }
 
 .viewport {
@@ -1139,46 +1185,87 @@ label.pref-row {
   position: absolute;
   inset: 0;
   z-index: 3;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 14px;
-  padding: 30px;
-  text-align: center;
+  display: grid;
+  place-items: center;
+  padding: 24px;
   background: #151819;
   color: #e6e9e9;
   font-size: 13px;
   line-height: 1.6;
+}
+.status-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  max-width: 300px;
+  text-align: center;
 }
 .video-status .spinner {
   width: 20px;
   height: 20px;
   color: #a2aaad;
 }
-.video-status #reconnect {
+/* Mirroring stopped and the person decides: a card, over the last picture when there is one. */
+.video-status.is-over-picture {
+  background: rgb(10 12 13 / 0.62);
+  animation: fade-in var(--medium) var(--ease-out);
+}
+.video-status.is-asking .status-card {
+  align-items: stretch;
+  gap: 6px;
+  width: min(100%, 300px);
+  padding: 18px 18px 12px;
+  border: 1px solid rgb(255 255 255 / 0.08);
+  border-radius: var(--r-overlay);
+  background: #232627;
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.45);
+  text-align: left;
+  animation: sheet-in var(--medium) var(--ease-out);
+}
+#status-title {
+  font: 600 16px/1.3 var(--font-display);
+  color: #eef1f1;
+}
+.is-asking #status-message {
+  color: #b4bcbf;
+}
+.status-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 10px;
+}
+.status-actions button {
   height: 32px;
-  min-width: 120px;
-  padding: 0 16px;
+  padding: 0 14px;
   border-radius: var(--r-control);
-  background: #e6e9e9;
-  color: #151819;
   font-weight: 600;
   transition:
+    background-color var(--fast) var(--ease-out),
     opacity var(--fast) var(--ease-out),
     scale var(--fast) var(--ease-out);
 }
-.video-status #reconnect:hover {
+#close-mirror {
+  color: #c6cdd0;
+}
+#close-mirror:hover {
+  background: rgb(255 255 255 / 0.08);
+}
+#reconnect {
+  background: #e6e9e9;
+  color: #151819;
+}
+#reconnect:hover {
   opacity: 0.88;
 }
-.video-status #reconnect:active {
+.status-actions button:active {
   scale: 0.96;
 }
 /* A passing status over a live picture: a small note that does not hide the video. */
 .video-status.is-notice {
   inset: 10px auto auto 50%;
-  flex-direction: row;
-  gap: 8px;
+  display: block;
   max-width: calc(100% - 24px);
   padding: 6px 12px;
   border-radius: 8px;
@@ -1189,6 +1276,11 @@ label.pref-row {
   pointer-events: none;
   translate: -50% 0;
   animation: notice-in var(--medium) var(--ease-out);
+}
+.video-status.is-notice .status-card {
+  flex-direction: row;
+  gap: 8px;
+  max-width: none;
 }
 .video-status.is-notice .spinner {
   width: 12px;
@@ -1234,14 +1326,13 @@ label.pref-row {
 
 @media (max-width: 330px) {
   .mirror-actions .icon-button {
-    width: 26px;
+    width: 27px;
   }
   .mirror-titlebar .window-buttons button {
-    width: 26px;
+    width: 30px;
   }
-  #device-home {
-    font-size: 11.5px;
-    padding: 0 4px;
+  .mirror-device {
+    padding-left: 10px;
   }
 }
 
@@ -1294,6 +1385,17 @@ label.pref-row {
 @keyframes screen-on {
   from {
     background: var(--phone-edge-hover);
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes sheet-in {
+  from {
+    opacity: 0;
+    translate: 0 6px;
   }
 }
 @keyframes picture-in {

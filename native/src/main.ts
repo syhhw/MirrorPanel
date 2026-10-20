@@ -5,6 +5,8 @@ import {
   dialog,
   shell,
   clipboard,
+  ClipboardItem,
+  nativeImage,
   powerSaveBlocker,
   screen,
   nativeTheme,
@@ -71,6 +73,16 @@ let polling = false,
 let diagnostics: Diagnostics, installer: ApkInstaller, fileSender: FileSender;
 let healthTimer: ReturnType<typeof setInterval>;
 const startOperations = new Map<string, Promise<void>>();
+/**
+ * Mirror windows left open after their device dropped off (cable pulled, Wi-Fi lost). When
+ * the same device is listed again and ready, the mirror resumes in that window by itself.
+ */
+const awaitingDevice = new Set<string>();
+const disconnectedMessage = () =>
+  t(
+    'Aparelho desconectado. O espelhamento volta sozinho quando ele for reconectado.',
+    'Device disconnected. Mirroring resumes by itself once it is connected again.',
+  );
 const closeOrigins = new WeakMap<BrowserWindow, string>();
 const diagnose = (event: string, data: Record<string, unknown> = {}) =>
   diagnostics?.write(event, data);
@@ -321,6 +333,19 @@ async function refresh(): Promise<void> {
     devices = [...preferred.values()];
     for (const device of devices) if (device.state === 'device') void displayRatio(device.serial);
     broadcast();
+    for (const serial of awaitingDevice) {
+      const window = mirrorWindows.get(serial);
+      if (!window || window.isDestroyed()) awaitingDevice.delete(serial);
+      else if (
+        devices.some((d) => d.serial === serial && d.state === 'device') &&
+        !sessions.has(serial) &&
+        !startOperations.has(serial)
+      ) {
+        awaitingDevice.delete(serial);
+        log(t('Aparelho reconectado; retomando ', 'Device reconnected; resuming ') + serial);
+        void start(serial);
+      }
+    }
   } catch (e) {
     log('ADB: ' + String(e), 'error');
   } finally {
@@ -337,6 +362,7 @@ function start(serial: string, attempt = 0, existing?: Entry): Promise<void> {
   return operation;
 }
 async function startSession(serial: string, attempt = 0, existing?: Entry): Promise<void> {
+  awaitingDevice.delete(serial);
   if (
     existing &&
     (sessions.get(serial) !== existing || existing.requestedStop || existing.window.isDestroyed())
@@ -573,13 +599,8 @@ async function startSession(serial: string, attempt = 0, existing?: Entry): Prom
           await start(serial, attempt + 1, entry);
         } else {
           await finishEntry(serial, entry);
-          sendMirror(entry, 'session-status', {
-            message: t(
-              'Aparelho desconectado. Conecte-o e tente novamente.',
-              'Device disconnected. Connect it and try again.',
-            ),
-            retry: true,
-          });
+          awaitingDevice.add(serial);
+          sendMirror(entry, 'session-status', { message: disconnectedMessage(), retry: true });
         }
       })();
     } else
@@ -758,7 +779,11 @@ async function startSession(serial: string, attempt = 0, existing?: Entry): Prom
     entry.requestedStop = true;
     await session.stop();
     await finishEntry(serial, entry);
-    const message = failureText(e);
+    // A start that failed because the device just dropped off waits for it like a lost session.
+    await refresh();
+    const gone = !devices.some((d) => d.serial === serial && d.state === 'device');
+    if (gone && !window.isDestroyed()) awaitingDevice.add(serial);
+    const message = gone ? disconnectedMessage() : failureText(e);
     log((device?.model ?? serial) + ': ' + message, 'error');
     if (!window.isDestroyed()) sendMirror(entry, 'session-status', { message, retry: true });
   }
@@ -991,14 +1016,30 @@ function handlers(): void {
       throw Error(t('Inicie o espelhamento', 'Start mirroring first'));
     sendMirror(entry, 'take-screenshot');
   });
-  ipcMain.handle('save-png', (event, png) => {
-    owner(event);
+  /** A screenshot from the mirror window: a PNG of reasonable size, nothing else. */
+  const validPng = (png: unknown): Uint8Array => {
     if (
       !(png instanceof Uint8Array) ||
+      png.byteLength < 8 ||
       png.byteLength > 32 * 1024 * 1024 ||
       Buffer.from(png).readUInt32BE(0) !== 0x89504e47
     )
       throw Error(t('PNG inválido', 'Invalid PNG'));
+    return png;
+  };
+  ipcMain.handle('copy-png', async (event, png) => {
+    owner(event);
+    const bytes = new Uint8Array(validPng(png));
+    // Decoding proves it is a real image before it reaches the system clipboard.
+    if (nativeImage.createFromBuffer(Buffer.from(bytes)).isEmpty())
+      throw Error(t('PNG inválido', 'Invalid PNG'));
+    await clipboard.write([
+      new ClipboardItem({ 'image/png': new Blob([bytes], { type: 'image/png' }) }),
+    ]);
+  });
+  ipcMain.handle('save-png', (event, png) => {
+    owner(event);
+    validPng(png);
     const path = mediaPath('png');
     writeFileSync(path, png, { flag: 'wx' });
     log(t('Captura salva: ', 'Screenshot saved: ') + path);

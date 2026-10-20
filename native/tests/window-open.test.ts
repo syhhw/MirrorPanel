@@ -17,7 +17,7 @@ test('the device ratio comes from wm size, preferring an override resolution', (
 
 test('a portrait mirror opens with the phone shape at a comfortable height', () => {
   const size = initialMirrorSize(0.45, fullHd);
-  assert.deepEqual(size, { width: 337, height: 835 });
+  assert.deepEqual(size, { width: 335, height: 836 });
 });
 
 test('the opening size is already settled, so the first frame does not resize it', () => {
