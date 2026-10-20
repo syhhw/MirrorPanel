@@ -1,13 +1,13 @@
-# Builds e saidas geradas (recriaveis a partir do codigo-fonte)
+# Builds and generated output (recreated from the source)
 /build/
 /dist/
 /installer_output/
 *.spec
 
-# Dados locais de uso (nao fazem parte do codigo)
-# Gravacoes/capturas de tela novas ficam em "Videos\MirrorPanel Media" do
-# usuario, fora da pasta do projeto - mas ainda ignora os nomes antigos aqui
-# tambem, caso sobre algo de uma instalacao anterior.
+# Local data left by the 1.x app (not part of the code). Recordings and
+# screenshots now go to the user's "Videos\MirrorPanel Media", outside the
+# project folder; the old folder names stay ignored in case an older
+# install left something behind.
 /logs/
 /recordings/
 /screenshots/
@@ -18,19 +18,20 @@ installer_language.marker
 __pycache__/
 *.pyc
 
-# Editor/SO
+# Editor/OS
 .vscode/
 Thumbs.db
 
-# Binarios de terceiros (scrcpy/adb) - baixe do repositorio oficial de cada um,
-# nao faz sentido re-hospedar aqui (e sao dezenas de MB de DLLs)
+# Third-party binaries used by the 1.x app (scrcpy/adb). Download them from
+# each project's official source; there is no point re-hosting tens of MB of
+# DLLs here.
 /bin/
 
-# Caches locais de consulta trail
+# Local trail query caches
 /graft/
 /.trail/cache/
 
-# Estado local de ferramentas de IA e automacoes pessoais (nao e codigo do projeto)
+# Local state of AI tools and personal automation (not project code)
 /.Codex/
 /.claude/
 /.claude-flow/
@@ -39,5 +40,5 @@ Thumbs.db
 /handoff.cmd
 /instalar_hook.bat
 
-# Capturas avulsas de tela
+# Loose screenshots
 /Prints/

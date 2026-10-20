@@ -12,7 +12,6 @@
     "format": "npm --prefix native run format",
     "format:check": "npm --prefix native run format:check",
     "test": "npm --prefix native test",
-    "test:legacy": "python -m unittest discover -s tests -q",
     "package": "npm --prefix native run package",
     "test:android": "npm --prefix native run test:android"
   }
