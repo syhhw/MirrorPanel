@@ -267,14 +267,14 @@ export class MirrorSession extends EventEmitter {
         }
       } else if (status.kind === 'heartbeat') {
         this.heartbeats++;
-        this.emit('heartbeat');
+        this.notify('heartbeat');
       } else if (status.kind === 'audio' && ['off', 'started', 'error'].includes(status.state)) {
         this.audioState = status.state;
         if (status.state !== 'started') {
           this.audioConfig = undefined;
-          if (this.recording) this.stopRecording();
+          if (this.recording) this.stopRecordingSafely();
         }
-        this.emit('audio-state', { state: status.state, message: status.message });
+        this.notify('audio-state', { state: status.state, message: status.message });
       }
       return;
     }
@@ -284,35 +284,59 @@ export class MirrorSession extends EventEmitter {
         try {
           this.recording.addAudio(packet);
         } catch (e) {
-          this.stopRecording();
-          this.emit('log', 'Falha ao gravar áudio: ' + String(e));
+          this.stopRecordingSafely();
+          this.notify('log', 'Falha ao gravar áudio: ' + String(e));
         }
-      this.emit('audio', packet);
+      this.notify('audio', packet);
       return;
     }
     if (packet.type === 1) {
       if (this.recording) {
-        this.stopRecording();
-        this.emit(
+        this.stopRecordingSafely();
+        this.notify(
           'log',
           'Gravação encerrada porque a tela girou. Inicie outra gravação para a nova orientação.',
         );
       }
       this.info = parseInfo(packet.data);
       this.config = undefined;
-      this.emit('info', this.info);
+      this.notify('info', this.info);
     } else if (packet.type === 2) {
       if (packet.flags & 2) this.config = packet.data;
-      if (this.info && this.config) this.emit('ready');
+      if (this.info && this.config) this.notify('ready');
       if (this.recording) {
         try {
           this.recording.add(packet);
         } catch (e) {
-          this.stopRecording();
-          this.emit('log', 'Erro ao gravar: ' + String(e));
+          this.stopRecordingSafely();
+          this.notify('log', 'Erro ao gravar: ' + String(e));
         }
       }
-      this.emit('video', packet);
+      this.notify('video', packet);
+    }
+  }
+  /**
+   * Emits a stream event to the app. A listener that throws is a desktop bug,
+   * not a corrupt stream, so it is reported instead of ending the session as
+   * protocol-error. Parsing errors in handle() still end the session.
+   */
+  private notify(event: string, ...args: unknown[]): void {
+    try {
+      this.emit(event, ...args);
+    } catch (error) {
+      try {
+        this.emit('diagnostic', 'listener-error', { event, message: String(error) });
+      } catch {
+        /* Diagnostics are best effort and must not end the session either. */
+      }
+    }
+  }
+  /** Inside the stream handler a file error ends the recording, never the mirror. */
+  private stopRecordingSafely(): void {
+    try {
+      this.stopRecording();
+    } catch (e) {
+      this.notify('log', 'Falha ao finalizar arquivo: ' + String(e));
     }
   }
   control(value: unknown): void {
@@ -443,7 +467,7 @@ export class MirrorSession extends EventEmitter {
     try {
       recording?.finish();
     } finally {
-      this.emit('recording', null);
+      this.notify('recording', null);
     }
   }
   async stop(source = 'api-stop'): Promise<void> {
