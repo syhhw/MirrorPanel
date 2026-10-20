@@ -1,34 +1,33 @@
 # MirrorPanel
 
-Espelha e controla celulares Android no Windows, com motor próprio: Electron +
-WebCodecs no computador e servidor Java no aparelho. Executa sem Python nem
-programas de terceiros; o ADB oficial vem incluído. Versão atual: prévia 5.
+Mirrors and controls Android phones on Windows, with its own engine: Electron +
+WebCodecs on the computer and a Java server on the device. Runs without Python or
+third-party programs; the official ADB is included. Current version: preview 5.
 
-Abra **Abrir MirrorPanel.vbs**. O executável fica em
-`native/dist/MirrorPanel-win32-x64/MirrorPanel.exe`; mantenha a pasta inteira.
-Conecte um Android **10+**, autorize a depuração USB e clique no celular desenhado no painel.
+Run **Open MirrorPanel.vbs**. The executable is at
+`native/dist/MirrorPanel-win32-x64/MirrorPanel.exe`; keep the whole folder.
+Connect an Android **10+** phone, authorize USB debugging and click the phone drawn in the panel.
 
-Recursos: vídeo H.264, áudio estéreo com autorização no celular, Unicode e
-composição de texto, multitoque com Alt+clique, MP4 com som, PNG, fullscreen,
-janelas por aparelho, qualidade, Wi-Fi, instalação de APK e envio de arquivos
-por arraste para a pasta Download do celular.
+Features: H.264 video, stereo audio with authorization on the phone, Unicode and
+text composition, multi-touch with Alt+click, MP4 with sound, PNG, fullscreen,
+per-device windows, quality, Wi-Fi, APK install and file transfer by drag and
+drop to the phone's Download folder.
 
-O ícone de fone ativa áudio. Alt+clique fixa um dedo; arraste para usar o outro.
-Esc cancela contatos ou volta. O Companion mostra orientação e estado; encerrar o espelhamento é feito pelo computador.
+The headphones icon turns on audio. Alt+click pins one finger; drag to use the other.
+Esc cancels contacts or goes back. The Companion shows guidance and status; mirroring is ended from the computer.
 
-É uma preview. Áudio depende da política do aplicativo Android. H.265,
-clipboard bidirecional, QR, bandeja e atualização automática ainda não existem.
-Rotação e mudança do áudio finalizam a gravação atual.
+This is a preview. Audio depends on the Android app's policy. H.265, two-way
+clipboard, QR, tray and automatic updates do not exist yet.
+Rotation and audio changes end the current recording.
 
-A preview 5 acomoda a proporção depois de soltar a borda, recupera falhas do
-renderer sem fechar a janela, aceita APK por arraste e anima os botões de navegação.
-No celular, fechar a tela de orientação não interrompe o espelho.
+Preview 5 fits the aspect ratio after you release the border, recovers from
+renderer crashes without closing the window, accepts APKs by drag and drop and animates the navigation buttons.
+On the phone, closing the guidance screen does not stop the mirror.
 
-## Desenvolvimento
+## Development
 
-O código ativo está em [native](native/README.md). Os arquivos Python históricos
-não são iniciados nem incluídos no pacote. A documentação anterior fica em
-[README 1.x](docs/README-1.x.md); releases públicas e tags anteriores não mudaram.
+The code is in [native](native/README.md). The 1.x Python app lives on the
+`old` branch; earlier public releases and tags have not changed.
 
 ```powershell
 npm run setup
@@ -41,7 +40,7 @@ npm start
 npm run package
 ```
 
-[Arquitetura](docs/ENGINE.md) · [Protocolo MPV1](native/docs/PROTOCOL.md) · [Build, testes e assinatura](native/README.md).
+[Architecture](docs/ENGINE.md) · [MPV1 protocol](native/docs/PROTOCOL.md) · [Build, tests and signing](native/README.md).
 
-MirrorPanel usa Apache-2.0; Electron/mp4-muxer MIT; avisos ADB/Chromium acompanham
-o portátil.
+MirrorPanel is Apache-2.0; Electron/mp4-muxer are MIT; ADB/Chromium notices ship
+with the portable build.

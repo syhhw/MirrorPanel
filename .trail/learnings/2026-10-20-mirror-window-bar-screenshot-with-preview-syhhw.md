@@ -1,5 +1,5 @@
 ---
-title: "Janela de espelho: barra, captura com prévia e volta sozinha após queda"
+title: "Mirror window: bar, screenshot with preview and automatic resume after a drop"
 author: Syhhw
 date: 2026-10-20
 branch: mirrorpanel-2.0

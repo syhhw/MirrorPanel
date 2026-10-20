@@ -1,5 +1,5 @@
 ---
-title: Volta sozinha apos queda longa e valor de tela ligada preservado
+title: Automatic resume after a long drop and preserved stay-awake value
 author: Syhhw
 date: 2026-10-20
 branch: mirrorpanel-2.0
@@ -16,7 +16,7 @@ touches:
 ---
 
 ## Decided
-- An automatic reconnect that fails counts as a lost link, as does a start whose device vanished. Both wait for the device and show "Aparelho desconectado…", never the raw adb error. A Companion refusal (the `refused` event) is not a lost link and keeps its own message.
+- An automatic reconnect that fails counts as a lost link, as does a start whose device vanished. Both wait for the device and show "Device disconnected…", never the raw adb error. A Companion refusal (the `refused` event) is not a lost link and keeps its own message.
 - The wait resumes only after the device is listed ready on two refreshes in a row, and gives up after 5 resumes in a row (MAX_RESUMES), so a persistent failure cannot loop forever.
 - If a session ends while the device is gone, the phone's original stay_on_while_plugged_in is kept in `unrestoredAwake`. The resumed session reuses it instead of reading back the 3 MirrorPanel had set. If no session follows, it is restored as soon as the device is listed again.
 - Verified on the Moto G30 with two `adb -s <serial> usb` calls 3 s apart: the card appeared over the dimmed last frame, the mirror resumed about 12 s later, and stay_on came back to 7.

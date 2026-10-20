@@ -1,89 +1,89 @@
-# MirrorPanel — arquitetura
+# MirrorPanel — architecture
 
-Electron + TypeScript + WebCodecs, motor Android próprio. Preview 4, 19/10/2026.
+Electron + TypeScript + WebCodecs, its own Android engine. Preview 4, 19/10/2026.
 
 ```text
-Painel Electron → Session manager → ADB oficial → app_process (UID shell)
-                                    │              MediaCodec H.264 / display
-                                    └→ Companion   indicador / IME / áudio
-Janela Electron ← IPC limitado ← forward MPV1 ← captura e estados autenticados
- WebCodecs canvas + AudioDecoder                → InputManager / commitText
- PNG e MP4 H.264 + AAC
+Electron panel → Session manager → official ADB → app_process (UID shell)
+                                   │               MediaCodec H.264 / display
+                                   └→ Companion    indicator / IME / audio
+Electron window ← limited IPC ← MPV1 forward ← capture and authenticated status
+ WebCodecs canvas + AudioDecoder               → InputManager / commitText
+ PNG and MP4 H.264 + AAC
 ```
 
-Main controla processos, arquivos e ADB. Preload expõe operações específicas;
-renderer tem sandbox, contextIsolation, CSP local e nodeIntegration desativado.
-Dois tokens aleatórios separam fluxo desktop e canal privado do Companion.
-O servidor só captura enquanto o indicador autenticado estiver ativo.
+Main controls processes, files and ADB. Preload exposes specific operations;
+the renderer has sandbox, contextIsolation, a local CSP and nodeIntegration disabled.
+Two random tokens separate the desktop stream from the Companion's private channel.
+The server only captures while the authenticated indicator is active.
 
 ## Android
 
-API29–33: SurfaceControl com superfície MediaCodec e layer stack do display real.
-API34+: assinatura estática DisplayManager espelhadora. O mínimo do produto
-agora é Android10; OEMs/versões não testados constam na matriz de validação.
+API 29–33: SurfaceControl with a MediaCodec surface and the real display's layer stack.
+API 34+: the static DisplayManager signature for mirroring. The product minimum
+is now Android 10; untested OEMs/versions are listed in the validation matrix.
 
-Multitoque valida estados e mapeia IDs externos a slots Android0..9 estáveis.
-Isso evita o problema do InputTarget Android12 com IDs altos. UP libera apenas
-o contato alterado; CANCEL, rotação e encerramento liberam o gesto.
+Multi-touch validates states and maps external IDs to stable Android slots 0..9.
+This avoids the Android 12 InputTarget problem with high IDs. UP releases only
+the changed contact; CANCEL, rotation and shutdown release the gesture.
 
-Unicode usa um InputMethodService próprio, sem ler conteúdo do editor. O teclado
-anterior é salvo e restaurado no encerramento. Texto requer editor ativo e ACK.
-Composição e colagem preservam os code points, com limite64KiB por comando.
+Unicode uses its own InputMethodService, without reading the editor's content. The previous
+keyboard is saved and restored at shutdown. Text requires an active editor and an ACK.
+Composition and paste preserve the code points, with a 64 KiB limit per command.
 
-Áudio usa Activity de consentimento MediaProjection e AudioPlaybackCapture;
-somente reprodução permitida pelos aplicativos. AAC-LC48k estéreo é codificado
-com MediaCodec, com timestamps monotônicos e fila limitada. Não usa microfone.
+Audio uses a MediaProjection consent Activity and AudioPlaybackCapture;
+only playback that the apps allow. AAC-LC 48k stereo is encoded
+with MediaCodec, with monotonic timestamps and a bounded queue. The microphone is not used.
 
-## Desktop e lifecycle
+## Desktop and lifecycle
 
-Vídeo: WebCodecs + canvas. Áudio: AudioDecoder + AudioContext, volume, fila
-limitada e interrupção das fontes agendadas ao parar. MP4 remuxa H.264/AAC sem
-reencodificar; PNG vem do canvas. Rotação e mudança de áudio finalizam o MP4 atual.
+Video: WebCodecs + canvas. Audio: AudioDecoder + AudioContext, volume, bounded
+queue and stopping the scheduled sources on stop. MP4 remuxes H.264/AAC without
+re-encoding; PNG comes from the canvas. Rotation and audio changes finish the current MP4.
 
-Uma sessão possui um processo, um forward e um JAR temporário. Nunca usa
-kill-server ou kill por nome. Limpeza aguarda operações ADB tardias, restaura
-IME/stay-awake e encerra apenas os recursos que possui. Falha do renderer cancela contatos pendentes e recarrega a imagem na mesma
-janela, preservando o transporte Android; filas destinadas ao renderer antigo são
-descartadas. Há três recuperações automáticas; depois disso, Reconectar continua
-disponível e os controles da janela permanecem utilizáveis. Destruir a janela
-encerra a sessão. Inícios concorrentes para o mesmo aparelho são serializados. Fechar a tela de orientação Android não encerra o espelho. Desconexões inesperadas têm até
-três tentativas de reconexão. Troca USB→Wi-Fi pode exigir novo Iniciar.
+A session owns one process, one forward and one temporary JAR. It never uses
+kill-server or kill by name. Cleanup waits for late ADB operations, restores
+IME/stay-awake and ends only the resources it owns. A renderer crash cancels pending contacts and reloads the image in the same
+window, keeping the Android transport; queues meant for the old renderer are
+discarded. There are three automatic recoveries; after that, Reconnect is still
+available and the window controls stay usable. Destroying the window
+ends the session. Concurrent starts for the same device are serialized. Closing the Android guidance screen does not end the mirror. Unexpected disconnections get up to
+three reconnection attempts. Switching USB→Wi-Fi may require a new Start.
 
-O heartbeat autenticado do Companion é encaminhado como status MPV1 ao PC.
-O watchdog de 15 s mede ausência de comunicação, não ausência de quadros novos.
-Assim uma tela estática permanece conectada sem desativar detecção de falhas.
+The Companion's authenticated heartbeat is forwarded to the PC as an MPV1 status.
+The 15 s watchdog measures absence of communication, not absence of new frames.
+So a static screen stays connected without disabling failure detection.
 
-As janelas usam moldura própria, barra superior de 38 px, navegação inferior
-de 48 px. O arraste nativo é livre; após 500 ms sem resize, o vídeo e a janela
-são acomodados pela maior dimensão, com tolerância de 3 px e limites do monitor.
-Maximizar/fullscreen usam vídeo contido e centralizado; o estado é reenviado ao
-recuperar um renderer. O registro de janelas
-independe das sessões, permitindo fechar/minimizar mesmo desconectado. Ações de janela
-aceitam apenas o sender proprietário e uma lista fechada de comandos.
+Windows use their own frame, a 38 px top bar and a 48 px bottom navigation
+bar. Native dragging is free; after 500 ms without a resize, the video and the window
+are fitted by the larger dimension, with a 3 px tolerance and the monitor's bounds.
+Maximize/fullscreen use contained, centered video; the state is resent when
+a renderer is recovered. The window registry
+is independent of sessions, so windows can be closed/minimized even while disconnected. Window actions
+accept only the owning sender and a closed list of commands.
 
-Perda do Companion é falha de conexão recuperável, não pedido de parada.
-Exit code zero também não implica intenção do usuário. O app Android mostra
-orientação e conexão; a notificação não encerra o serviço quando dispensada.
+Losing the Companion is a recoverable connection failure, not a stop request.
+Exit code zero does not imply user intent either. The Android app shows
+guidance and the connection; dismissing the notification does not end the service.
 
-## Referências e estado
+## References and status
 
-- `native/docs/PROTOCOL.md`: contratos, limites, autenticação e timestamps.
+- `native/docs/PROTOCOL.md`: contracts, limits, authentication and timestamps.
 
-H.265, clipboard bidirecional, QR, bandeja e updater ainda não implementados.
-O pacote não usa a versão Python. Nenhum código ou recurso de terceiros
-participa do motor além do ADB oficial e do Electron. Chromium mantém seu componente interno ffmpeg.dll.
+H.265, two-way clipboard, QR, tray and updater are not implemented yet.
+No third-party code or resource takes part in the engine besides the official ADB
+and Electron. Chromium keeps its internal ffmpeg.dll component.
 
-## APK, interação e diagnóstico (preview 5)
+## APK, interaction and diagnostics (preview 5)
 
-O preload converte um File real em caminho via webUtils.getPathForFile. O main
-valida arquivo local APK/ZIP, tamanho e janela proprietária; o instalador usa
-argv `adb install -r`, sem shell e com trava por aparelho. O seletor do painel
-compartilha esse instalador. Arquivos sintéticos do renderer não viram caminhos.
+The preload turns a real File into a path through webUtils.getPathForFile. Main
+validates a local APK/ZIP file, its size and the owning window; the installer uses
+argv `adb install -r`, with no shell and a per-device lock. The panel's file picker
+shares that installer. Synthetic files from the renderer do not become paths.
 
-Ripple de navegação: expansão de 250 ms, opacidade 0,25, mínimo de 250 ms e
-saída de 300 ms. Mouse e teclado não duplicam a ação Android.
+Navigation ripple: 250 ms expansion, 0.25 opacity, 250 ms minimum and
+300 ms exit. Mouse and keyboard do not duplicate the Android action.
 
-Diagnóstico local rotativo (2 MiB + um anterior): ciclo de janela, comandos
-nativos de fechar/minimizar/maximizar, falhas do renderer, início/fim, heartbeat,
-contagem de pacotes e PID do transporte. Não registra tokens, texto, clipboard
-ou argumentos ADB. Falha de gravação do diagnóstico não interrompe o produto.
+Rotating local diagnostics (2 MiB + one previous file): window lifecycle, native
+close/minimize/maximize commands, renderer crashes, start/end, heartbeat,
+packet counts and the transport PID. It does not log tokens, text, clipboard
+or ADB arguments. A failure to write diagnostics does not interrupt the product.

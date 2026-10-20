@@ -17,7 +17,7 @@ touches:
 ## Decided
 - One Companion session at a time; a new valid ConnectActivity request is refused, not allowed to take over. Takeover would let two desktops race on the IME (each reads the other's MirrorInput as "previous"), audio consent and the notification, and a test profile could end the user's real mirror.
 - Handshake (common/Handshake.java): after the token the Companion sends a heartbeat (type 6) to accept or an end frame (type 4, reason companion-busy | indicator-blocked) to refuse. The server reads this first frame before capturing; on refusal it accepts the desktop, sends type 4 with the reason and exits only after the desktop closes.
-- session.ts maps the reason with refusalMessage() and fails start() at once; the session ends as start-failed, which main.ts never auto-retries. The 15 s "não confirmou o indicador" timeout stays as the fallback.
+- session.ts maps the reason with refusalMessage() and fails start() at once; the session ends as start-failed, which main.ts never auto-retries. The 15 s "did not confirm the mirroring indicator" timeout stays as the fallback.
 - app.requestSingleInstanceLock() was already there since d0910db and is per userData, so smoke/verification profiles (app.setPath('userData') before require) coexist. Two MirrorPanels on one phone means two profiles, not a missing lock.
 
 ## Tried and ruled out

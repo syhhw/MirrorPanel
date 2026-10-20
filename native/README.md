@@ -1,88 +1,88 @@
-# MirrorPanel — prévia 5
+# MirrorPanel — preview 5
 
-Electron + TypeScript + WebCodecs, com motor Android próprio. O pacote executa
-sem Python nem programas de terceiros. Inclui o ADB oficial para transporte USB/Wi-Fi.
+Electron + TypeScript + WebCodecs, with its own Android engine. The package runs
+without Python or third-party programs. It includes the official ADB for USB/Wi-Fi transport.
 
-## Usar
+## Usage
 
-Abra `dist/MirrorPanel-win32-x64/MirrorPanel.exe` ou **Abrir MirrorPanel.vbs**
-na raiz do projeto. Mantenha os arquivos da pasta portátil juntos.
+Open `dist/MirrorPanel-win32-x64/MirrorPanel.exe` or **Open MirrorPanel.vbs**
+at the project root. Keep the files of the portable folder together.
 
-1. Android **10 ou superior**, depuração USB ativada e computador autorizado.
-2. Clique no celular desenhado no painel. O app instala seu Companion e mostra
-   um indicador no celular.
-3. Clique num campo de texto para digitar ou colar. Acentos, idiomas, composição
-   e sequências de emoji são enviados pelo IME MirrorPanel, sem normalização.
-4. **Alt+clique** fixa um dedo. Arraste com o mouse para usar o segundo; outro
-   Alt+clique libera a âncora. Esc cancela contatos. Uma tela touch no PC pode
-   enviar até dez contatos simultâneos.
-5. Clique no **fone** e autorize a captura no Android para ouvir áudio de mídia.
-   O controle de volume afeta o computador. Inicie áudio antes de gravar para
-   incluir a faixa AAC no MP4.
+1. Android **10 or later**, USB debugging enabled and the computer authorized.
+2. Click the phone drawn in the panel. The app installs its Companion and shows
+   an indicator on the phone.
+3. Click a text field to type or paste. Accents, languages, composition
+   and emoji sequences are sent through the MirrorPanel IME, without normalization.
+4. **Alt+click** pins one finger. Drag with the mouse to use the second; another
+   Alt+click releases the anchor. Esc cancels contacts. A touch screen on the PC can
+   send up to ten simultaneous contacts.
+5. Click the **headphones** and authorize the capture on Android to hear media audio.
+   The volume control affects the computer. Start audio before recording to
+   include the AAC track in the MP4.
 
-Clique direito/Esc: Voltar; clique do meio/Home: Início; End: recentes;
-F11: tela cheia; Ctrl+V: colar. A barra oferece PNG e gravação MP4.
-Fechar a janela de vídeo ou usar Parar no painel do computador encerra a sessão.
-O aplicativo Android mostra orientação e estado da conexão; fechar essa tela
-ou dispensar a notificação não encerra o espelhamento.
-Use a engrenagem para qualidade, nome do aparelho e controles adicionais.
-Na preview 3, a janela tem barra superior única, vídeo ajustado à proporção
-do aparelho e navegação inferior. Heartbeats mantêm a conexão em telas paradas;
-ausência real de resposta continua sendo detectada pelo watchdog.
-Na preview 5, o arraste das bordas é livre; após 500 ms sem movimento, a janela
-acomoda o vídeo pela maior dimensão, mantendo a proporção. Reduza a altura em
-retrato para reduzir o espelho; estreitar apenas a lateral faz a largura voltar.
-Maximizar e tela cheia centralizam o vídeo. Os botões de navegação têm animação
-ao pressionar com mouse ou teclado.
-Arraste arquivos locais para a janela de espelhamento: um APK sozinho é instalado
-naquele aparelho; outros arquivos (até 20 por vez, 4 GB cada) vão para a pasta
-Download do celular sem sobrescrever nomes existentes. Pastas de rede são recusadas.
-Os controles da janela continuam funcionando mesmo sem sessão. Perdas do
-Companion admitem recuperação; após falhas repetidas, Reconectar tenta novamente
-na mesma janela. A reconexão não restaura uma janela que você minimizou.
-Falhas do renderer tentam recuperar a imagem na mesma janela e transporte,
-cancelando contatos pendentes. Após três recuperações, a janela oferece Reconectar
-e preserva Fechar/Minimizar. O áudio precisa ser ativado novamente após essa falha.
-O diagnóstico local fica em `%APPDATA%/MirrorPanel/diagnostics/lifecycle.jsonl`;
-registra origem de fechamento, estado e contadores, sem texto digitado ou clipboard.
-O teclado anterior é restaurado ao encerrar. Se o Android reiniciar durante uma
-sessão, selecione seu teclado habitual em Configurações → Idioma e entrada.
+Right click/Esc: Back; middle click/Home: Home; End: recents;
+F11: fullscreen; Ctrl+V: paste. The bar offers PNG and MP4 recording.
+Closing the video window or using Stop in the computer's panel ends the session.
+The Android app shows guidance and the connection status; closing that screen
+or dismissing the notification does not end mirroring.
+Use the gear for quality, device name and additional controls.
+In preview 3, the window has a single top bar, video fitted to the device's
+aspect ratio and bottom navigation. Heartbeats keep the connection alive on static screens;
+a real lack of response is still detected by the watchdog.
+In preview 5, dragging the borders is free; after 500 ms without movement, the window
+fits the video by its larger dimension, keeping the aspect ratio. Reduce the height in
+portrait to shrink the mirror; narrowing only from the side makes the width return.
+Maximize and fullscreen center the video. The navigation buttons animate
+when pressed with the mouse or keyboard.
+Drag local files onto the mirror window: a single APK is installed
+on that device; other files (up to 20 at a time, 4 GB each) go to the phone's
+Download folder without overwriting existing names. Network folders are refused.
+The window controls keep working even without a session. Losing the
+Companion is recoverable; after repeated failures, Reconnect tries again
+in the same window. Reconnecting does not restore a window you minimized.
+Renderer crashes try to recover the image in the same window and transport,
+cancelling pending contacts. After three recoveries, the window offers Reconnect
+and keeps Close/Minimize. Audio has to be turned on again after such a crash.
+The local diagnostics log is at `%APPDATA%/MirrorPanel/diagnostics/lifecycle.jsonl`;
+it records the close origin, state and counters, without typed text or clipboard contents.
+The previous keyboard is restored when the session ends. If Android restarts during a
+session, select your usual keyboard in Settings → Languages & input.
 
-## Recursos
+## Features
 
-- Janelas independentes por aparelho, nomes, qualidade e preferências persistidas.
-- H.264 MediaCodec → WebCodecs; áudio de reprodução → AAC 48 kHz estéreo → AudioDecoder.
-- Multitoque com identidade estável, arrasto, rolagem, teclas e Unicode até 64 KiB por envio.
-- MP4 com vídeo e áudio originais, sem reencodificação; capturas PNG.
-- Reconexão limitada, cancelamento de entrada, recuperação após perda de vídeo.
-- USB, conexão Wi-Fi por IP, pareamento por código, ativação TCP/IP via USB.
-- Instalação de APK por seletor ou arraste para a janela e logs locais.
-- Envio de arquivos por arraste para Download, com nomes seguros e sem sobrescrever.
+- Independent windows per device; names, quality and preferences are persisted.
+- H.264 MediaCodec → WebCodecs; playback audio → AAC 48 kHz stereo → AudioDecoder.
+- Multi-touch with stable identity, drag, scroll, keys and Unicode up to 64 KiB per send.
+- MP4 with the original video and audio, no re-encoding; PNG screenshots.
+- Bounded reconnection, input cancellation, recovery after video loss.
+- USB, Wi-Fi connection by IP, pairing by code, enabling TCP/IP over USB.
+- APK install from a file picker or by dragging onto the window, and local logs.
+- File transfer by drag and drop to Download, with safe names and no overwriting.
 
-Arquivos ficam em `Vídeos/MirrorPanel Media`. O aplicativo só remove seus
-processos, forwards e JARs temporários; não encerra o servidor ADB compartilhado.
-O Companion é visível e pode ser desinstalado normalmente.
+Files are saved in `Videos/MirrorPanel Media`. The app only removes its own
+processes, forwards and temporary JARs; it does not stop the shared ADB server.
+The Companion is visible and can be uninstalled normally.
 
-## Compatibilidade e limites
+## Compatibility and limits
 
-O caminho Android 10–13 usa SurfaceControl; Android 14+ usa DisplayManager.
-O mínimo API 29 é uma decisão de implementação, não certificação de todas as ROMs.
+The Android 10–13 path uses SurfaceControl; Android 14+ uses DisplayManager.
+The API 29 minimum is an implementation decision, not a certification of every ROM.
 
-Áudio depende da política do aplicativo Android: apps podem impedir captura;
-chamadas, conteúdo protegido e microfone não são capturados. A permissão do
-sistema é solicitada a cada nova captura quando exigida pelo Android.
-Unicode é preservado; os glifos disponíveis dependem do app e das fontes do celular.
+Audio depends on the Android app's policy: apps can block capture;
+calls, protected content and the microphone are not captured. The system
+permission is requested for each new capture when Android requires it.
+Unicode is preserved; the available glyphs depend on the app and the phone's fonts.
 
-Rotação, mudança no áudio ou encerramento finalizam a gravação corrente. Inicie
-outro arquivo depois da alteração. Não há H.265, clipboard bidirecional, QR,
-bandeja ou atualização automática nesta preview. Wi-Fi ainda não tem validação
-em rede física nesta rodada.
+Rotation, an audio change or ending the session finishes the current recording. Start
+another file after the change. There is no H.265, two-way clipboard, QR,
+tray or automatic update in this preview. Wi-Fi has not yet been validated
+on a physical network in this round.
 
-## Compilar e verificar
+## Build and verify
 
-Windows x64, Node >=22.12, Python 3, JDK 17, SDK `platforms;android-35` e
-`build-tools;36.0.0`. Configure `JAVA_HOME` e `ANDROID_HOME` se necessário.
-Esses requisitos são de desenvolvimento; o usuário do portátil não precisa deles.
+Windows x64, Node >=22.12, Python 3, JDK 17, SDK `platforms;android-35` and
+`build-tools;36.0.0`. Set `JAVA_HOME` and `ANDROID_HOME` if needed.
+These requirements are for development; users of the portable build do not need them.
 
 ```powershell
 npm ci
@@ -95,41 +95,41 @@ npm run test:android
 npm run package
 ```
 
-O build usa uma chave de desenvolvimento local em `build/android`. Ela não
-entra no pacote. Para reproduzir atualizações do Companion, use a mesma chave
-estável via `MIRRORPANEL_KEYSTORE`, `MIRRORPANEL_STORE_PASSWORD` e
-`MIRRORPANEL_KEY_ALIAS`. Não há remoção automática de app com assinatura diferente.
+The build uses a local development key in `build/android`. It is not
+included in the package. For reproducible Companion updates, use the same
+stable key through `MIRRORPANEL_KEYSTORE`, `MIRRORPANEL_STORE_PASSWORD` and
+`MIRRORPANEL_KEY_ALIAS`. An app with a different signature is not removed automatically.
 
-Testes reais exigem aparelhos de teste autorizados e desbloqueados:
+Real tests require authorized, unlocked test devices:
 
 ```powershell
 python scripts/build-fixture.py
 adb -s SERIAL install -r build/android/fixture.apk
 node_modules/.bin/tsx scripts/smoke-features.ts SERIAL
 node_modules/electron/dist/electron.exe smoke-features.cjs SERIAL
-node_modules/electron/dist/electron.exe scripts/verify-media.cjs CAMINHO_MP4
+node_modules/electron/dist/electron.exe scripts/verify-media.cjs MP4_PATH
 node_modules/electron/dist/electron.exe smoke-preview5.cjs SERIAL
 node_modules/electron/dist/electron.exe smoke-visual.cjs SERIAL
 node_modules/electron/dist/electron.exe smoke-window-lifecycle.cjs SERIAL
 node_modules/.bin/tsx scripts/smoke-stability.ts SERIAL 90 final
-node_modules/.bin/tsx scripts/smoke-lifecycle.ts SERIAL_ROTACAO SERIAL_STOP
+node_modules/.bin/tsx scripts/smoke-lifecycle.ts SERIAL_ROTATION SERIAL_STOP
 ```
 
-O fixture produz texto, eventos e um tom de 440 Hz; seus dados são privados ao app.
-`smoke-preview5.cjs` instala o fixture por evento de drop Chromium, provoca
-falhas de renderer e verifica recuperação, ripple, resize e controles.
-`smoke-renderer-crash.cjs` é um alias dessa suíte. `smoke-window-lifecycle.cjs`
-testa perda do Companion e geometria por Electron.setBounds; isso não substitui
-arrastar bordas com mouse.
-O teste de lifecycle muda temporariamente rotação no primeiro aparelho e encerra
-o Companion no segundo. O fixture, evidências e chaves não entram no portátil.
+The fixture produces text, events and a 440 Hz tone; its data is private to the app.
+`smoke-preview5.cjs` installs the fixture through a Chromium drop event, triggers
+renderer crashes and checks recovery, ripple, resize and controls.
+`smoke-renderer-crash.cjs` is an alias for that suite. `smoke-window-lifecycle.cjs`
+tests Companion loss and geometry through Electron.setBounds; this does not replace
+dragging the borders with a mouse.
+The lifecycle test temporarily changes the rotation on the first device and stops
+the Companion on the second. The fixture, evidence and keys are not included in the portable build.
 
-## Engenharia
+## Engineering
 
-`docs/PROTOCOL.md` descreve o protocolo MPV1. O MirrorPanel usa código e interface próprios.
+`docs/PROTOCOL.md` describes the MPV1 protocol. MirrorPanel uses its own code and interface.
 
-O teste TCP precisa de acesso local a 127.0.0.1.
+The TCP test needs local access to 127.0.0.1.
 
-Código original Apache-2.0; Electron e mp4-muxer MIT. Avisos Chromium acompanham
-o Electron e os do ADB ficam em `resources/adb`. Chromium inclui `ffmpeg.dll`
-internamente; o app não invoca um programa FFmpeg externo.
+Original code is Apache-2.0; Electron and mp4-muxer are MIT. Chromium notices ship with
+Electron and the ADB notices are in `resources/adb`. Chromium includes `ffmpeg.dll`
+internally; the app does not invoke an external FFmpeg program.

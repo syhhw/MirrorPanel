@@ -1,5 +1,5 @@
 ---
-title: "Identidade visual do 2.0: logo, tema escuro e Companion"
+title: "2.0 visual identity: logo, dark theme and Companion"
 author: Syhhw
 date: 2026-10-20
 branch: mirrorpanel-2.0

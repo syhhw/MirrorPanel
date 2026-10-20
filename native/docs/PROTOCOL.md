@@ -1,83 +1,83 @@
 # MPV1 — preview 4
 
-Protocolo original do MirrorPanel. Desktop e servidor geram um socket abstrato
-`mp_<128 bits hex>` e dois tokens aleatórios de 256 bits. A inicialização passa
-os dois tokens em 128 caracteres ASCII pelo stdin de `adb shell -T`, mantido aberto.
-O token do fluxo não aparece em argumentos. O segundo autentica o Companion
-visível e seu canal privado de áudio/IME/heartbeat.
+MirrorPanel's original protocol. The desktop and server generate an abstract socket
+`mp_<128 bits hex>` and two random 256-bit tokens. Startup passes
+both tokens as 128 ASCII characters through the stdin of `adb shell -T`, which is kept open.
+The stream token does not appear in arguments. The second one authenticates the visible
+Companion and its private audio/IME/heartbeat channel.
 
-`MIRRORPANEL_READY <porta>` anuncia o TCP loopback Android do Companion.
-O desktop aloca `adb forward tcp:0 localabstract:<nome>`, conecta em loopback e
-envia o token do fluxo em 32 bytes. Comparação por `MessageDigest.isEqual`.
-Captura começa somente com o indicador ativo. Bootstrap, conexão e heartbeat
-têm prazo; perda do Companion encerra o motor.
+`MIRRORPANEL_READY <port>` announces the Companion's Android loopback TCP port.
+The desktop allocates `adb forward tcp:0 localabstract:<name>`, connects over loopback and
+sends the stream token as 32 bytes. Comparison uses `MessageDigest.isEqual`.
+Capture starts only with the indicator active. Bootstrap, connection and heartbeat
+have deadlines; losing the Companion stops the engine.
 
-## Framing binário
+## Binary framing
 
-Cabeçalho de 20 bytes big endian, seguido do payload:
+20-byte big-endian header, followed by the payload:
 
-| Offset | Tipo | Campo |
+| Offset | Type | Field |
 |---|---|---|
 | 0 | uint32 | magic `0x4d505631` |
-| 4 | uint8 | tipo |
-| 5 | uint8 | bit 0 keyframe; bit 1 configuração de codec |
-| 6 | uint16 | reservado, zero |
-| 8 | uint32 | comprimento, máximo 8 MiB no fluxo desktop |
-| 12 | uint64 | timestamp em microssegundos, inteiro seguro no JavaScript |
+| 4 | uint8 | type |
+| 5 | uint8 | bit 0 keyframe; bit 1 codec config |
+| 6 | uint16 | reserved, zero |
+| 8 | uint32 | length, at most 8 MiB on the desktop stream |
+| 12 | uint64 | timestamp in microseconds, a safe integer in JavaScript |
 
-- 1: metadata JSON, dimensões lógicas/codificadas, rotação e codec H.264.
-- 2: H.264 Annex-B; SPS/PPS em pacote config; timestamp MediaCodec.
-- 3: AAC-LC bruto, 48 kHz, 2 canais; AudioSpecificConfig em pacote config.
-- 4: término do fluxo, com motivo UTF-8. `companion-lost` indica perda do
-  canal autenticado e admite reconexão; `phone-stop` só é aceito como motivo
-  explícito de versões anteriores. EOF ou exit code 0 não indicam intenção do usuário.
-- 5: estado JSON: `{kind:'audio',state,message}`, `{kind:'text',id,ok,message}`
-  ou `{kind:'heartbeat'}`. O último encaminha a confirmação autenticada do
-  Companion ao desktop, mantendo viva uma conexão sem quadros novos.
-- 6: heartbeat, exclusivo do canal Companion e ecoado pelo servidor.
-- 7: comando JSON privado, exclusivo do canal Companion.
+- 1: JSON metadata, logical/encoded dimensions, rotation and H.264 codec.
+- 2: H.264 Annex-B; SPS/PPS in a config packet; MediaCodec timestamp.
+- 3: raw AAC-LC, 48 kHz, 2 channels; AudioSpecificConfig in a config packet.
+- 4: end of stream, with a UTF-8 reason. `companion-lost` means the
+  authenticated channel was lost and allows reconnection; `phone-stop` is only accepted as an
+  explicit reason from earlier versions. EOF or exit code 0 do not indicate user intent.
+- 5: JSON status: `{kind:'audio',state,message}`, `{kind:'text',id,ok,message}`
+  or `{kind:'heartbeat'}`. The last one forwards the Companion's authenticated
+  confirmation to the desktop, keeping a connection with no new frames alive.
+- 6: heartbeat, only on the Companion channel and echoed by the server.
+- 7: private JSON command, only on the Companion channel.
 
-O canal Companion limita payload a 128 KiB. Escritas de frames são sincronizadas,
-pois áudio, status e heartbeat podem ser produzidos por threads diferentes.
-Vídeo e áudio compartilham o relógio monotônico Android; áudio usa AudioTimestamp
-quando disponível e acumula amostras para evitar deriva por leitura.
+The Companion channel limits payloads to 128 KiB. Frame writes are synchronized,
+because audio, status and heartbeat can be produced by different threads.
+Video and audio share the Android monotonic clock; audio uses AudioTimestamp
+when available and accumulates samples to avoid per-read drift.
 
-O main limita quatro mensagens de vídeo e doze de áudio em trânsito. O renderer
-confirma cada pacote e fecha VideoFrame/AudioData. Ao perder referência de vídeo,
-descarta até keyframe e pede sync com limitação. Áudio mantém até 250 ms agendados,
-com latência inicial de 45 ms; parar limpa fontes e suspende AudioContext.
+Main allows at most four video messages and twelve audio messages in flight. The renderer
+acknowledges each packet and closes VideoFrame/AudioData. When it loses the video reference,
+it drops packets until a keyframe and requests sync, rate-limited. Audio keeps up to 250 ms scheduled,
+with 45 ms initial latency; stopping clears the sources and suspends AudioContext.
 
-## Controle desktop → Android
+## Desktop → Android control
 
-uint32 BE de tamanho + JSON UTF-8, até 128 KiB:
+uint32 BE length + UTF-8 JSON, up to 128 KiB:
 
-- `touch`: action 0 down/1 up/2 move/3 cancel; `id` alterado e `pointers:[{id,x,y}]`.
-- Coordenadas finitas normalizadas [0,1], até dez contatos únicos; IDs externos 0..31.
-- O servidor mapeia IDs externos a slots Android 0..9 estáveis até UP/CANCEL.
-  Nunca indexa estruturas nativas com IDs externos altos. A ordem da lista
-  define índices do MotionEvent; o bitfield do índice é calculado separadamente.
-- Formato legado de toque único `{x,y}` usa ID externo 0.
-- `key`: código Android 0..400; down/up gerados pelo motor.
-- `text`: UTF-8 válido, até 64 KiB, sem surrogates isolados, com ID de ACK.
-- `ime-restore`: teclado anterior; comando interno autenticado para o Companion.
-- `audio-stop`, `sync`, `stop`: encerramento de áudio, keyframe, término da sessão.
+- `touch`: action 0 down/1 up/2 move/3 cancel; the changed `id` and `pointers:[{id,x,y}]`.
+- Finite coordinates normalized to [0,1], up to ten unique contacts; external IDs 0..31.
+- The server maps external IDs to stable Android slots 0..9 until UP/CANCEL.
+  It never indexes native structures with high external IDs. The list order
+  defines the MotionEvent indices; the index bitfield is computed separately.
+- The legacy single-touch format `{x,y}` uses external ID 0.
+- `key`: Android keycode 0..400; down/up generated by the engine.
+- `text`: valid UTF-8, up to 64 KiB, no lone surrogates, with an ACK ID.
+- `ime-restore`: previous keyboard; internal authenticated command for the Companion.
+- `audio-stop`, `sync`, `stop`: stop audio, keyframe, end the session.
 
-Texto é commitado por InputConnection no thread principal Android, somente com
-editor real ativo. Sem editor, retorna erro; não guarda texto para a próxima tela.
-ACK/status saem por executor limitado, evitando rede no thread principal.
-Composição é enviada após compositionend; colagem preserva o texto recebido.
+Text is committed through InputConnection on the Android main thread, only with a
+real active editor. Without an editor it returns an error; it does not keep the text for the next screen.
+ACK/status go out through a bounded executor, keeping network work off the main thread.
+Composition is sent after compositionend; paste preserves the received text.
 
-## Ciclo de vida e gravação
+## Lifecycle and recording
 
-Rotação cancela contatos, reinicia encoder e finaliza MP4 anterior. Áudio é
-iniciado por Activity autorizada pelo token, diálogo MediaProjection e serviço
-foreground. Usa AudioPlaybackCapture de mídia; não usa fonte de microfone.
+Rotation cancels contacts, restarts the encoder and finishes the previous MP4. Audio is
+started by an Activity authorized by the token, the MediaProjection dialog and a
+foreground service. It uses media AudioPlaybackCapture; it does not use a microphone source.
 
-Encerramento limpa somente processo/forward/JAR próprios, finaliza MP4 e restaura
-IME e stay-awake. Stop durante início aguarda operações pendentes e recolhe
-alocações tardias. Renderer morto encerra a sessão; phone-stop legado não reconecta.
-Fechar a Activity de orientação e dispensar a notificação não encerram o fluxo.
+Shutdown cleans up only its own process/forward/JAR, finishes the MP4 and restores
+IME and stay-awake. Stop during startup waits for pending operations and collects
+late allocations. A dead renderer ends the session; legacy phone-stop does not reconnect.
+Closing the guidance Activity and dismissing the notification do not end the stream.
 
-MP4 fragmentado recebe H.264 convertido Annex-B→AVCC e AAC sem reencodificação.
-Começa no keyframe; timestamps dos dois fluxos usam a mesma origem. Áudio anterior
-ao primeiro vídeo é descartado. Troca de orientação/áudio finaliza o arquivo.
+Fragmented MP4 receives H.264 converted Annex-B→AVCC and AAC without re-encoding.
+It starts at the keyframe; the timestamps of both streams use the same origin. Audio before
+the first video frame is discarded. An orientation/audio change finishes the file.

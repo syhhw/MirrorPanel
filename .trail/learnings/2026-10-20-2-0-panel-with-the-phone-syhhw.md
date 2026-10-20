@@ -1,5 +1,5 @@
 ---
-title: "Painel 2.0 com o celular no centro, sem cara de interface gerada"
+title: "2.0 panel with the phone in the center, not looking like a generated interface"
 author: Syhhw
 date: 2026-10-20
 branch: mirrorpanel-2.0
@@ -19,7 +19,7 @@ touches:
 
 ## Decided
 - The panel draws each connected phone as an outline with its real screen shape (wm size ratio, always upright) and real model name (getprop ro.product.model). Clicking the phone mirrors, or shows the window when live. Device settings sit on a small sliders button next to the name.
-- Preferences and the activity log moved to their own view behind the gear in the title bar. The home footer only holds "Conectar pela rede", a warnings count when there are warnings, and Ajuda.
+- Preferences and the activity log moved to their own view behind the gear in the title bar. The home footer only holds "Connect over the network", a warnings count when there are warnings, and Help.
 - No cards: the drawn phone is the only framed element, because it is the interaction. Colour marks state only (aqua = live, coral = recording, amber = warning). Buttons, switches and the selected segment use the neutral --button colour.
 - Typeface: Segoe UI Variable, chosen on purpose for a native Windows utility, using its optical-size families (Text for body, Display for names and headings, Small for captions). Manrope was removed.
 - Design rules come from the design-review AI-slop list plus the Impeccable and Make Interfaces Feel Better guidance:
