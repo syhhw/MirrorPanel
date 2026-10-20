@@ -1,0 +1,17 @@
+{
+  "name": "mirrorpanel",
+  "version": "2.0.0-preview.2",
+  "private": true,
+  "scripts": {
+    "setup": "npm --prefix native ci && node native/node_modules/electron/install.js",
+    "android": "npm --prefix native run android",
+    "start": "npm --prefix native start",
+    "build": "npm --prefix native run build",
+    "typecheck": "npm --prefix native run typecheck",
+    "lint": "npm --prefix native run lint",
+    "test": "npm --prefix native test",
+    "test:legacy": "python -m unittest discover -s tests -q",
+    "package": "npm --prefix native run package",
+    "test:android": "npm --prefix native run test:android"
+  }
+}

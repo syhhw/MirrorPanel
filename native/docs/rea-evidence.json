@@ -1,0 +1,41 @@
+{
+  "date": "2026-10-18",
+  "tool": "rea-agents 6.7.0",
+  "source": "https://app.vysor.io/js/app.14d718c6.js",
+  "source_sha256": "c74f0808e60af8ce04c2f33ae6407f12f03e19010c1f4c2b7f7fe377ede959b2",
+  "evidence_id": "ev_b8a1bf19cd1101741bf5ec7f1e0b94338f2e991238c664f6d898798a0962e060",
+  "statistics": {
+    "relevant_files": 3,
+    "nested_asar_containers": 0,
+    "text_bytes_read": 367804,
+    "invalid_utf8_files": 0,
+    "parsed_javascript_files": 1,
+    "skipped_javascript_files": 0,
+    "visited_ast_nodes": 91432,
+    "findings": 49,
+    "modules": 0,
+    "parse_failures": 0
+  },
+  "application_graph": {
+    "nodes": 37,
+    "edges": 53,
+    "coverage": {
+      "status": "partial",
+      "truncated": false,
+      "omitted_count": null,
+      "limits": []
+    }
+  },
+  "semantic_graph": {
+    "nodes": 20000,
+    "relations": 11620
+  },
+  "limitations": [
+    "CommonJS and ESM binding relationships were recovered from inert syntax and resolved only within the inventoried artifact container.",
+    "Graph coverage is incomplete; unavailable facts remain explicit and must not be read as absence.",
+    "JavaScript and HTML were parsed as inert text; bundle bootstrap code was never executed.",
+    "Static imports, entrypoints, workers, endpoints, and storage relationships do not prove runtime execution.",
+    "Static paths and relationships may remain unresolved when expressions are dynamic or obfuscated.",
+    "Webpack/Rspack factories were recovered from AST literals; REA did not invoke push handlers or bundle bootstrap code."
+  ]
+}

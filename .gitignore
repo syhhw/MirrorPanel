@@ -25,3 +25,20 @@ Thumbs.db
 # Binarios de terceiros (scrcpy/adb) - baixe do repositorio oficial de cada um,
 # nao faz sentido re-hospedar aqui (e sao dezenas de MB de DLLs)
 /bin/
+
+# Caches locais de consulta trail
+/graft/
+/.trail/cache/
+
+# Estado local de ferramentas de IA e automacoes pessoais (nao e codigo do projeto)
+/.Codex/
+/.claude/
+/.claude-flow/
+/.swarm/
+/.ruff_cache/
+/handoff.cmd
+/instalar_hook.bat
+
+# Material de referencia de terceiros e capturas avulsas - nunca redistribuir
+/Vysor/
+/Prints/

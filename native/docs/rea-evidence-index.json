@@ -1,0 +1,1013 @@
+{
+  "analysis_date": "2026-10-19",
+  "canonical_reports": [
+    {
+      "file": "active-runtime-rea.json",
+      "sha256": "ed4111ac9baccde138a50e396042cc879f672771870b8b092f41b50c750955e6",
+      "evidence_id": "ev_9400a15e4bccb72909d3d557f3e3cbb42882ce160e2dee2b3f09642129e30687",
+      "operation": "capture_electron_scenario",
+      "subject": null,
+      "provider": {
+        "id": "rea-playwright-electron-active",
+        "name": "REA Playwright active Electron observation provider",
+        "version": "1"
+      },
+      "confidence": "observed",
+      "limitations": [
+        "Artifact identity is unavailable for this observation.",
+        "IPC payloads are represented by value shapes; payload values are never retained.",
+        "IPC direction and sender/receiver identifiers are observed only where Electron exposes them at the hooked boundary.",
+        "The runtime timeline records lifecycle, navigation, shell, permission, popup, download, protocol, preload, native-addon, process, and IPC events; activity before hook installation is unavailable.",
+        "The preload and renderer process contexts are not instrumented by the main-process -r hook; preload configuration and contextBridge API-shape events are main-boundary observations, not proof of renderer-side execution.",
+        "Preload configuration was not exposed by the observed Electron window metadata. Preload paths and execution remain unavailable.",
+        "Process metrics are an Electron API snapshot and do not prove hostile-local-user isolation.",
+        "External shell opens, external navigation, permission grants, downloads, popup windows, updater relaunches, and OS integration are blocked and recorded by the active hook; other application filesystem and network behavior is not sandboxed by this provider.",
+        "The active IPC hook could not be installed.",
+        "Application host platform and architecture were not observed."
+      ]
+    },
+    {
+      "file": "android-classes-rea.json",
+      "sha256": "2f2463d71f3265e65712aac4773948f5083ac8b8b0fcb13fc4b6f4b475165f73",
+      "evidence_id": "ev_409042888c2991033dc89d1d44e57d0c825892f4db1c7f68f581deaa0c0648eb",
+      "operation": "search_android_classes",
+      "subject": {
+        "name": "Vysor-release.4e0959161399532ab658e5020d22602c217cf17dec9c211502af6d5783ba3bfc.apk",
+        "digest": {
+          "sha256": "4e0959161399532ab658e5020d22602c217cf17dec9c211502af6d5783ba3bfc"
+        },
+        "local_path": "C:\\Users\\ACKERMAN\\Documents\\Codex\\2026-10-18\\fa\\work\\vysor-full\\app\\native\\android\\Vysor-release.4e0959161399532ab658e5020d22602c217cf17dec9c211502af6d5783ba3bfc.apk",
+        "format": "apk",
+        "architecture": null
+      },
+      "provider": {
+        "id": "jadx",
+        "name": "JADX headless",
+        "version": "0.7.1"
+      },
+      "confidence": "observed",
+      "limitations": [
+        "Static decompiler observations do not establish runtime behavior; the APK is never executed.",
+        "Method signatures use provider display types; DEX prototypes come from frozen JADX metadata. Display names may be aliases, and overload indices are local to this engine and artifact.",
+        "Class inventories use parsed metadata before code generation, including synthetic members that may be omitted from decompiled source. Source positions remain unknown.",
+        "Incoming reference totals count JADX using nodes. Direct invoke entries within a using method report raw DEX code-unit offsets and method indexes, but coverage is limited to those nodes and directly matched invokes; it does not establish every possible dynamic or reflective call site.",
+        "Manifest summary fields are extracted by the upstream engine; decoded XML is retained for verification. APK signatures, split APKs, native libraries and Android runtime capture are not verified by this provider."
+      ]
+    },
+    {
+      "file": "android-display-classes-rea.json",
+      "sha256": "d1f60f428a0a885c0abfadea540f2a0496c7c1f718b554ba217b47ef3c60782a",
+      "evidence_id": "ev_902910f3d5235d3b99743499a8212b822d434ce9c6f5635339ef557dda14fb6a",
+      "operation": "search_android_classes",
+      "subject": {
+        "name": "base.apk",
+        "digest": {
+          "sha256": "2f862e923a9ebcd21c2d8898c683b47a5362568c7091dd8e80337952b5020b5f"
+        },
+        "local_path": "C:\\Users\\ACKERMAN\\Documents\\Codex\\2026-10-18\\fa\\work\\vysor-full\\installed\\com.koushikdutta.vysor\\base.apk",
+        "format": "apk",
+        "architecture": null
+      },
+      "provider": {
+        "id": "jadx",
+        "name": "JADX headless",
+        "version": "0.7.1"
+      },
+      "confidence": "observed",
+      "limitations": [
+        "Static decompiler observations do not establish runtime behavior; the APK is never executed.",
+        "Method signatures use provider display types; DEX prototypes come from frozen JADX metadata. Display names may be aliases, and overload indices are local to this engine and artifact.",
+        "Class inventories use parsed metadata before code generation, including synthetic members that may be omitted from decompiled source. Source positions remain unknown.",
+        "Incoming reference totals count JADX using nodes. Direct invoke entries within a using method report raw DEX code-unit offsets and method indexes, but coverage is limited to those nodes and directly matched invokes; it does not establish every possible dynamic or reflective call site.",
+        "Manifest summary fields are extracted by the upstream engine; decoded XML is retained for verification. APK signatures, split APKs, native libraries and Android runtime capture are not verified by this provider."
+      ]
+    },
+    {
+      "file": "android-package-rea.json",
+      "sha256": "703026390cb4607e300666cb896ef132c93394cdd60331c02567cbf8b19a0da2",
+      "evidence_id": "ev_ebeb8d4057cddf420d9130bdb8806a5ac701f9d35ed98313c8718d663736acd9",
+      "operation": "inspect_android_package",
+      "subject": {
+        "name": "Vysor-release.4e0959161399532ab658e5020d22602c217cf17dec9c211502af6d5783ba3bfc.apk",
+        "digest": {
+          "sha256": "4e0959161399532ab658e5020d22602c217cf17dec9c211502af6d5783ba3bfc"
+        },
+        "local_path": "C:\\Users\\ACKERMAN\\Documents\\Codex\\2026-10-18\\fa\\work\\vysor-full\\app\\native\\android\\Vysor-release.4e0959161399532ab658e5020d22602c217cf17dec9c211502af6d5783ba3bfc.apk",
+        "format": "apk",
+        "architecture": null
+      },
+      "provider": {
+        "id": "jadx",
+        "name": "JADX headless",
+        "version": "0.7.1"
+      },
+      "confidence": "observed",
+      "limitations": [
+        "Static decompiler observations do not establish runtime behavior; the APK is never executed.",
+        "Method signatures use provider display types; DEX prototypes come from frozen JADX metadata. Display names may be aliases, and overload indices are local to this engine and artifact.",
+        "Class inventories use parsed metadata before code generation, including synthetic members that may be omitted from decompiled source. Source positions remain unknown.",
+        "Incoming reference totals count JADX using nodes. Direct invoke entries within a using method report raw DEX code-unit offsets and method indexes, but coverage is limited to those nodes and directly matched invokes; it does not establish every possible dynamic or reflective call site.",
+        "Manifest summary fields are extracted by the upstream engine; decoded XML is retained for verification. APK signatures, split APKs, native libraries and Android runtime capture are not verified by this provider."
+      ]
+    },
+    {
+      "file": "class-AndroidInternals.json",
+      "sha256": "7b978b51366312f9cad72ec706881aa88b11745ed02558f5dab5f35f8ff96782",
+      "evidence_id": "ev_7044e118e8bccca619a9c89ada06f8e183af3578415121bd12f067764596f053",
+      "operation": "inspect_android_class",
+      "subject": {
+        "name": "base.apk",
+        "digest": {
+          "sha256": "2f862e923a9ebcd21c2d8898c683b47a5362568c7091dd8e80337952b5020b5f"
+        },
+        "local_path": "C:\\Users\\ACKERMAN\\Documents\\Codex\\2026-10-18\\fa\\work\\vysor-full\\installed\\com.koushikdutta.vysor\\base.apk",
+        "format": "apk",
+        "architecture": null
+      },
+      "provider": {
+        "id": "jadx",
+        "name": "JADX headless",
+        "version": "0.7.1"
+      },
+      "confidence": "observed",
+      "limitations": [
+        "Static decompiler observations do not establish runtime behavior; the APK is never executed.",
+        "Method signatures use provider display types; DEX prototypes come from frozen JADX metadata. Display names may be aliases, and overload indices are local to this engine and artifact.",
+        "Class inventories use parsed metadata before code generation, including synthetic members that may be omitted from decompiled source. Source positions remain unknown.",
+        "Incoming reference totals count JADX using nodes. Direct invoke entries within a using method report raw DEX code-unit offsets and method indexes, but coverage is limited to those nodes and directly matched invokes; it does not establish every possible dynamic or reflective call site.",
+        "Manifest summary fields are extracted by the upstream engine; decoded XML is retained for verification. APK signatures, split APKs, native libraries and Android runtime capture are not verified by this provider."
+      ]
+    },
+    {
+      "file": "class-CaptureAudioActivity.json",
+      "sha256": "4508855c313a8beb483ff5f813524b08e58009c3bcbac4a93d26c4e9c5f4247a",
+      "evidence_id": "ev_a20365868b874a80d99c720950796dc46e7dc5cbb16566d63270c534d15160f7",
+      "operation": "inspect_android_class",
+      "subject": {
+        "name": "base.apk",
+        "digest": {
+          "sha256": "2f862e923a9ebcd21c2d8898c683b47a5362568c7091dd8e80337952b5020b5f"
+        },
+        "local_path": "C:\\Users\\ACKERMAN\\Documents\\Codex\\2026-10-18\\fa\\work\\vysor-full\\installed\\com.koushikdutta.vysor\\base.apk",
+        "format": "apk",
+        "architecture": null
+      },
+      "provider": {
+        "id": "jadx",
+        "name": "JADX headless",
+        "version": "0.7.1"
+      },
+      "confidence": "observed",
+      "limitations": [
+        "Static decompiler observations do not establish runtime behavior; the APK is never executed.",
+        "Method signatures use provider display types; DEX prototypes come from frozen JADX metadata. Display names may be aliases, and overload indices are local to this engine and artifact.",
+        "Class inventories use parsed metadata before code generation, including synthetic members that may be omitted from decompiled source. Source positions remain unknown.",
+        "Incoming reference totals count JADX using nodes. Direct invoke entries within a using method report raw DEX code-unit offsets and method indexes, but coverage is limited to those nodes and directly matched invokes; it does not establish every possible dynamic or reflective call site.",
+        "Manifest summary fields are extracted by the upstream engine; decoded XML is retained for verification. APK signatures, split APKs, native libraries and Android runtime capture are not verified by this provider."
+      ]
+    },
+    {
+      "file": "class-CaptureAudioService.json",
+      "sha256": "3083dbf77274eaf6fe5833d78c461c91b07c7d53b358580f7c4dde6756d6b352",
+      "evidence_id": "ev_01373ec1f1bd731aecc7586c95c499bdfcd736ea432219e3839893833b901cfc",
+      "operation": "inspect_android_class",
+      "subject": {
+        "name": "base.apk",
+        "digest": {
+          "sha256": "2f862e923a9ebcd21c2d8898c683b47a5362568c7091dd8e80337952b5020b5f"
+        },
+        "local_path": "C:\\Users\\ACKERMAN\\Documents\\Codex\\2026-10-18\\fa\\work\\vysor-full\\installed\\com.koushikdutta.vysor\\base.apk",
+        "format": "apk",
+        "architecture": null
+      },
+      "provider": {
+        "id": "jadx",
+        "name": "JADX headless",
+        "version": "0.7.1"
+      },
+      "confidence": "observed",
+      "limitations": [
+        "Static decompiler observations do not establish runtime behavior; the APK is never executed.",
+        "Method signatures use provider display types; DEX prototypes come from frozen JADX metadata. Display names may be aliases, and overload indices are local to this engine and artifact.",
+        "Class inventories use parsed metadata before code generation, including synthetic members that may be omitted from decompiled source. Source positions remain unknown.",
+        "Incoming reference totals count JADX using nodes. Direct invoke entries within a using method report raw DEX code-unit offsets and method indexes, but coverage is limited to those nodes and directly matched invokes; it does not establish every possible dynamic or reflective call site.",
+        "Manifest summary fields are extracted by the upstream engine; decoded XML is retained for verification. APK signatures, split APKs, native libraries and Android runtime capture are not verified by this provider."
+      ]
+    },
+    {
+      "file": "class-EncoderFeeder.Companion.json",
+      "sha256": "88e96d0ade3f5f74623470cb03f5a0d2156664bd56115867946c5bc6beabf785",
+      "evidence_id": "ev_9c30f37294bbfb8cf80d854681ffa11567fb2e3bf5f04c07b53c920ac03d342d",
+      "operation": "inspect_android_class",
+      "subject": {
+        "name": "base.apk",
+        "digest": {
+          "sha256": "2f862e923a9ebcd21c2d8898c683b47a5362568c7091dd8e80337952b5020b5f"
+        },
+        "local_path": "C:\\Users\\ACKERMAN\\Documents\\Codex\\2026-10-18\\fa\\work\\vysor-full\\installed\\com.koushikdutta.vysor\\base.apk",
+        "format": "apk",
+        "architecture": null
+      },
+      "provider": {
+        "id": "jadx",
+        "name": "JADX headless",
+        "version": "0.7.1"
+      },
+      "confidence": "observed",
+      "limitations": [
+        "Static decompiler observations do not establish runtime behavior; the APK is never executed.",
+        "Method signatures use provider display types; DEX prototypes come from frozen JADX metadata. Display names may be aliases, and overload indices are local to this engine and artifact.",
+        "Class inventories use parsed metadata before code generation, including synthetic members that may be omitted from decompiled source. Source positions remain unknown.",
+        "Incoming reference totals count JADX using nodes. Direct invoke entries within a using method report raw DEX code-unit offsets and method indexes, but coverage is limited to those nodes and directly matched invokes; it does not establish every possible dynamic or reflective call site.",
+        "Manifest summary fields are extracted by the upstream engine; decoded XML is retained for verification. APK signatures, split APKs, native libraries and Android runtime capture are not verified by this provider."
+      ]
+    },
+    {
+      "file": "class-EncoderFeeder.json",
+      "sha256": "87df9374236d0c7b695746aa9d7b682520cacea5c11cb016f4332b20d6967e20",
+      "evidence_id": "ev_d93e421267292159adb59b2025131e244e31e77714cadb6bc9986773c18089f7",
+      "operation": "inspect_android_class",
+      "subject": {
+        "name": "base.apk",
+        "digest": {
+          "sha256": "2f862e923a9ebcd21c2d8898c683b47a5362568c7091dd8e80337952b5020b5f"
+        },
+        "local_path": "C:\\Users\\ACKERMAN\\Documents\\Codex\\2026-10-18\\fa\\work\\vysor-full\\installed\\com.koushikdutta.vysor\\base.apk",
+        "format": "apk",
+        "architecture": null
+      },
+      "provider": {
+        "id": "jadx",
+        "name": "JADX headless",
+        "version": "0.7.1"
+      },
+      "confidence": "observed",
+      "limitations": [
+        "Static decompiler observations do not establish runtime behavior; the APK is never executed.",
+        "Method signatures use provider display types; DEX prototypes come from frozen JADX metadata. Display names may be aliases, and overload indices are local to this engine and artifact.",
+        "Class inventories use parsed metadata before code generation, including synthetic members that may be omitted from decompiled source. Source positions remain unknown.",
+        "Incoming reference totals count JADX using nodes. Direct invoke entries within a using method report raw DEX code-unit offsets and method indexes, but coverage is limited to those nodes and directly matched invokes; it does not establish every possible dynamic or reflective call site.",
+        "Manifest summary fields are extracted by the upstream engine; decoded XML is retained for verification. APK signatures, split APKs, native libraries and Android runtime capture are not verified by this provider."
+      ]
+    },
+    {
+      "file": "class-StdOutDevice.json",
+      "sha256": "f83aa64d95de810af343dd6473debbe28af1eba76a87613bed0e49130ff05654",
+      "evidence_id": "ev_57ed199e43f0a885480ef6505e2ba3a8271a51bc0000a06c485f9ced0d77b8d6",
+      "operation": "inspect_android_class",
+      "subject": {
+        "name": "base.apk",
+        "digest": {
+          "sha256": "2f862e923a9ebcd21c2d8898c683b47a5362568c7091dd8e80337952b5020b5f"
+        },
+        "local_path": "C:\\Users\\ACKERMAN\\Documents\\Codex\\2026-10-18\\fa\\work\\vysor-full\\installed\\com.koushikdutta.vysor\\base.apk",
+        "format": "apk",
+        "architecture": null
+      },
+      "provider": {
+        "id": "jadx",
+        "name": "JADX headless",
+        "version": "0.7.1"
+      },
+      "confidence": "observed",
+      "limitations": [
+        "Static decompiler observations do not establish runtime behavior; the APK is never executed.",
+        "Method signatures use provider display types; DEX prototypes come from frozen JADX metadata. Display names may be aliases, and overload indices are local to this engine and artifact.",
+        "Class inventories use parsed metadata before code generation, including synthetic members that may be omitted from decompiled source. Source positions remain unknown.",
+        "Incoming reference totals count JADX using nodes. Direct invoke entries within a using method report raw DEX code-unit offsets and method indexes, but coverage is limited to those nodes and directly matched invokes; it does not establish every possible dynamic or reflective call site.",
+        "Manifest summary fields are extracted by the upstream engine; decoded XML is retained for verification. APK signatures, split APKs, native libraries and Android runtime capture are not verified by this provider."
+      ]
+    },
+    {
+      "file": "class-StdOutDeviceWriter.json",
+      "sha256": "b53131ce8f31e8631cd8b72b8784c0e29a72eb63a697c162a07661ecdb6f07b6",
+      "evidence_id": "ev_8957845154863800e8fe61472d9e4f8133619ab0dedefaf084e0ad4b65b163e9",
+      "operation": "inspect_android_class",
+      "subject": {
+        "name": "base.apk",
+        "digest": {
+          "sha256": "2f862e923a9ebcd21c2d8898c683b47a5362568c7091dd8e80337952b5020b5f"
+        },
+        "local_path": "C:\\Users\\ACKERMAN\\Documents\\Codex\\2026-10-18\\fa\\work\\vysor-full\\installed\\com.koushikdutta.vysor\\base.apk",
+        "format": "apk",
+        "architecture": null
+      },
+      "provider": {
+        "id": "jadx",
+        "name": "JADX headless",
+        "version": "0.7.1"
+      },
+      "confidence": "observed",
+      "limitations": [
+        "Static decompiler observations do not establish runtime behavior; the APK is never executed.",
+        "Method signatures use provider display types; DEX prototypes come from frozen JADX metadata. Display names may be aliases, and overload indices are local to this engine and artifact.",
+        "Class inventories use parsed metadata before code generation, including synthetic members that may be omitted from decompiled source. Source positions remain unknown.",
+        "Incoming reference totals count JADX using nodes. Direct invoke entries within a using method report raw DEX code-unit offsets and method indexes, but coverage is limited to those nodes and directly matched invokes; it does not establish every possible dynamic or reflective call site.",
+        "Manifest summary fields are extracted by the upstream engine; decoded XML is retained for verification. APK signatures, split APKs, native libraries and Android runtime capture are not verified by this provider."
+      ]
+    },
+    {
+      "file": "class-SurfaceControlVirtualDisplayFactory.json",
+      "sha256": "46570be765a43d6eb2d6ad76c9fb24f560df5a9d992c633ea8ab8448d4695598",
+      "evidence_id": "ev_4d028cb311d96902eb25f75d4939848733abd1fdece2cc3d2c159a036bf571c3",
+      "operation": "inspect_android_class",
+      "subject": {
+        "name": "base.apk",
+        "digest": {
+          "sha256": "2f862e923a9ebcd21c2d8898c683b47a5362568c7091dd8e80337952b5020b5f"
+        },
+        "local_path": "C:\\Users\\ACKERMAN\\Documents\\Codex\\2026-10-18\\fa\\work\\vysor-full\\installed\\com.koushikdutta.vysor\\base.apk",
+        "format": "apk",
+        "architecture": null
+      },
+      "provider": {
+        "id": "jadx",
+        "name": "JADX headless",
+        "version": "0.7.1"
+      },
+      "confidence": "observed",
+      "limitations": [
+        "Static decompiler observations do not establish runtime behavior; the APK is never executed.",
+        "Method signatures use provider display types; DEX prototypes come from frozen JADX metadata. Display names may be aliases, and overload indices are local to this engine and artifact.",
+        "Class inventories use parsed metadata before code generation, including synthetic members that may be omitted from decompiled source. Source positions remain unknown.",
+        "Incoming reference totals count JADX using nodes. Direct invoke entries within a using method report raw DEX code-unit offsets and method indexes, but coverage is limited to those nodes and directly matched invokes; it does not establish every possible dynamic or reflective call site.",
+        "Manifest summary fields are extracted by the upstream engine; decoded XML is retained for verification. APK signatures, split APKs, native libraries and Android runtime capture are not verified by this provider."
+      ]
+    },
+    {
+      "file": "class-VysorControl.json",
+      "sha256": "ba2c3996732bd05335e8a9970474b067c3ff94aa54f7a9d092f86f0581a17271",
+      "evidence_id": "ev_4814639c8ed89137b8899201f2b1d8b81d322c682b44cba2a9ade8753420194c",
+      "operation": "inspect_android_class",
+      "subject": {
+        "name": "base.apk",
+        "digest": {
+          "sha256": "2f862e923a9ebcd21c2d8898c683b47a5362568c7091dd8e80337952b5020b5f"
+        },
+        "local_path": "C:\\Users\\ACKERMAN\\Documents\\Codex\\2026-10-18\\fa\\work\\vysor-full\\installed\\com.koushikdutta.vysor\\base.apk",
+        "format": "apk",
+        "architecture": null
+      },
+      "provider": {
+        "id": "jadx",
+        "name": "JADX headless",
+        "version": "0.7.1"
+      },
+      "confidence": "observed",
+      "limitations": [
+        "Static decompiler observations do not establish runtime behavior; the APK is never executed.",
+        "Method signatures use provider display types; DEX prototypes come from frozen JADX metadata. Display names may be aliases, and overload indices are local to this engine and artifact.",
+        "Class inventories use parsed metadata before code generation, including synthetic members that may be omitted from decompiled source. Source positions remain unknown.",
+        "Incoming reference totals count JADX using nodes. Direct invoke entries within a using method report raw DEX code-unit offsets and method indexes, but coverage is limited to those nodes and directly matched invokes; it does not establish every possible dynamic or reflective call site.",
+        "Manifest summary fields are extracted by the upstream engine; decoded XML is retained for verification. APK signatures, split APKs, native libraries and Android runtime capture are not verified by this provider."
+      ]
+    },
+    {
+      "file": "class-VysorControlBase.json",
+      "sha256": "7b53fd7bc0ffe6d424a7dc6ffb56f70f656fba086f75473c450b2d54459b5a57",
+      "evidence_id": "ev_d459c56a063ce9e5c7ee4595623d52de242fea04c57e376776bc342b3b552dec",
+      "operation": "inspect_android_class",
+      "subject": {
+        "name": "base.apk",
+        "digest": {
+          "sha256": "2f862e923a9ebcd21c2d8898c683b47a5362568c7091dd8e80337952b5020b5f"
+        },
+        "local_path": "C:\\Users\\ACKERMAN\\Documents\\Codex\\2026-10-18\\fa\\work\\vysor-full\\installed\\com.koushikdutta.vysor\\base.apk",
+        "format": "apk",
+        "architecture": null
+      },
+      "provider": {
+        "id": "jadx",
+        "name": "JADX headless",
+        "version": "0.7.1"
+      },
+      "confidence": "observed",
+      "limitations": [
+        "Static decompiler observations do not establish runtime behavior; the APK is never executed.",
+        "Method signatures use provider display types; DEX prototypes come from frozen JADX metadata. Display names may be aliases, and overload indices are local to this engine and artifact.",
+        "Class inventories use parsed metadata before code generation, including synthetic members that may be omitted from decompiled source. Source positions remain unknown.",
+        "Incoming reference totals count JADX using nodes. Direct invoke entries within a using method report raw DEX code-unit offsets and method indexes, but coverage is limited to those nodes and directly matched invokes; it does not establish every possible dynamic or reflective call site.",
+        "Manifest summary fields are extracted by the upstream engine; decoded XML is retained for verification. APK signatures, split APKs, native libraries and Android runtime capture are not verified by this provider."
+      ]
+    },
+    {
+      "file": "class-VysorDaemon.json",
+      "sha256": "0f5cfb8e6be05a7b96864cb2d09ba4b8a64e83cd5fd7de97a546b98adf171ed1",
+      "evidence_id": "ev_2ca986950f6b49d8dd579a114032141254d5d5e08b9652935c91e9b1d9edc8a3",
+      "operation": "inspect_android_class",
+      "subject": {
+        "name": "base.apk",
+        "digest": {
+          "sha256": "2f862e923a9ebcd21c2d8898c683b47a5362568c7091dd8e80337952b5020b5f"
+        },
+        "local_path": "C:\\Users\\ACKERMAN\\Documents\\Codex\\2026-10-18\\fa\\work\\vysor-full\\installed\\com.koushikdutta.vysor\\base.apk",
+        "format": "apk",
+        "architecture": null
+      },
+      "provider": {
+        "id": "jadx",
+        "name": "JADX headless",
+        "version": "0.7.1"
+      },
+      "confidence": "observed",
+      "limitations": [
+        "Static decompiler observations do not establish runtime behavior; the APK is never executed.",
+        "Method signatures use provider display types; DEX prototypes come from frozen JADX metadata. Display names may be aliases, and overload indices are local to this engine and artifact.",
+        "Class inventories use parsed metadata before code generation, including synthetic members that may be omitted from decompiled source. Source positions remain unknown.",
+        "Incoming reference totals count JADX using nodes. Direct invoke entries within a using method report raw DEX code-unit offsets and method indexes, but coverage is limited to those nodes and directly matched invokes; it does not establish every possible dynamic or reflective call site.",
+        "Manifest summary fields are extracted by the upstream engine; decoded XML is retained for verification. APK signatures, split APKs, native libraries and Android runtime capture are not verified by this provider."
+      ]
+    },
+    {
+      "file": "class-VysorDaemonBase.json",
+      "sha256": "c0754fb79f3d2f0b1539651358ab39531bff760b6276a4d87cfa1f657940d21c",
+      "evidence_id": "ev_ad58ceadaeefd1c47aa355ae7ab01d4921060769fb0613c2496599a6ff44b537",
+      "operation": "inspect_android_class",
+      "subject": {
+        "name": "base.apk",
+        "digest": {
+          "sha256": "2f862e923a9ebcd21c2d8898c683b47a5362568c7091dd8e80337952b5020b5f"
+        },
+        "local_path": "C:\\Users\\ACKERMAN\\Documents\\Codex\\2026-10-18\\fa\\work\\vysor-full\\installed\\com.koushikdutta.vysor\\base.apk",
+        "format": "apk",
+        "architecture": null
+      },
+      "provider": {
+        "id": "jadx",
+        "name": "JADX headless",
+        "version": "0.7.1"
+      },
+      "confidence": "observed",
+      "limitations": [
+        "Static decompiler observations do not establish runtime behavior; the APK is never executed.",
+        "Method signatures use provider display types; DEX prototypes come from frozen JADX metadata. Display names may be aliases, and overload indices are local to this engine and artifact.",
+        "Class inventories use parsed metadata before code generation, including synthetic members that may be omitted from decompiled source. Source positions remain unknown.",
+        "Incoming reference totals count JADX using nodes. Direct invoke entries within a using method report raw DEX code-unit offsets and method indexes, but coverage is limited to those nodes and directly matched invokes; it does not establish every possible dynamic or reflective call site.",
+        "Manifest summary fields are extracted by the upstream engine; decoded XML is retained for verification. APK signatures, split APKs, native libraries and Android runtime capture are not verified by this provider."
+      ]
+    },
+    {
+      "file": "class-VysorIME.json",
+      "sha256": "218ac4cccb17733ef4d5fdd824a148d1bcc367412249e6c047cf74204c4f8e41",
+      "evidence_id": "ev_277a210babd2a2519134bc1134c51208c264227cc2573bb4546b2f25400b4311",
+      "operation": "inspect_android_class",
+      "subject": {
+        "name": "base.apk",
+        "digest": {
+          "sha256": "2f862e923a9ebcd21c2d8898c683b47a5362568c7091dd8e80337952b5020b5f"
+        },
+        "local_path": "C:\\Users\\ACKERMAN\\Documents\\Codex\\2026-10-18\\fa\\work\\vysor-full\\installed\\com.koushikdutta.vysor\\base.apk",
+        "format": "apk",
+        "architecture": null
+      },
+      "provider": {
+        "id": "jadx",
+        "name": "JADX headless",
+        "version": "0.7.1"
+      },
+      "confidence": "observed",
+      "limitations": [
+        "Static decompiler observations do not establish runtime behavior; the APK is never executed.",
+        "Method signatures use provider display types; DEX prototypes come from frozen JADX metadata. Display names may be aliases, and overload indices are local to this engine and artifact.",
+        "Class inventories use parsed metadata before code generation, including synthetic members that may be omitted from decompiled source. Source positions remain unknown.",
+        "Incoming reference totals count JADX using nodes. Direct invoke entries within a using method report raw DEX code-unit offsets and method indexes, but coverage is limited to those nodes and directly matched invokes; it does not establish every possible dynamic or reflective call site.",
+        "Manifest summary fields are extracted by the upstream engine; decoded XML is retained for verification. APK signatures, split APKs, native libraries and Android runtime capture are not verified by this provider."
+      ]
+    },
+    {
+      "file": "desktop-rea.json",
+      "sha256": "79cf81e9e86d4629a42f504ac4e74bbd63784ec092f67d54d732d6ba090dd74f",
+      "evidence_id": "ev_0bd2c5fb6c52961b02605f82edd07dafd9afd840ee08f7cfaa817b9ae9ed597a",
+      "operation": "analyze_javascript_application",
+      "subject": {
+        "name": "app.asar",
+        "digest": {
+          "sha256": "b4ac35a9926a307835f0e6bb695957e7af7da305a7c984ed4c88dd9f72e6c348"
+        },
+        "local_path": "C:\\Users\\ACKERMAN\\Documents\\Codex\\2026-10-18\\fa\\work\\vysor-full\\package\\lib\\net45\\resources\\app.asar",
+        "format": "asar",
+        "architecture": null
+      },
+      "provider": {
+        "id": "rea-javascript-application",
+        "name": "REA JavaScript application analyzer",
+        "version": "1"
+      },
+      "confidence": "derived",
+      "limitations": [
+        "Artifact integrity metadata contradicts observed bytes at native/win32/adb.exe; the observed bytes are untrusted.",
+        "CommonJS and ESM binding relationships were recovered from inert syntax and resolved only within the inventoried artifact container.",
+        "Dynamic IPC channel expressions remain unresolved and are never paired by textual similarity.",
+        "Electron API identity follows proven lexical module aliases and structurally verified module-namespace interop. Other reassignments, dynamic selections, and visibly overwritten namespace members are unresolved; missing findings do not establish absence. Arbitrary call side effects and runtime registration are not evaluated.",
+        "Electron relationships are derived from inert syntax; runtime registration, reachability, defaults, and enforcement remain unproven.",
+        "Graph coverage is incomplete; unavailable facts remain explicit and must not be read as absence.",
+        "JavaScript and HTML were parsed as inert text; bundle bootstrap code was never executed.",
+        "Static imports, entrypoints, workers, endpoints, and storage relationships do not prove runtime execution.",
+        "Static paths and relationships may remain unresolved when expressions are dynamic or obfuscated.",
+        "Webpack/Rspack factories were recovered from AST literals; REA did not invoke push handlers or bundle bootstrap code.",
+        "js/chunk-vendors.6af85436.js: Resource constraint during analyze_javascript_application: Complete JavaScript file facts exceed the transfer byte budget",
+        "native/electron/safemode.html has 1 inline JavaScript body starting at line 5 that was not analyzed; endpoints, storage, imports and other facts in it are absent from the evidence."
+      ]
+    },
+    {
+      "file": "fuses-rea.json",
+      "sha256": "4b1c3ec44e602958c10fda89598302e5cbcc5bc47acff0e691d4c45ad358f863",
+      "evidence_id": "ev_6d6693f6314b2741473d9992bfb80fbdae50ca03b7bad4f6129e54f5760f6b22",
+      "operation": "inspect_electron_fuses",
+      "subject": {
+        "name": "Vysor.exe",
+        "digest": {
+          "sha256": "30d1ab04aa5be4ffb5624d2f017659cc5d38278ba31029ab49b9aa2a62fe840b"
+        },
+        "local_path": "C:\\Users\\ACKERMAN\\Documents\\Codex\\2026-10-18\\fa\\work\\vysor-full\\package\\lib\\net45\\Vysor.exe",
+        "format": "pe",
+        "architecture": "x86_64"
+      },
+      "provider": {
+        "id": "electron-fuses",
+        "name": "REA Electron fuse reader",
+        "version": "1"
+      },
+      "confidence": "observed",
+      "limitations": [
+        "Fuse state does not prove the application enables Inspector through other means, such as app.commandLine or a remote-debugging switch in application code.",
+        "A missing sentinel means fuse state is unknown, not that every fuse is disabled.",
+        "The selected file is admitted as one regular file of at most 1 GiB. Sentinel search uses 262144-byte windows, and each slice keeps at most 32 sentinels."
+      ]
+    },
+    {
+      "file": "installed-pull-rea.json",
+      "sha256": "d2cf4551d7dcc313cb8acd6ca09c7fe4d84ff010627cc7ff0bdb9c2162fd084b",
+      "evidence_id": "ev_2c830c1a5c88c423c8ed7ac678a88b41446145af2a8d272f3fe297561cf7b9c1",
+      "operation": "pull_adb_package",
+      "subject": null,
+      "provider": {
+        "id": "adb",
+        "name": "Android Debug Bridge",
+        "version": "37.0.0-14910828"
+      },
+      "confidence": "observed",
+      "limitations": [
+        "Artifact identity is unavailable for this observation.",
+        "APK role names derive from the pulled file names (base.apk, split_*.apk)",
+        "Pulled artifacts are host-local copies; the device retains the originals"
+      ]
+    },
+    {
+      "file": "method-AndroidInternals-injectMotionEvents.json",
+      "sha256": "77a2a6e09e389b3dcd74c7087c3790cd09933e2f4deb93c7b30d3e67cc5845b9",
+      "evidence_id": "ev_90cb6224f7a8f54ed0925cc111191eba9535f383377e920d0dee4f53d44e1b90",
+      "operation": "inspect_android_method",
+      "subject": {
+        "name": "base.apk",
+        "digest": {
+          "sha256": "2f862e923a9ebcd21c2d8898c683b47a5362568c7091dd8e80337952b5020b5f"
+        },
+        "local_path": "C:\\Users\\ACKERMAN\\Documents\\Codex\\2026-10-18\\fa\\work\\vysor-full\\installed\\com.koushikdutta.vysor\\base.apk",
+        "format": "apk",
+        "architecture": null
+      },
+      "provider": {
+        "id": "jadx",
+        "name": "JADX headless",
+        "version": "0.7.1"
+      },
+      "confidence": "derived",
+      "limitations": [
+        "Static decompiler observations do not establish runtime behavior; the APK is never executed.",
+        "Method signatures use provider display types; DEX prototypes come from frozen JADX metadata. Display names may be aliases, and overload indices are local to this engine and artifact.",
+        "Class inventories use parsed metadata before code generation, including synthetic members that may be omitted from decompiled source. Source positions remain unknown.",
+        "Incoming reference totals count JADX using nodes. Direct invoke entries within a using method report raw DEX code-unit offsets and method indexes, but coverage is limited to those nodes and directly matched invokes; it does not establish every possible dynamic or reflective call site.",
+        "Manifest summary fields are extracted by the upstream engine; decoded XML is retained for verification. APK signatures, split APKs, native libraries and Android runtime capture are not verified by this provider."
+      ]
+    },
+    {
+      "file": "method-CaptureAudioActivity-onActivityResult.json",
+      "sha256": "4c4ef4eb0e95caadcd22314caa977984a3c4486f38c3417e5e07b8d632aa3469",
+      "evidence_id": "ev_109ec33cf1b7b3a5265ea0d2745b9271c503a908b1ca402eca6bc6b7a46c5f7a",
+      "operation": "inspect_android_method",
+      "subject": {
+        "name": "base.apk",
+        "digest": {
+          "sha256": "2f862e923a9ebcd21c2d8898c683b47a5362568c7091dd8e80337952b5020b5f"
+        },
+        "local_path": "C:\\Users\\ACKERMAN\\Documents\\Codex\\2026-10-18\\fa\\work\\vysor-full\\installed\\com.koushikdutta.vysor\\base.apk",
+        "format": "apk",
+        "architecture": null
+      },
+      "provider": {
+        "id": "jadx",
+        "name": "JADX headless",
+        "version": "0.7.1"
+      },
+      "confidence": "derived",
+      "limitations": [
+        "Static decompiler observations do not establish runtime behavior; the APK is never executed.",
+        "Method signatures use provider display types; DEX prototypes come from frozen JADX metadata. Display names may be aliases, and overload indices are local to this engine and artifact.",
+        "Class inventories use parsed metadata before code generation, including synthetic members that may be omitted from decompiled source. Source positions remain unknown.",
+        "Incoming reference totals count JADX using nodes. Direct invoke entries within a using method report raw DEX code-unit offsets and method indexes, but coverage is limited to those nodes and directly matched invokes; it does not establish every possible dynamic or reflective call site.",
+        "Manifest summary fields are extracted by the upstream engine; decoded XML is retained for verification. APK signatures, split APKs, native libraries and Android runtime capture are not verified by this provider."
+      ]
+    },
+    {
+      "file": "method-CaptureAudioService-startMirroring.json",
+      "sha256": "2f2e0da8bf81c909d34a5b3084ed8ae09eb29ea6e45540da820ad87d54d1b838",
+      "evidence_id": "ev_b81dfa37b9cb3ae92afed9de66a4e5ae8f4e01aee1185387de173cb162b0d6ef",
+      "operation": "inspect_android_method",
+      "subject": {
+        "name": "base.apk",
+        "digest": {
+          "sha256": "2f862e923a9ebcd21c2d8898c683b47a5362568c7091dd8e80337952b5020b5f"
+        },
+        "local_path": "C:\\Users\\ACKERMAN\\Documents\\Codex\\2026-10-18\\fa\\work\\vysor-full\\installed\\com.koushikdutta.vysor\\base.apk",
+        "format": "apk",
+        "architecture": null
+      },
+      "provider": {
+        "id": "jadx",
+        "name": "JADX headless",
+        "version": "0.7.1"
+      },
+      "confidence": "derived",
+      "limitations": [
+        "Static decompiler observations do not establish runtime behavior; the APK is never executed.",
+        "Method signatures use provider display types; DEX prototypes come from frozen JADX metadata. Display names may be aliases, and overload indices are local to this engine and artifact.",
+        "Class inventories use parsed metadata before code generation, including synthetic members that may be omitted from decompiled source. Source positions remain unknown.",
+        "Incoming reference totals count JADX using nodes. Direct invoke entries within a using method report raw DEX code-unit offsets and method indexes, but coverage is limited to those nodes and directly matched invokes; it does not establish every possible dynamic or reflective call site.",
+        "Manifest summary fields are extracted by the upstream engine; decoded XML is retained for verification. APK signatures, split APKs, native libraries and Android runtime capture are not verified by this provider."
+      ]
+    },
+    {
+      "file": "method-createVirtualDisplay.json",
+      "sha256": "c515ccd631cc71b890f60a60ff06c279edea21c5d16bc2668bf42ae442ee8ac9",
+      "evidence_id": "ev_befdc5e88e9770d088d9854d688e4172d966223656afd66f712356a27c772af2",
+      "operation": "inspect_android_method",
+      "subject": {
+        "name": "base.apk",
+        "digest": {
+          "sha256": "2f862e923a9ebcd21c2d8898c683b47a5362568c7091dd8e80337952b5020b5f"
+        },
+        "local_path": "C:\\Users\\ACKERMAN\\Documents\\Codex\\2026-10-18\\fa\\work\\vysor-full\\installed\\com.koushikdutta.vysor\\base.apk",
+        "format": "apk",
+        "architecture": null
+      },
+      "provider": {
+        "id": "jadx",
+        "name": "JADX headless",
+        "version": "0.7.1"
+      },
+      "confidence": "derived",
+      "limitations": [
+        "Static decompiler observations do not establish runtime behavior; the APK is never executed.",
+        "Method signatures use provider display types; DEX prototypes come from frozen JADX metadata. Display names may be aliases, and overload indices are local to this engine and artifact.",
+        "Class inventories use parsed metadata before code generation, including synthetic members that may be omitted from decompiled source. Source positions remain unknown.",
+        "Incoming reference totals count JADX using nodes. Direct invoke entries within a using method report raw DEX code-unit offsets and method indexes, but coverage is limited to those nodes and directly matched invokes; it does not establish every possible dynamic or reflective call site.",
+        "Manifest summary fields are extracted by the upstream engine; decoded XML is retained for verification. APK signatures, split APKs, native libraries and Android runtime capture are not verified by this provider."
+      ]
+    },
+    {
+      "file": "method-StdOutDeviceWriter-encode.json",
+      "sha256": "e7b94a5e59309d32698a992d1137ed95e26e4faf89a187b99388a4736351842b",
+      "evidence_id": "ev_2ea9d6057059e39802388b41e0fa2883397cb5b4f92407cfd4a92e216a56a20c",
+      "operation": "inspect_android_method",
+      "subject": {
+        "name": "base.apk",
+        "digest": {
+          "sha256": "2f862e923a9ebcd21c2d8898c683b47a5362568c7091dd8e80337952b5020b5f"
+        },
+        "local_path": "C:\\Users\\ACKERMAN\\Documents\\Codex\\2026-10-18\\fa\\work\\vysor-full\\installed\\com.koushikdutta.vysor\\base.apk",
+        "format": "apk",
+        "architecture": null
+      },
+      "provider": {
+        "id": "jadx",
+        "name": "JADX headless",
+        "version": "0.7.1"
+      },
+      "confidence": "derived",
+      "limitations": [
+        "Static decompiler observations do not establish runtime behavior; the APK is never executed.",
+        "Method signatures use provider display types; DEX prototypes come from frozen JADX metadata. Display names may be aliases, and overload indices are local to this engine and artifact.",
+        "Class inventories use parsed metadata before code generation, including synthetic members that may be omitted from decompiled source. Source positions remain unknown.",
+        "Incoming reference totals count JADX using nodes. Direct invoke entries within a using method report raw DEX code-unit offsets and method indexes, but coverage is limited to those nodes and directly matched invokes; it does not establish every possible dynamic or reflective call site.",
+        "Manifest summary fields are extracted by the upstream engine; decoded XML is retained for verification. APK signatures, split APKs, native libraries and Android runtime capture are not verified by this provider."
+      ]
+    },
+    {
+      "file": "method-VysorControl-handleCommand.json",
+      "sha256": "796a06082be6d8a8a3cc9de10de530c5f7a1769e047cc086a786d8936738b779",
+      "evidence_id": "ev_646710a31d05415722e4a898c77d38664f94847e117c571065920ade69ddf2ce",
+      "operation": "inspect_android_method",
+      "subject": {
+        "name": "base.apk",
+        "digest": {
+          "sha256": "2f862e923a9ebcd21c2d8898c683b47a5362568c7091dd8e80337952b5020b5f"
+        },
+        "local_path": "C:\\Users\\ACKERMAN\\Documents\\Codex\\2026-10-18\\fa\\work\\vysor-full\\installed\\com.koushikdutta.vysor\\base.apk",
+        "format": "apk",
+        "architecture": null
+      },
+      "provider": {
+        "id": "jadx",
+        "name": "JADX headless",
+        "version": "0.7.1"
+      },
+      "confidence": "derived",
+      "limitations": [
+        "Static decompiler observations do not establish runtime behavior; the APK is never executed.",
+        "Method signatures use provider display types; DEX prototypes come from frozen JADX metadata. Display names may be aliases, and overload indices are local to this engine and artifact.",
+        "Class inventories use parsed metadata before code generation, including synthetic members that may be omitted from decompiled source. Source positions remain unknown.",
+        "Incoming reference totals count JADX using nodes. Direct invoke entries within a using method report raw DEX code-unit offsets and method indexes, but coverage is limited to those nodes and directly matched invokes; it does not establish every possible dynamic or reflective call site.",
+        "Manifest summary fields are extracted by the upstream engine; decoded XML is retained for verification. APK signatures, split APKs, native libraries and Android runtime capture are not verified by this provider."
+      ]
+    },
+    {
+      "file": "method-VysorControlBase-handleCommand.json",
+      "sha256": "c050b7ad0a8d93020b1997eaacfd73aeb801205ac97d238d55bda25278b5ea79",
+      "evidence_id": "ev_50e6c20dc9234350326589312841f98cec61a366c6abdbf2ecf9eda93f29340d",
+      "operation": "inspect_android_method",
+      "subject": {
+        "name": "base.apk",
+        "digest": {
+          "sha256": "2f862e923a9ebcd21c2d8898c683b47a5362568c7091dd8e80337952b5020b5f"
+        },
+        "local_path": "C:\\Users\\ACKERMAN\\Documents\\Codex\\2026-10-18\\fa\\work\\vysor-full\\installed\\com.koushikdutta.vysor\\base.apk",
+        "format": "apk",
+        "architecture": null
+      },
+      "provider": {
+        "id": "jadx",
+        "name": "JADX headless",
+        "version": "0.7.1"
+      },
+      "confidence": "derived",
+      "limitations": [
+        "Static decompiler observations do not establish runtime behavior; the APK is never executed.",
+        "Method signatures use provider display types; DEX prototypes come from frozen JADX metadata. Display names may be aliases, and overload indices are local to this engine and artifact.",
+        "Class inventories use parsed metadata before code generation, including synthetic members that may be omitted from decompiled source. Source positions remain unknown.",
+        "Incoming reference totals count JADX using nodes. Direct invoke entries within a using method report raw DEX code-unit offsets and method indexes, but coverage is limited to those nodes and directly matched invokes; it does not establish every possible dynamic or reflective call site.",
+        "Manifest summary fields are extracted by the upstream engine; decoded XML is retained for verification. APK signatures, split APKs, native libraries and Android runtime capture are not verified by this provider."
+      ]
+    },
+    {
+      "file": "method-VysorControlBase-writer.json",
+      "sha256": "74554c9b72c25e0fa12c675548138e1cade5cdee5157f271dafe316c9fb25e7c",
+      "evidence_id": "ev_c79ff2471b19386fab566862c16bcb2e84b5f4b8df1f85a455617ed722301ca5",
+      "operation": "inspect_android_method",
+      "subject": {
+        "name": "base.apk",
+        "digest": {
+          "sha256": "2f862e923a9ebcd21c2d8898c683b47a5362568c7091dd8e80337952b5020b5f"
+        },
+        "local_path": "C:\\Users\\ACKERMAN\\Documents\\Codex\\2026-10-18\\fa\\work\\vysor-full\\installed\\com.koushikdutta.vysor\\base.apk",
+        "format": "apk",
+        "architecture": null
+      },
+      "provider": {
+        "id": "jadx",
+        "name": "JADX headless",
+        "version": "0.7.1"
+      },
+      "confidence": "derived",
+      "limitations": [
+        "Static decompiler observations do not establish runtime behavior; the APK is never executed.",
+        "Method signatures use provider display types; DEX prototypes come from frozen JADX metadata. Display names may be aliases, and overload indices are local to this engine and artifact.",
+        "Class inventories use parsed metadata before code generation, including synthetic members that may be omitted from decompiled source. Source positions remain unknown.",
+        "Incoming reference totals count JADX using nodes. Direct invoke entries within a using method report raw DEX code-unit offsets and method indexes, but coverage is limited to those nodes and directly matched invokes; it does not establish every possible dynamic or reflective call site.",
+        "Manifest summary fields are extracted by the upstream engine; decoded XML is retained for verification. APK signatures, split APKs, native libraries and Android runtime capture are not verified by this provider."
+      ]
+    },
+    {
+      "file": "method-VysorDaemonBase-manageVideoSocket.json",
+      "sha256": "61e2b787b6c0571b49eb90ea345adb6162e69879e6b174daf36fb09b8590b8be",
+      "evidence_id": "ev_1779e0f52e630700bb620da59aa6ba1309ad44f8fe4a3175a3eee681f6f17ca5",
+      "operation": "inspect_android_method",
+      "subject": {
+        "name": "base.apk",
+        "digest": {
+          "sha256": "2f862e923a9ebcd21c2d8898c683b47a5362568c7091dd8e80337952b5020b5f"
+        },
+        "local_path": "C:\\Users\\ACKERMAN\\Documents\\Codex\\2026-10-18\\fa\\work\\vysor-full\\installed\\com.koushikdutta.vysor\\base.apk",
+        "format": "apk",
+        "architecture": null
+      },
+      "provider": {
+        "id": "jadx",
+        "name": "JADX headless",
+        "version": "0.7.1"
+      },
+      "confidence": "derived",
+      "limitations": [
+        "Static decompiler observations do not establish runtime behavior; the APK is never executed.",
+        "Method signatures use provider display types; DEX prototypes come from frozen JADX metadata. Display names may be aliases, and overload indices are local to this engine and artifact.",
+        "Class inventories use parsed metadata before code generation, including synthetic members that may be omitted from decompiled source. Source positions remain unknown.",
+        "Incoming reference totals count JADX using nodes. Direct invoke entries within a using method report raw DEX code-unit offsets and method indexes, but coverage is limited to those nodes and directly matched invokes; it does not establish every possible dynamic or reflective call site.",
+        "Manifest summary fields are extracted by the upstream engine; decoded XML is retained for verification. APK signatures, split APKs, native libraries and Android runtime capture are not verified by this provider."
+      ]
+    },
+    {
+      "file": "method-VysorIME-connectSocket.json",
+      "sha256": "43d131f5ba6f8065e9735f861b4e72ceb0a17027b8f0e1c917c607c2ba9ae5ae",
+      "evidence_id": "ev_90166f0b7b2299cce1bdc2a13b8a6a239df8de2b661b1b35750d22fb86ba1d10",
+      "operation": "inspect_android_method",
+      "subject": {
+        "name": "base.apk",
+        "digest": {
+          "sha256": "2f862e923a9ebcd21c2d8898c683b47a5362568c7091dd8e80337952b5020b5f"
+        },
+        "local_path": "C:\\Users\\ACKERMAN\\Documents\\Codex\\2026-10-18\\fa\\work\\vysor-full\\installed\\com.koushikdutta.vysor\\base.apk",
+        "format": "apk",
+        "architecture": null
+      },
+      "provider": {
+        "id": "jadx",
+        "name": "JADX headless",
+        "version": "0.7.1"
+      },
+      "confidence": "derived",
+      "limitations": [
+        "Static decompiler observations do not establish runtime behavior; the APK is never executed.",
+        "Method signatures use provider display types; DEX prototypes come from frozen JADX metadata. Display names may be aliases, and overload indices are local to this engine and artifact.",
+        "Class inventories use parsed metadata before code generation, including synthetic members that may be omitted from decompiled source. Source positions remain unknown.",
+        "Incoming reference totals count JADX using nodes. Direct invoke entries within a using method report raw DEX code-unit offsets and method indexes, but coverage is limited to those nodes and directly matched invokes; it does not establish every possible dynamic or reflective call site.",
+        "Manifest summary fields are extracted by the upstream engine; decoded XML is retained for verification. APK signatures, split APKs, native libraries and Android runtime capture are not verified by this provider."
+      ]
+    },
+    {
+      "file": "method-VysorIME-sendText.json",
+      "sha256": "387a3690b3558a0ddea519c14eb41552ae23608d5b175d33d34bf4678e0ebdd8",
+      "evidence_id": "ev_f37e3710af3d2664f266a4f582b0b488eab4f883d4fef01e67b9a847cfba030a",
+      "operation": "inspect_android_method",
+      "subject": {
+        "name": "base.apk",
+        "digest": {
+          "sha256": "2f862e923a9ebcd21c2d8898c683b47a5362568c7091dd8e80337952b5020b5f"
+        },
+        "local_path": "C:\\Users\\ACKERMAN\\Documents\\Codex\\2026-10-18\\fa\\work\\vysor-full\\installed\\com.koushikdutta.vysor\\base.apk",
+        "format": "apk",
+        "architecture": null
+      },
+      "provider": {
+        "id": "jadx",
+        "name": "JADX headless",
+        "version": "0.7.1"
+      },
+      "confidence": "derived",
+      "limitations": [
+        "Static decompiler observations do not establish runtime behavior; the APK is never executed.",
+        "Method signatures use provider display types; DEX prototypes come from frozen JADX metadata. Display names may be aliases, and overload indices are local to this engine and artifact.",
+        "Class inventories use parsed metadata before code generation, including synthetic members that may be omitted from decompiled source. Source positions remain unknown.",
+        "Incoming reference totals count JADX using nodes. Direct invoke entries within a using method report raw DEX code-unit offsets and method indexes, but coverage is limited to those nodes and directly matched invokes; it does not establish every possible dynamic or reflective call site.",
+        "Manifest summary fields are extracted by the upstream engine; decoded XML is retained for verification. APK signatures, split APKs, native libraries and Android runtime capture are not verified by this provider."
+      ]
+    },
+    {
+      "file": "native-decoder-functions-rea.json",
+      "sha256": "3cacd32131a2eb2d5e6a154c559977973773a18dc871064b164677d2c0f2c44b",
+      "evidence_id": "ev_5288dc580e7917f6fb89b8296b3e7772b49366bfe8db1b4c19b3c38c8750309b",
+      "operation": "search_procedures",
+      "subject": {
+        "name": "video_decode.dll",
+        "digest": {
+          "sha256": "d01f9c3dbaf631392d0a3df00417d89fa2114caf4fc054c0cb5b5f2335e8489e"
+        },
+        "local_path": "C:\\Users\\ACKERMAN\\Documents\\Codex\\2026-10-18\\fa\\work\\vysor-full\\app\\native\\win32\\video_decode.dll",
+        "format": "pe",
+        "architecture": "x86_64"
+      },
+      "provider": {
+        "id": "ghidra",
+        "name": "Ghidra",
+        "version": "12.1.4"
+      },
+      "confidence": "observed",
+      "limitations": [
+        "The session serves operations only after Ghidra reports default auto-analysis complete; incomplete analysis does not expose partial results.",
+        "The imported Program and temporary project are ephemeral and deleted on close. Annotation operations edit session database metadata; original executable bytes are never written.",
+        "Cancelling an active Ghidra request terminates its ephemeral database and discards session annotations. The selected target remains open; the next provider query imports the original artifact again.",
+        "Default-space addresses use lowercase 0x-prefixed hexadecimal; other address spaces use <percent-encoded-space>:0x<hex>.",
+        "Regex mode uses Java Pattern semantics. Matcher or compiler stack exhaustion returns a resource constraint without closing the session; literal mode avoids regex recursion and returns complete matching values.",
+        "Windows Ghidra P0 accepts native x86, x86-64, ARMNT (Thumb-2) and ARM64 PE applications and DLLs, and explicitly selected raw 6502 images; managed, hostile, sensitive, and mutable-path targets are unsupported.",
+        "The Windows bridge uses authenticated IPv4 loopback because Node path-based IPC does not expose Java AF_UNIX sockets; the endpoint file contains no bearer token.",
+        "Windows sessions require the matching packaged Windows x64 native addon, local NTFS targets and runtimes, and Windows 10 or later. Native handles enforce path admission, private DACLs, and Job Object ownership automatically.",
+        "The Ghidra Program references PDB video_decode_unstripped.dll.pdb (GUID 7cb5c52a-3509-43fd-ae93-5cd169adb240, age (hex) 6, signature unknown, version RSDS); Ghidra reports load state unknown. Original names and types may be missing; an empty name search does not prove a procedure is absent. Use list_procedures and address-based analysis to inspect recovered functions. REA does not admit a caller-selected PDB companion."
+      ]
+    },
+    {
+      "file": "native-decoder-rea.json",
+      "sha256": "6fe78a9b112ef9ed4c4d52131f9022ca759158788290bc76f9fd5247a8c134af",
+      "evidence_id": "ev_0eba2b2cac479a34f0cac9a6754746b767f886359ff360231f0821b50b6f0b9a",
+      "operation": "binary_overview",
+      "subject": {
+        "name": "video_decode.dll",
+        "digest": {
+          "sha256": "d01f9c3dbaf631392d0a3df00417d89fa2114caf4fc054c0cb5b5f2335e8489e"
+        },
+        "local_path": "C:\\Users\\ACKERMAN\\Documents\\Codex\\2026-10-18\\fa\\work\\vysor-full\\app\\native\\win32\\video_decode.dll",
+        "format": "pe",
+        "architecture": "x86_64"
+      },
+      "provider": {
+        "id": "rea-workflow",
+        "name": "REA composed investigation workflow",
+        "version": "1"
+      },
+      "confidence": "derived",
+      "limitations": [
+        "Derived by an REA composed workflow.",
+        "Ghidra (ghidra 12.1.4) read_binary_inventory_summary: Cancelling an active Ghidra request terminates its ephemeral database and discards session annotations. The selected target remains open; the next provider query imports the original artifact again.",
+        "Ghidra (ghidra 12.1.4) read_binary_inventory_summary: Counts use the complete defined-string inventory and the same local/external function inventory as list_strings and list_procedures. They do not establish discovery of undefined strings or unidentified functions.",
+        "Ghidra (ghidra 12.1.4) read_binary_inventory_summary: Default-space addresses use lowercase 0x-prefixed hexadecimal; other address spaces use <percent-encoded-space>:0x<hex>.",
+        "Ghidra (ghidra 12.1.4) read_binary_inventory_summary: Memory-block end addresses are exclusive; segment lengths use those observed address coordinates.",
+        "Ghidra (ghidra 12.1.4) read_binary_inventory_summary: Only Ghidra-defined string Data is observed; packed or undefined string bytes may be absent. Completeness applies to that inventory, and an empty search does not establish that text is absent from the artifact. If an address is known, use read_bytes and xrefs to inspect bytes and references.",
+        "Ghidra (ghidra 12.1.4) read_binary_inventory_summary: The Ghidra Program references PDB video_decode_unstripped.dll.pdb (GUID 7cb5c52a-3509-43fd-ae93-5cd169adb240, age (hex) 6, signature unknown, version RSDS); Ghidra reports load state unknown. Original names and types may be missing; an empty name search does not prove a procedure is absent. Use list_procedures and address-based analysis to inspect recovered functions. REA does not admit a caller-selected PDB companion.",
+        "Ghidra (ghidra 12.1.4) read_binary_inventory_summary: The Windows bridge uses authenticated IPv4 loopback because Node path-based IPC does not expose Java AF_UNIX sockets; the endpoint file contains no bearer token.",
+        "Ghidra (ghidra 12.1.4) read_binary_inventory_summary: The imported Program and temporary project are ephemeral and deleted on close. Annotation operations edit session database metadata; original executable bytes are never written.",
+        "Ghidra (ghidra 12.1.4) read_binary_inventory_summary: The session serves operations only after Ghidra reports default auto-analysis complete; incomplete analysis does not expose partial results.",
+        "Ghidra (ghidra 12.1.4) read_binary_inventory_summary: Windows Ghidra P0 accepts native x86, x86-64, ARMNT (Thumb-2) and ARM64 PE applications and DLLs, and explicitly selected raw 6502 images; managed, hostile, sensitive, and mutable-path targets are unsupported.",
+        "Ghidra (ghidra 12.1.4) read_binary_inventory_summary: Windows sessions require the matching packaged Windows x64 native addon, local NTFS targets and runtimes, and Windows 10 or later. Native handles enforce path admission, private DACLs, and Job Object ownership automatically."
+      ]
+    },
+    {
+      "file": "native-PPP-InitializeModule.json",
+      "sha256": "6d03ef88028d44cc2d1bdbc148594224167e60d0f5cf5c2b028f84a8d632ac0e",
+      "evidence_id": "ev_91e7c2691b5402065fc3f3ba5c96b5bd5b64e0088aa33c13abb5edade6ddc767",
+      "operation": "analyze_function",
+      "subject": {
+        "name": "video_decode.dll",
+        "digest": {
+          "sha256": "d01f9c3dbaf631392d0a3df00417d89fa2114caf4fc054c0cb5b5f2335e8489e"
+        },
+        "local_path": "C:\\Users\\ACKERMAN\\Documents\\Codex\\2026-10-18\\fa\\work\\vysor-full\\app\\native\\win32\\video_decode.dll",
+        "format": "pe",
+        "architecture": "x86_64"
+      },
+      "provider": {
+        "id": "ghidra",
+        "name": "Ghidra",
+        "version": "12.1.4"
+      },
+      "confidence": "observed",
+      "limitations": [
+        "The session serves operations only after Ghidra reports default auto-analysis complete; incomplete analysis does not expose partial results.",
+        "The imported Program and temporary project are ephemeral and deleted on close. Annotation operations edit session database metadata; original executable bytes are never written.",
+        "Cancelling an active Ghidra request terminates its ephemeral database and discards session annotations. The selected target remains open; the next provider query imports the original artifact again.",
+        "Default-space addresses use lowercase 0x-prefixed hexadecimal; other address spaces use <percent-encoded-space>:0x<hex>.",
+        "References cover the complete Ghidra function-body AddressSet and exact entry. Dossier incoming edges omit sources owned by that function; procedure_references also retains those internal edges.",
+        "The dossier combines Ghidra FunctionManager, Listing, ReferenceManager, BasicBlockModel, and decompiler observations; provider-specific pseudocode and assembly are not cross-provider text invariants.",
+        "Resolved reference metadata identifies computed, indirect, external, call, jump, and data edges; unresolved targetless flows remain unknown, and function classifications distinguish thunks and externals.",
+        "Synthetic Ghidra entry-point references without actionable memory sources are omitted.",
+        "The Java bridge serializes one function request per Program and lets each decompilation run until it completes or the caller cancels.",
+        "Windows Ghidra P0 accepts native x86, x86-64, ARMNT (Thumb-2) and ARM64 PE applications and DLLs, and explicitly selected raw 6502 images; managed, hostile, sensitive, and mutable-path targets are unsupported.",
+        "The Windows bridge uses authenticated IPv4 loopback because Node path-based IPC does not expose Java AF_UNIX sockets; the endpoint file contains no bearer token.",
+        "Windows sessions require the matching packaged Windows x64 native addon, local NTFS targets and runtimes, and Windows 10 or later. Native handles enforce path admission, private DACLs, and Job Object ownership automatically.",
+        "The Ghidra Program references PDB video_decode_unstripped.dll.pdb (GUID 7cb5c52a-3509-43fd-ae93-5cd169adb240, age (hex) 6, signature unknown, version RSDS); Ghidra reports load state unknown. Original names and types may be missing; an empty name search does not prove a procedure is absent. Use list_procedures and address-based analysis to inspect recovered functions. REA does not admit a caller-selected PDB companion."
+      ]
+    },
+    {
+      "file": "targets-rea.json",
+      "sha256": "a5adbeb728afae9c09565ee211a94e31415f04fa66acbdaf04013a859449bf90",
+      "evidence_id": "ev_b7af7a71cf5511c80e31696102e7d2fa4dfe889161c946c646a31c6b141eb93c",
+      "operation": "list_electron_targets",
+      "subject": null,
+      "provider": {
+        "id": "rea-cdp-electron",
+        "name": "REA Electron file-page CDP observation provider",
+        "version": "1"
+      },
+      "confidence": "observed",
+      "limitations": [
+        "Artifact identity is unavailable for this observation.",
+        "Every local file page exposed by the selected loopback CDP endpoint is eligible for listing."
+      ]
+    },
+    {
+      "file": "wasm-decoder-rea.json",
+      "sha256": "5bcd2c9f466596e5ff4ec59d5cbc6c09dc497290a4649078b2db43c433c43b20",
+      "evidence_id": "ev_106f9076351a1446e4bb6f85e11af6b015ef3f9c16db6d03ff2c6f4dddcb6e75",
+      "operation": "inspect_wasm_artifact",
+      "subject": {
+        "name": "f99175d3b657e4fac2c971aa69fe9513.wasm",
+        "digest": {
+          "sha256": "9ce921dd677d32811a11a1e90a5d2075d50c1b9b565f7872d32188f215e5452b"
+        },
+        "local_path": "C:\\Users\\ACKERMAN\\Documents\\Codex\\2026-10-18\\fa\\work\\vysor-full\\app\\f99175d3b657e4fac2c971aa69fe9513.wasm",
+        "format": "file",
+        "architecture": null
+      },
+      "provider": {
+        "id": "wabt-artifact",
+        "name": "REA WABT artifact adapter",
+        "version": "wabt@1.0.42"
+      },
+      "confidence": "observed",
+      "limitations": [
+        "WAT is a decoded representation, not original source or proof of runtime behavior. Custom annotations may retain payloads, but WAT does not establish original binary layout or round-trip byte identity. Original bytes and objdump output remain authoritative.",
+        "Imports and exports retain exact top-level WABT WAT forms. Names remain escaped producer text; unescaped objdump display names are not parsed as unambiguous identifiers.",
+        "JavaScript references are AST-observed static literals only. Candidate matches are associations, not proven data flow, URL-to-file identity or runtime loading. Computed references and aliases are not resolved.",
+        "No target execution or implicit fetch. WABT tools are trusted caller-supplied executables; SHA-256 identifies their bytes, not publisher authenticity. No OS memory sandbox is claimed.",
+        "Each subprocess has a 30-second deadline and 32 MiB combined output budget. Oversized output fails instead of producing truncated success."
+      ]
+    }
+  ]
+}
