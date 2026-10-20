@@ -74,10 +74,34 @@ let diagnostics: Diagnostics, installer: ApkInstaller, fileSender: FileSender;
 let healthTimer: ReturnType<typeof setInterval>;
 const startOperations = new Map<string, Promise<void>>();
 /**
- * Mirror windows left open after their device dropped off (cable pulled, Wi-Fi lost). When
- * the same device is listed again and ready, the mirror resumes in that window by itself.
+ * Mirror windows left open after their device dropped off (cable pulled, Wi-Fi lost). Once the
+ * same device is listed ready on two refreshes in a row (a cable still settling flickers), the
+ * mirror resumes in that window by itself. `tries` caps resumes that keep failing.
  */
-const awaitingDevice = new Set<string>();
+const awaitingDevice = new Map<string, { ready: number; tries: number }>();
+const MAX_RESUMES = 5;
+/**
+ * The phone's own stay-awake value, when a session could not put it back because the device
+ * was gone. The next session reuses it instead of reading the value MirrorPanel set, and if
+ * no session follows it goes back as soon as the device is listed again.
+ */
+const unrestoredAwake = new Map<string, string>();
+const putAwake = (serial: string, value: string) =>
+  adb
+    .shell(
+      serial,
+      /^\d+$/.test(value)
+        ? ['settings', 'put', 'global', 'stay_on_while_plugged_in', value]
+        : ['settings', 'delete', 'global', 'stay_on_while_plugged_in'],
+      4000,
+    )
+    .then(
+      () => true,
+      () => false,
+    );
+function awaitDevice(serial: string): void {
+  awaitingDevice.set(serial, { ready: 0, tries: awaitingDevice.get(serial)?.tries ?? 0 });
+}
 const disconnectedMessage = () =>
   t(
     'Aparelho desconectado. O espelhamento volta sozinho quando ele for reconectado.',
@@ -333,19 +357,31 @@ async function refresh(): Promise<void> {
     devices = [...preferred.values()];
     for (const device of devices) if (device.state === 'device') void displayRatio(device.serial);
     broadcast();
-    for (const serial of awaitingDevice) {
+    for (const [serial, wait] of awaitingDevice) {
       const window = mirrorWindows.get(serial);
-      if (!window || window.isDestroyed()) awaitingDevice.delete(serial);
-      else if (
-        devices.some((d) => d.serial === serial && d.state === 'device') &&
-        !sessions.has(serial) &&
-        !startOperations.has(serial)
-      ) {
+      if (!window || window.isDestroyed()) {
         awaitingDevice.delete(serial);
+        continue;
+      }
+      wait.ready = devices.some((d) => d.serial === serial && d.state === 'device')
+        ? wait.ready + 1
+        : 0;
+      if (wait.ready >= 2 && !sessions.has(serial) && !startOperations.has(serial)) {
+        wait.ready = 0;
+        wait.tries++;
         log(t('Aparelho reconectado; retomando ', 'Device reconnected; resuming ') + serial);
-        void start(serial);
+        // Counts as a reconnect: if the link drops again mid-start, it goes back to waiting.
+        void start(serial, 1);
       }
     }
+    for (const [serial, value] of unrestoredAwake)
+      if (
+        devices.some((d) => d.serial === serial && d.state === 'device') &&
+        !awaitingDevice.has(serial) &&
+        !sessions.has(serial) &&
+        !startOperations.has(serial)
+      )
+        void putAwake(serial, value).then((done) => done && unrestoredAwake.delete(serial));
   } catch (e) {
     log('ADB: ' + String(e), 'error');
   } finally {
@@ -362,7 +398,6 @@ function start(serial: string, attempt = 0, existing?: Entry): Promise<void> {
   return operation;
 }
 async function startSession(serial: string, attempt = 0, existing?: Entry): Promise<void> {
-  awaitingDevice.delete(serial);
   if (
     existing &&
     (sessions.get(serial) !== existing || existing.requestedStop || existing.window.isDestroyed())
@@ -440,6 +475,9 @@ async function startSession(serial: string, attempt = 0, existing?: Entry): Prom
   sendMirror(entry, 'session-status', t('Conectando…', 'Connecting…'));
   session.on('log', (message: string) => log(serial + ': ' + message, 'warning'));
   session.on('state', () => broadcast());
+  // A Companion that refuses (busy, indicator blocked) has said why; that is not a lost link.
+  let refused = false;
+  session.on('refused', () => (refused = true));
   session.on('recording', (path) => {
     broadcast();
     if (!window.isDestroyed()) sendMirror(entry, 'recording-state', Boolean(path));
@@ -599,7 +637,7 @@ async function startSession(serial: string, attempt = 0, existing?: Entry): Prom
           await start(serial, attempt + 1, entry);
         } else {
           await finishEntry(serial, entry);
-          awaitingDevice.add(serial);
+          awaitDevice(serial);
           sendMirror(entry, 'session-status', { message: disconnectedMessage(), retry: true });
         }
       })();
@@ -761,17 +799,16 @@ async function startSession(serial: string, attempt = 0, existing?: Entry): Prom
       return;
     }
     if (settings.stayAwake && entry.awake === undefined) {
-      entry.awake = await adb.shell(serial, [
-        'settings',
-        'get',
-        'global',
-        'stay_on_while_plugged_in',
-      ]);
+      entry.awake =
+        unrestoredAwake.get(serial) ??
+        (await adb.shell(serial, ['settings', 'get', 'global', 'stay_on_while_plugged_in']));
+      unrestoredAwake.delete(serial);
       await adb.shell(serial, ['settings', 'put', 'global', 'stay_on_while_plugged_in', '3']);
     }
     await session.start();
     if (entry.requestedStop) return;
     if (!window.isDestroyed()) sendMirror(entry, 'session-status', '');
+    awaitingDevice.delete(serial);
     diagnose('session-ready', { id: entry.id, windowId: window.id });
     log(t('Espelhando ', 'Mirroring ') + (device?.model ?? serial));
     broadcast();
@@ -779,11 +816,18 @@ async function startSession(serial: string, attempt = 0, existing?: Entry): Prom
     entry.requestedStop = true;
     await session.stop();
     await finishEntry(serial, entry);
-    // A start that failed because the device just dropped off waits for it like a lost session.
+    // A start that failed because the link dropped (the device is gone, or this was already a
+    // reconnect) waits for the device like a lost session, up to MAX_RESUMES times.
     await refresh();
     const gone = !devices.some((d) => d.serial === serial && d.state === 'device');
-    if (gone && !window.isDestroyed()) awaitingDevice.add(serial);
-    const message = gone ? disconnectedMessage() : failureText(e);
+    const lost =
+      !refused &&
+      (gone || attempt > 0) &&
+      (awaitingDevice.get(serial)?.tries ?? 0) < MAX_RESUMES &&
+      !window.isDestroyed();
+    if (lost) awaitDevice(serial);
+    else awaitingDevice.delete(serial);
+    const message = lost ? disconnectedMessage() : failureText(e);
     log((device?.model ?? serial) + ': ' + message, 'error');
     if (!window.isDestroyed()) sendMirror(entry, 'session-status', { message, retry: true });
   }
@@ -793,17 +837,8 @@ async function finishEntry(serial: string, entry: Entry): Promise<void> {
   entry.finishPromise = (async () => {
     if (sessions.get(serial) !== entry) return;
     sessions.delete(serial);
-    if (entry.awake !== undefined) {
-      const value = entry.awake;
-      if (/^\d+$/.test(value))
-        await adb
-          .shell(serial, ['settings', 'put', 'global', 'stay_on_while_plugged_in', value], 4000)
-          .catch(() => {});
-      else
-        await adb
-          .shell(serial, ['settings', 'delete', 'global', 'stay_on_while_plugged_in'], 4000)
-          .catch(() => {});
-    }
+    if (entry.awake !== undefined && !(await putAwake(serial, entry.awake)))
+      unrestoredAwake.set(serial, entry.awake);
     if (!sessions.size && blocker !== undefined) {
       powerSaveBlocker.stop(blocker);
       blocker = undefined;
