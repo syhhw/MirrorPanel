@@ -75,6 +75,16 @@ export function failureText(error: unknown): string {
   return (error instanceof Error && error.message) || String(error);
 }
 
+/**
+ * The keyboard to give back when a session ends. A session that lost the phone mid-way cannot
+ * restore it, so MirrorPanel's own keyboard may still be selected when the next one starts;
+ * that was never the person's choice, and their first other enabled keyboard stands in.
+ */
+export function keyboardToRestore(current: string, enabled: string[], ours: string): string {
+  if (current !== ours) return current;
+  return enabled.find((id) => id && id !== ours) ?? current;
+}
+
 /** Owns only its child process, forward and remote temporary JAR. Never kills ADB. */
 export class MirrorSession extends EventEmitter {
   state: SessionState = 'starting';
@@ -86,7 +96,6 @@ export class MirrorSession extends EventEmitter {
   private noticeToken = '';
   private previousIme?: string;
   private imeSetup?: Promise<void>;
-  private imeWasEnabled = false;
   private readonly ime = COMPANION + '/.MirrorInput';
   private textId = 0;
   private pendingText = new Map<
@@ -488,12 +497,11 @@ export class MirrorSession extends EventEmitter {
     return 'installed';
   }
   private async enableIme(): Promise<void> {
-    this.previousIme = (
+    const current = (
       await this.adb.shell(this.serial, ['settings', 'get', 'secure', 'default_input_method'])
     ).trim();
-    this.imeWasEnabled = (await this.adb.shell(this.serial, ['ime', 'list', '-s']))
-      .split(/\s+/)
-      .includes(this.ime);
+    const enabled = (await this.adb.shell(this.serial, ['ime', 'list', '-s'])).split(/\s+/);
+    this.previousIme = keyboardToRestore(current, enabled, this.ime);
     this.checkpoint();
     this.send({ type: 'ime-restore', previous: this.previousIme });
     await this.adb.shell(this.serial, ['ime', 'enable', this.ime]);
@@ -584,7 +592,8 @@ export class MirrorSession extends EventEmitter {
         .shell(this.serial, ['settings', 'get', 'secure', 'default_input_method'])
         .catch(() => '')
     ).trim();
-    if (!this.imeWasEnabled && after !== this.ime)
+    // Nobody turns this keyboard on by choice; left enabled it only clutters the phone's list.
+    if (after !== this.ime)
       await this.adb.shell(this.serial, ['ime', 'disable', this.ime]).catch(() => {});
   }
   startRecording(path: string): void {
