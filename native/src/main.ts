@@ -23,6 +23,7 @@ import {
 } from './window-sizing';
 import { Diagnostics } from './diagnostics';
 import { ApkInstaller } from './apk-install';
+import { findBySender } from './window-owner';
 
 type Settings = {
   alwaysOnTop: boolean;
@@ -225,7 +226,7 @@ function mirrorWindow(event: IpcMainInvokeEvent): { serial: string; window: Brow
   throw Error('Janela desconhecida');
 }
 function owner(event: IpcMainInvokeEvent): Entry {
-  const entry = [...sessions.values()].find((e) => e.window.webContents === event.sender);
+  const entry = findBySender(sessions.values(), event.sender);
   if (!entry) throw Error('Janela sem sessão');
   return entry;
 }
@@ -815,7 +816,8 @@ function handlers(): void {
     settings.language = value.language;
     if (typeof value.showSerial === 'boolean') settings.showSerial = value.showSerial;
     saveSettings();
-    for (const entry of sessions.values()) entry.window.setAlwaysOnTop(settings.alwaysOnTop);
+    for (const window of mirrorWindows.values())
+      if (!window.isDestroyed()) window.setAlwaysOnTop(settings.alwaysOnTop);
     broadcast();
   });
   ipcMain.handle('control', (event, value) => {
@@ -828,7 +830,7 @@ function handlers(): void {
     return owner(event).session.setAudio(enabled);
   });
   ipcMain.on('frame-ack', (event, id: number) => {
-    const entry = [...sessions.values()].find((e) => e.window.webContents === event.sender);
+    const entry = findBySender(sessions.values(), event.sender);
     entry?.frames.delete(id);
     entry?.audioFrames.delete(id);
   });
@@ -848,8 +850,8 @@ function handlers(): void {
   });
   ipcMain.handle('screenshot', async (event, serial) => {
     const entry = event.sender === panel.webContents ? sessions.get(String(serial)) : owner(event);
-    if (!entry) throw Error('Inicie o espelhamento');
-    entry.window.webContents.send('take-screenshot');
+    if (!entry || entry.window.isDestroyed()) throw Error('Inicie o espelhamento');
+    sendMirror(entry, 'take-screenshot');
   });
   ipcMain.handle('save-png', (event, png) => {
     owner(event);
