@@ -9,6 +9,8 @@
     "build": "npm --prefix native run build",
     "typecheck": "npm --prefix native run typecheck",
     "lint": "npm --prefix native run lint",
+    "format": "npm --prefix native run format",
+    "format:check": "npm --prefix native run format:check",
     "test": "npm --prefix native test",
     "test:legacy": "python -m unittest discover -s tests -q",
     "package": "npm --prefix native run package",

@@ -10,6 +10,8 @@
     "build": "node scripts/build.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src tests",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "test": "tsx --test tests/*.test.ts",
     "start": "npm run build && electron .",
     "package": "npm run build && node scripts/package.mjs",
@@ -19,14 +21,16 @@
     "mp4-muxer": "5.2.2"
   },
   "devDependencies": {
-    "electron": "44.9.0",
-    "typescript": "5.9.3",
     "@electron/packager": "20.3.0",
-    "@types/node": "^24.0.0",
     "@types/dom-webcodecs": "^0.1.16",
+    "@types/node": "^24.0.0",
+    "electron": "44.9.0",
     "esbuild": "^0.25.0",
-    "tsx": "^4.20.0",
     "eslint": "^9.39.0",
+    "prettier": "3.9.9",
+    "prettier-plugin-java": "2.11.0",
+    "tsx": "^4.20.0",
+    "typescript": "5.9.3",
     "typescript-eslint": "^8.46.0"
   }
 }
