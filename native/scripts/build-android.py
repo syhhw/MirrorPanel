@@ -3,6 +3,7 @@
 No Gradle or network download is used. Development signing key
 stays in build/; set MIRRORPANEL_KEYSTORE and signing environment for releases.
 """
+import filecmp
 import os
 from pathlib import Path
 import shutil
@@ -81,9 +82,11 @@ def main():
     # Only official ADB transport files enter the application package.
     adb_dir = OUT / "adb"
     adb_dir.mkdir(exist_ok=True)
-    for name in ("adb.exe", "AdbWinApi.dll", "AdbWinUsbApi.dll"):
-        shutil.copy2(SDK / "platform-tools" / name, adb_dir / name)
-    shutil.copy2(SDK / "platform-tools/NOTICE.txt", adb_dir / "NOTICE.txt")
+    # An ADB server started from resources/adb locks adb.exe; unchanged files are left alone.
+    for name in ("adb.exe", "AdbWinApi.dll", "AdbWinUsbApi.dll", "NOTICE.txt"):
+        source, target = SDK / "platform-tools" / name, adb_dir / name
+        if not target.exists() or not filecmp.cmp(source, target, shallow=False):
+            shutil.copy2(source, target)
     print("Android build OK: original server, signed Companion, official ADB")
 
 
