@@ -1,4 +1,4 @@
-name: Motor proprio Electron
+name: Electron app
 on:
   push:
     paths: ["native/**", ".github/workflows/native-tests.yml"]

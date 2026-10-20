@@ -1,5 +1,5 @@
-# Texto normalizado para LF no repositorio; cada maquina escolhe o fim de
-# linha na copia de trabalho. Scripts do Windows ficam sempre em CRLF.
+# Text is stored with LF in the repository; each machine picks the line
+# endings of its working copy. Windows scripts always use CRLF.
 * text=auto
 *.bat text eol=crlf
 *.cmd text eol=crlf
