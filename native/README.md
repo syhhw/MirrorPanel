@@ -34,8 +34,9 @@ acomoda o vídeo pela maior dimensão, mantendo a proporção. Reduza a altura e
 retrato para reduzir o espelho; estreitar apenas a lateral faz a largura voltar.
 Maximizar e tela cheia centralizam o vídeo. Os botões de navegação têm animação
 ao pressionar com mouse ou teclado.
-Arraste um APK local para a janela de espelhamento para instalar naquele aparelho.
-A interface mostra instalação pendente, sucesso ou erro; aceita um APK por vez.
+Arraste arquivos locais para a janela de espelhamento: um APK sozinho é instalado
+naquele aparelho; outros arquivos (até 20 por vez, 4 GB cada) vão para a pasta
+Download do celular sem sobrescrever nomes existentes. Pastas de rede são recusadas.
 Os controles da janela continuam funcionando mesmo sem sessão. Perdas do
 Companion admitem recuperação; após falhas repetidas, Reconectar tenta novamente
 na mesma janela. A reconexão não restaura uma janela que você minimizou.
@@ -56,6 +57,7 @@ sessão, selecione seu teclado habitual em Configurações → Idioma e entrada.
 - Reconexão limitada, cancelamento de entrada, recuperação após perda de vídeo.
 - USB, conexão Wi-Fi por IP, pareamento por código, ativação TCP/IP via USB.
 - Instalação de APK por seletor ou arraste para a janela e logs locais.
+- Envio de arquivos por arraste para Download, com nomes seguros e sem sobrescrever.
 
 Arquivos ficam em `Vídeos/MirrorPanel Media`. O aplicativo só remove seus
 processos, forwards e JARs temporários; não encerra o servidor ADB compartilhado.

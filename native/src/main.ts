@@ -23,6 +23,7 @@ import {
 } from './window-sizing';
 import { Diagnostics } from './diagnostics';
 import { ApkInstaller } from './apk-install';
+import { FileSender, validateDroppedFiles } from './file-transfer';
 import { findBySender } from './window-owner';
 import { setLanguage, t } from './i18n';
 
@@ -58,7 +59,7 @@ let settings: Settings;
 let settingsFile: string;
 let polling = false,
   quitting = false;
-let diagnostics: Diagnostics, installer: ApkInstaller;
+let diagnostics: Diagnostics, installer: ApkInstaller, fileSender: FileSender;
 let healthTimer: ReturnType<typeof setInterval>;
 const startOperations = new Map<string, Promise<void>>();
 const closeOrigins = new WeakMap<BrowserWindow, string>();
@@ -1003,6 +1004,21 @@ function handlers(): void {
     const name = await installer.install(valid, result.filePaths[0]);
     log(t('APK instalado: ', 'APK installed: ') + name);
   });
+  ipcMain.handle('send-files', async (event, paths: unknown) => {
+    const { serial, window } = mirrorWindow(event);
+    assertDevice(serial);
+    const files = await validateDroppedFiles(paths);
+    diagnose('file-transfer-start', { windowId: window.id, count: files.length });
+    try {
+      const names = await fileSender.send(serial, files);
+      log(t('Enviado para Download: ', 'Sent to Download: ') + names.join(', '));
+      diagnose('file-transfer-complete', { windowId: window.id, count: names.length });
+      return names;
+    } catch (error) {
+      diagnose('file-transfer-failed', { windowId: window.id });
+      throw error;
+    }
+  });
   ipcMain.handle('install-dropped-apk', async (event, path: unknown) => {
     const { serial, window } = mirrorWindow(event);
     assertDevice(serial);
@@ -1043,6 +1059,7 @@ else {
     diagnose('app-ready', { version: app.getVersion() });
     adb = new Adb(join(resources, 'adb', 'adb.exe'));
     installer = new ApkInstaller(adb);
+    fileSender = new FileSender(adb);
     loadSettings();
     handlers();
     healthTimer = setInterval(
