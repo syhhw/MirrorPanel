@@ -639,8 +639,8 @@ function mirror(): void {
     $('volume').setAttribute('aria-label', t('Volume no computador', 'Computer volume'));
     $('mirror-help-text').textContent = t('Mouse e atalhos', 'Mouse and shortcuts');
     $('apk-drop').textContent = t(
-      'Solte para enviar ao Download do aparelho. Um APK sozinho é instalado.',
-      "Drop to send to the device's Download folder. A single APK is installed.",
+      'Solte para enviar os arquivos ao Android (pasta Download). Um APK sozinho é instalado.',
+      'Drop to send the files to Android (Download folder). A single APK is installed.',
     );
     $('video').setAttribute(
       'aria-label',
@@ -680,10 +680,12 @@ function mirror(): void {
   });
   const drop = $('apk-drop');
   let dragDepth = 0,
-    transferring = false;
+    transferring = false,
+    dragWatch: ReturnType<typeof setTimeout> | undefined;
   const hideDrop = () => {
     dragDepth = 0;
     drop.hidden = true;
+    clearTimeout(dragWatch);
   };
   document.addEventListener('dragenter', (event) => {
     event.preventDefault();
@@ -695,6 +697,10 @@ function mirror(): void {
   document.addEventListener('dragover', (event) => {
     event.preventDefault();
     if (event.dataTransfer) event.dataTransfer.dropEffect = transferring ? 'none' : 'copy';
+    // Chromium repeats dragover while files hover the window; if they stop (a drag
+    // cancelled without dragleave), the banner must not stay over the screen.
+    clearTimeout(dragWatch);
+    if (!drop.hidden) dragWatch = setTimeout(hideDrop, 700);
   });
   document.addEventListener('dragleave', () => {
     if (--dragDepth <= 0) hideDrop();

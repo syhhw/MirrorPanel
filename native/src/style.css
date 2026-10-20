@@ -1093,17 +1093,26 @@ dialog fieldset {
 .volume-control input {
   accent-color: #b7c7ff;
 }
+/* While files are dragged over the mirror: a slim banner under the title bar, screen still visible. */
 .apk-drop {
   position: absolute;
-  inset: 38px 0 48px;
+  top: 38px;
+  left: 0;
+  right: 0;
   z-index: 6;
-  display: grid;
-  place-items: center;
-  text-align: center;
-  padding: 24px;
-  background: #283681e8;
+  padding: 11px 16px;
+  background: #2f9a58;
   color: white;
-  border: 3px dashed #bac6ff;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  box-shadow: 0 2px 8px #0004;
   pointer-events: none;
-  font-size: 16px;
+  animation: drop-banner 0.15s ease-out;
+}
+@keyframes drop-banner {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
 }
