@@ -1,119 +1,93 @@
 /*
  * MirrorPanel interface.
  *
- * Direction: "glass, not gloss". Cool neutral surfaces, one action colour (glass)
- * that also marks a live mirror, coral only for recording and stopping. Depth comes
- * from layered surfaces and hairlines; motion answers what the person does, plus one
- * moment of light when a mirror starts.
+ * The phone is the subject: the panel draws each connected phone with its real screen
+ * shape, and clicking it mirrors. Everything else is quiet Windows chrome: the system
+ * typeface in its optical sizes, faintly cool neutrals, hairlines instead of boxes.
+ * Colour carries state only: aqua while a phone is live, coral while it records.
  *
- * Order: tokens, base, controls, dialog and toast, panel, mirror window, motion.
+ * Order: tokens, base, controls, dialog and toast, window chrome, panel, mirror window,
+ * motion.
  */
 
 /* ---------- Tokens ---------- */
 
-@font-face {
-  font-family: 'Manrope';
-  src: url('fonts/manrope-latin.woff2') format('woff2');
-  font-weight: 200 800;
-  font-display: block;
-  unicode-range:
-    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074,
-    U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-@font-face {
-  font-family: 'Manrope';
-  src: url('fonts/manrope-latin-ext.woff2') format('woff2');
-  font-weight: 200 800;
-  font-display: block;
-  unicode-range:
-    U+0100-024F, U+0259, U+1E00-1EFF, U+2020, U+20A0-20AB, U+20AD-20CF, U+2113, U+2C60-2C7F,
-    U+A720-A7FF;
-}
-
 :root {
   color-scheme: light;
-  --font: 'Manrope', 'Segoe UI', system-ui, sans-serif;
+  /* Segoe UI Variable picks its optical size by family name. */
+  --font: 'Segoe UI Variable Text', 'Segoe UI', sans-serif;
+  --font-display: 'Segoe UI Variable Display', 'Segoe UI', sans-serif;
+  --font-small: 'Segoe UI Variable Small', 'Segoe UI', sans-serif;
 
-  --bg: #eef3f4;
-  --surface: #ffffff;
-  --surface-2: #f5f8f9;
-  --raised: #ffffff;
-  --text: #13222b;
-  --text-2: #5a6b74;
-  --text-3: #8696a0;
-  --border: #d7e1e4;
-  --border-strong: #c3d1d6;
-  --hover: rgb(19 34 43 / 0.06);
-  --press: rgb(19 34 43 / 0.1);
+  --bg: #f3f4f4;
+  --surface: #fbfbfb;
+  --sunken: #e8ebeb;
+  --text: #1b1f20;
+  --text-2: #5a6367;
+  --text-3: #858e92;
+  --line: rgb(27 31 32 / 0.1);
+  --line-strong: rgb(27 31 32 / 0.2);
+  --hover: rgb(27 31 32 / 0.05);
+  --press: rgb(27 31 32 / 0.09);
 
-  --accent: #12808b;
-  --accent-hover: #0e6d77;
-  --on-accent: #ffffff;
-  --accent-soft: #dcf2f3;
-  --accent-text: #0e6d77;
-  --live: #1fa8b4;
-  --coral: #d93d42;
-  --coral-soft: #fbe5e5;
-  --amber: #a76a12;
+  --phone-edge: #4a5357;
+  --phone-edge-hover: #1b1f20;
+  --phone-screen: #e2e6e6;
 
-  --chrome: #ffffff;
-  --chrome-text: #13222b;
-  --chrome-border: #dfe7ea;
-  --chrome-hover: rgb(19 34 43 / 0.07);
-  --toast-bg: #13222be8;
-  --toast-text: #f2f7f8;
-  --backdrop: rgb(9 20 26 / 0.42);
-  --focus: #1fa8b4;
+  --live: #0d7680;
+  --live-screen: #c9e8ea;
+  --rec: #b5412d;
+  --rec-soft: #f5ddd7;
+  --warn: #8a5b00;
 
-  --shadow-1: 0 1px 2px rgb(19 34 43 / 0.05);
-  --shadow-2: 0 18px 44px rgb(13 30 38 / 0.18), 0 3px 8px rgb(13 30 38 / 0.08);
+  --button: #1b1f20;
+  --on-button: #f3f4f4;
+  --focus: #0d7680;
+  --toast-bg: #1b1f20;
+  --toast-text: #f3f4f4;
+  --backdrop: rgb(14 17 18 / 0.3);
+  --shadow-pop: 0 12px 32px rgb(14 17 18 / 0.16), 0 2px 6px rgb(14 17 18 / 0.08);
 
-  --r-sm: 8px;
-  --r-md: 12px;
-  --r-lg: 16px;
-  --r-pill: 999px;
+  /* Controls 6, overlays 10; a drawn phone gets its own radius from its width. */
+  --r-control: 6px;
+  --r-overlay: 10px;
 
-  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-out: cubic-bezier(0.2, 0, 0, 1);
   --fast: 120ms;
   --medium: 200ms;
-  --slow: 320ms;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
     color-scheme: dark;
-    --bg: #0e171c;
-    --surface: #15222a;
-    --surface-2: #1a2a33;
-    --raised: #1c2d36;
-    --text: #e6eef0;
-    --text-2: #9aaab2;
-    --text-3: #6f8590;
-    --border: #253944;
-    --border-strong: #31495a;
-    --hover: rgb(230 238 240 / 0.07);
-    --press: rgb(230 238 240 / 0.12);
+    --bg: #1b1e1f;
+    --surface: #26292a;
+    --sunken: #232627;
+    --text: #e6e9e9;
+    --text-2: #a2aaad;
+    --text-3: #7b8487;
+    --line: rgb(230 233 233 / 0.1);
+    --line-strong: rgb(230 233 233 / 0.2);
+    --hover: rgb(230 233 233 / 0.06);
+    --press: rgb(230 233 233 / 0.1);
 
-    --accent: #39c2c9;
-    --accent-hover: #5fd4d9;
-    --on-accent: #06262a;
-    --accent-soft: #123a40;
-    --accent-text: #6fd8dc;
-    --live: #39c2c9;
-    --coral: #ff6369;
-    --coral-soft: #3a1e21;
-    --amber: #e3a64a;
+    --phone-edge: #9aa3a6;
+    --phone-edge-hover: #e6e9e9;
+    --phone-screen: #2a2e2f;
 
-    --chrome: #0b1418;
-    --chrome-text: #e6eef0;
-    --chrome-border: #1c2d36;
-    --chrome-hover: rgb(230 238 240 / 0.08);
-    --toast-bg: #2a3e49f0;
-    --toast-text: #f2f7f8;
-    --backdrop: rgb(3 8 10 / 0.6);
+    --live: #62c3cb;
+    --live-screen: #16373a;
+    --rec: #f08b74;
+    --rec-soft: #3e2520;
+    --warn: #ddb055;
 
-    --shadow-1: 0 1px 2px rgb(0 0 0 / 0.3);
-    --shadow-2: 0 18px 44px rgb(0 0 0 / 0.5), 0 3px 8px rgb(0 0 0 / 0.3);
+    --button: #e6e9e9;
+    --on-button: #1b1e1f;
+    --focus: #62c3cb;
+    --toast-bg: #e6e9e9;
+    --toast-text: #1b1e1f;
+    --backdrop: rgb(0 0 0 / 0.45);
+    --shadow-pop: 0 12px 32px rgb(0 0 0 / 0.45), 0 2px 6px rgb(0 0 0 / 0.3);
   }
 }
 
@@ -131,15 +105,11 @@ body {
 }
 body {
   font-family: var(--font);
-  font-size: 13.5px;
-  line-height: 1.45;
+  font-size: 14px;
+  line-height: 1.43;
   color: var(--text);
   background: var(--bg);
-  -webkit-font-smoothing: antialiased;
   overflow: hidden;
-  transition:
-    background-color var(--slow) var(--ease),
-    color var(--slow) var(--ease);
 }
 [hidden] {
   display: none !important;
@@ -149,6 +119,13 @@ h2,
 h3,
 p {
   margin: 0;
+}
+h2,
+h3 {
+  text-wrap: balance;
+}
+p {
+  text-wrap: pretty;
 }
 button,
 input,
@@ -166,15 +143,15 @@ button {
 }
 button:disabled {
   cursor: not-allowed;
-  opacity: 0.45;
+  opacity: 0.4;
 }
 :focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
 .icon {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   flex-shrink: 0;
 }
 ::-webkit-scrollbar {
@@ -182,9 +159,9 @@ button:disabled {
   height: 10px;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--border-strong);
+  background: var(--line-strong);
   border: 3px solid transparent;
-  border-radius: var(--r-pill);
+  border-radius: 5px;
   background-clip: padding-box;
 }
 ::-webkit-scrollbar-track {
@@ -194,16 +171,17 @@ button:disabled {
 /* ---------- Controls ---------- */
 
 .icon-button {
+  position: relative;
   display: inline-grid;
   place-items: center;
   width: 32px;
   height: 32px;
-  border-radius: var(--r-sm);
+  border-radius: var(--r-control);
   color: var(--text-2);
   transition:
-    background-color var(--fast) var(--ease),
-    color var(--fast) var(--ease),
-    transform var(--fast) var(--ease);
+    background-color var(--fast) var(--ease-out),
+    color var(--fast) var(--ease-out),
+    scale var(--fast) var(--ease-out);
 }
 .icon-button:hover:not(:disabled) {
   background: var(--hover);
@@ -211,101 +189,87 @@ button:disabled {
 }
 .icon-button:active:not(:disabled) {
   background: var(--press);
-  transform: scale(0.94);
+  scale: 0.96;
+}
+.icon-button[aria-pressed='true'] {
+  background: var(--press);
+  color: var(--text);
 }
 
 .primary,
-.secondary-button,
-.mirror-button,
 dialog footer button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 7px;
-  height: 34px;
+  gap: 6px;
+  min-width: 88px;
+  height: 32px;
   padding: 0 14px;
-  border-radius: 10px;
-  font-weight: 650;
+  border-radius: var(--r-control);
+  font-weight: 600;
   white-space: nowrap;
   transition:
-    background-color var(--fast) var(--ease),
-    border-color var(--fast) var(--ease),
-    color var(--fast) var(--ease),
-    transform var(--fast) var(--ease);
+    background-color var(--fast) var(--ease-out),
+    opacity var(--fast) var(--ease-out),
+    scale var(--fast) var(--ease-out);
 }
-.primary,
-.mirror-button {
-  background: var(--accent);
-  color: var(--on-accent);
+.primary {
+  background: var(--button);
+  color: var(--on-button);
 }
-.primary:hover:not(:disabled),
-.mirror-button:hover:not(:disabled) {
-  background: var(--accent-hover);
+.primary:hover:not(:disabled) {
+  opacity: 0.88;
 }
-.secondary-button,
 dialog footer button:not(.primary) {
-  background: var(--surface);
-  color: var(--text);
-  border: 1px solid var(--border-strong);
+  border: 1px solid var(--line-strong);
 }
-.secondary-button:hover:not(:disabled),
 dialog footer button:not(.primary):hover {
-  background: var(--surface-2);
+  background: var(--hover);
 }
 .primary:active:not(:disabled),
-.secondary-button:active:not(:disabled),
-.mirror-button:active:not(:disabled),
 dialog footer button:active {
-  transform: scale(0.97);
-}
-.mirror-button .icon {
-  width: 15px;
-  height: 15px;
-}
-.mirror-button.is-live {
-  background: var(--accent-soft);
-  color: var(--accent-text);
-}
-.mirror-button.is-live:hover:not(:disabled) {
-  background: var(--accent-soft);
-  filter: brightness(0.97);
+  scale: 0.96;
 }
 
 .text-button {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 30px;
+  height: 32px;
   padding: 0 8px;
-  border-radius: var(--r-sm);
-  color: var(--accent-text);
-  font-weight: 650;
-  transition: background-color var(--fast) var(--ease);
+  border-radius: var(--r-control);
+  color: var(--text-2);
+  transition:
+    background-color var(--fast) var(--ease-out),
+    color var(--fast) var(--ease-out);
 }
-.text-button:hover {
-  background: var(--accent-soft);
+.text-button:hover:not(:disabled) {
+  background: var(--hover);
+  color: var(--text);
 }
-.text-button .icon {
-  width: 16px;
-  height: 16px;
+.text-button.is-warning {
+  color: var(--warn);
+  font-variant-numeric: tabular-nums;
 }
 
 select,
 dialog input:not([type='range']) {
-  height: 36px;
-  padding: 0 11px;
-  border: 1px solid var(--border-strong);
-  border-radius: 9px;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-control);
   background: var(--surface);
-  transition:
-    border-color var(--fast) var(--ease),
-    box-shadow var(--fast) var(--ease);
+  transition: border-color var(--fast) var(--ease-out);
+}
+select:hover,
+dialog input:hover {
+  border-color: var(--text-3);
 }
 select:focus-visible,
 dialog input:focus-visible {
   outline: 0;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft);
+  border-color: var(--focus);
+  box-shadow: 0 0 0 1px var(--focus);
 }
 
 /* Switch: the checkbox stays for keyboard and screen readers; the track is drawn. */
@@ -318,29 +282,34 @@ dialog input:focus-visible {
 .switch-track {
   position: relative;
   flex-shrink: 0;
-  width: 38px;
-  height: 22px;
-  border-radius: var(--r-pill);
-  background: var(--border-strong);
-  transition: background-color var(--medium) var(--ease);
+  width: 40px;
+  height: 20px;
+  border-radius: 10px;
+  border: 1px solid var(--text-2);
+  transition:
+    background-color var(--fast) var(--ease-out),
+    border-color var(--fast) var(--ease-out);
 }
 .switch-track::after {
   content: '';
   position: absolute;
   top: 3px;
   left: 3px;
-  width: 16px;
-  height: 16px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 1px 2px rgb(0 0 0 / 0.25);
-  transition: transform var(--medium) var(--ease);
+  background: var(--text-2);
+  transition:
+    translate var(--medium) var(--ease-out),
+    background-color var(--fast) var(--ease-out);
 }
 input:checked + .switch-track {
-  background: var(--accent);
+  background: var(--button);
+  border-color: var(--button);
 }
 input:checked + .switch-track::after {
-  transform: translateX(16px);
+  translate: 20px 0;
+  background: var(--on-button);
 }
 input:focus-visible + .switch-track {
   outline: 2px solid var(--focus);
@@ -349,14 +318,15 @@ input:focus-visible + .switch-track {
 
 .segmented {
   display: inline-flex;
-  padding: 3px;
-  gap: 2px;
-  border-radius: 11px;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-control);
+  overflow: hidden;
 }
 .segmented label {
   position: relative;
+}
+.segmented label + label {
+  border-left: 1px solid var(--line-strong);
 }
 .segmented input {
   position: absolute;
@@ -368,30 +338,26 @@ input:focus-visible + .switch-track {
 .segmented span {
   display: block;
   padding: 5px 12px;
-  border-radius: 8px;
   color: var(--text-2);
-  font-weight: 650;
-  font-size: 12.5px;
   transition:
-    background-color var(--medium) var(--ease),
-    color var(--medium) var(--ease),
-    box-shadow var(--medium) var(--ease);
+    background-color var(--fast) var(--ease-out),
+    color var(--fast) var(--ease-out);
+}
+.segmented label:hover span {
+  background: var(--hover);
 }
 .segmented input:checked + span {
-  background: var(--raised);
-  color: var(--text);
-  box-shadow:
-    var(--shadow-1),
-    0 0 0 1px var(--border);
+  background: var(--button);
+  color: var(--on-button);
 }
 .segmented input:focus-visible + span {
   outline: 2px solid var(--focus);
-  outline-offset: 1px;
+  outline-offset: -2px;
 }
 
 .spinner {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
   border: 2px solid currentColor;
   border-right-color: transparent;
@@ -401,12 +367,12 @@ input:focus-visible + .switch-track {
 kbd {
   display: inline-block;
   min-width: 22px;
-  padding: 1px 6px;
-  border: 1px solid var(--border-strong);
-  border-radius: 6px;
-  background: var(--surface-2);
-  box-shadow: inset 0 -1px 0 var(--border-strong);
-  font: 650 11.5px/1.5 var(--font);
+  padding: 0 6px;
+  border: 1px solid var(--line-strong);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: var(--surface);
+  font: 12px/1.6 var(--font-small);
   text-align: center;
   color: var(--text);
 }
@@ -414,36 +380,35 @@ kbd {
 /* ---------- Dialog and toast ---------- */
 
 dialog {
-  width: min(460px, calc(100vw - 32px));
+  width: min(440px, calc(100vw - 32px));
   padding: 0;
-  border: 1px solid var(--border);
-  border-radius: var(--r-lg);
-  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: var(--r-overlay);
+  background: var(--surface);
   color: var(--text);
-  box-shadow: var(--shadow-2);
+  box-shadow: var(--shadow-pop);
   transition:
-    opacity var(--medium) var(--ease),
-    transform var(--medium) var(--ease),
+    opacity var(--medium) var(--ease-out),
+    translate var(--medium) var(--ease-out),
     overlay var(--medium) allow-discrete,
     display var(--medium) allow-discrete;
   opacity: 0;
-  transform: translateY(8px) scale(0.98);
+  translate: 0 6px;
 }
 dialog[open] {
   opacity: 1;
-  transform: none;
+  translate: 0 0;
 }
 @starting-style {
   dialog[open] {
     opacity: 0;
-    transform: translateY(8px) scale(0.98);
+    translate: 0 6px;
   }
 }
 dialog::backdrop {
   background: var(--backdrop);
-  backdrop-filter: blur(2px);
   transition:
-    opacity var(--medium) var(--ease),
+    opacity var(--medium) var(--ease-out),
     overlay var(--medium) allow-discrete,
     display var(--medium) allow-discrete;
   opacity: 0;
@@ -459,19 +424,17 @@ dialog[open]::backdrop {
 #dialog-content {
   display: grid;
   gap: 14px;
-  max-height: calc(100vh - 160px);
+  max-height: calc(100vh - 150px);
   overflow-y: auto;
-  padding: 22px 24px 6px;
+  padding: 20px 22px 4px;
 }
 #dialog-content h2 {
-  font-size: 17px;
-  font-weight: 750;
-  letter-spacing: -0.01em;
+  font: 600 18px/1.3 var(--font-display);
 }
 #dialog-content h3 {
-  font-size: 13.5px;
-  font-weight: 750;
-  margin-bottom: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 4px;
 }
 #dialog-content p,
 .dialog-lead,
@@ -481,24 +444,23 @@ dialog[open]::backdrop {
 #dialog-content label {
   display: grid;
   gap: 6px;
-  font-weight: 650;
-  font-size: 12.5px;
+  color: var(--text-2);
 }
 #dialog-content small {
   color: var(--text-3);
-  font-size: 12px;
+  font: 12px var(--font-small);
 }
 dialog footer {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
-  padding: 16px 24px 20px;
+  padding: 16px 22px 20px;
 }
 .settings-section {
   display: grid;
   gap: 10px;
   padding-top: 14px;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--line);
 }
 .settings-section:first-of-type {
   border-top: 0;
@@ -516,8 +478,10 @@ fieldset {
   grid-template-columns: repeat(3, 1fr);
   gap: 10px;
 }
-.presets {
+.presets,
+.device-settings-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
 }
 .presets button,
@@ -526,36 +490,23 @@ fieldset {
   align-items: center;
   gap: 6px;
   height: 30px;
-  padding: 0 11px;
-  border-radius: var(--r-pill);
-  border: 1px solid var(--border-strong);
-  font-weight: 650;
-  font-size: 12.5px;
-  transition: background-color var(--fast) var(--ease);
+  padding: 0 10px;
+  border-radius: var(--r-control);
+  border: 1px solid var(--line-strong);
+  transition: background-color var(--fast) var(--ease-out);
 }
 .presets button:hover,
 .device-settings-actions button:hover:not(:disabled) {
-  background: var(--surface-2);
-}
-.device-settings-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-.device-settings-actions .icon {
-  width: 15px;
-  height: 15px;
+  background: var(--hover);
 }
 .device-settings-actions .danger {
-  color: var(--coral);
-  border-color: color-mix(in srgb, var(--coral) 45%, transparent);
+  color: var(--rec);
 }
 .device-settings-actions .danger:hover {
-  background: var(--coral-soft);
+  background: var(--rec-soft);
 }
 .shortcuts {
   display: grid;
-  gap: 2px;
   margin: 0;
 }
 .shortcuts div {
@@ -563,10 +514,9 @@ fieldset {
   grid-template-columns: 150px 1fr;
   gap: 12px;
   padding: 7px 0;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--line);
 }
 .shortcuts dt {
-  font-weight: 650;
   color: var(--text);
 }
 .shortcuts dd {
@@ -577,26 +527,32 @@ fieldset {
 #toast {
   position: fixed;
   left: 50%;
-  bottom: 60px;
+  bottom: 64px;
   z-index: 100;
-  max-width: min(90%, 440px);
-  padding: 9px 15px;
-  border-radius: var(--r-md);
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  max-width: min(90%, 420px);
+  padding: 8px 14px;
+  border-radius: 8px;
   background: var(--toast-bg);
   color: var(--toast-text);
-  backdrop-filter: blur(8px);
-  box-shadow: var(--shadow-2);
-  font-size: 12.5px;
-  font-weight: 600;
+  box-shadow: var(--shadow-pop);
+  font-size: 13px;
   line-height: 1.45;
   white-space: pre-wrap;
-  transform: translateX(-50%);
-  animation: toast-in var(--medium) var(--ease);
+  translate: -50% 0;
+  animation: toast-in var(--medium) var(--ease-out);
 }
-#toast.is-error {
-  box-shadow:
-    inset 3px 0 0 var(--coral),
-    var(--shadow-2);
+/* An error keeps the same note, marked by a coral dot rather than a coloured edge. */
+#toast.is-error::before {
+  content: '';
+  flex-shrink: 0;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--rec);
+  translate: 0 -1px;
 }
 
 /* ---------- Window chrome ---------- */
@@ -605,11 +561,9 @@ fieldset {
 .mirror-titlebar {
   display: flex;
   align-items: center;
-  background: var(--chrome);
-  color: var(--chrome-text);
-  border-bottom: 1px solid var(--chrome-border);
+  background: var(--bg);
+  color: var(--text);
   user-select: none;
-  transition: background-color var(--slow) var(--ease);
 }
 .title-drag {
   -webkit-app-region: drag;
@@ -628,20 +582,20 @@ fieldset {
 .window-buttons button {
   display: grid;
   place-items: center;
-  width: 44px;
+  width: 46px;
   height: 100%;
-  color: var(--chrome-text);
-  transition: background-color var(--fast) var(--ease);
+  color: var(--text);
+  transition: background-color var(--fast) var(--ease-out);
 }
 .window-buttons .icon {
   width: 14px;
   height: 14px;
 }
 .window-buttons button:hover {
-  background: var(--chrome-hover);
+  background: var(--hover);
 }
 .window-buttons [data-window='close']:hover {
-  background: #e5484d;
+  background: #c42b1c;
   color: #fff;
 }
 
@@ -649,268 +603,262 @@ fieldset {
 
 #panel {
   display: grid;
-  grid-template-rows: 40px 1fr 34px;
+  grid-template-rows: 40px 1fr auto;
   height: 100vh;
+}
+.app-titlebar {
+  height: 40px;
 }
 .app-titlebar .title-drag {
   gap: 10px;
   padding-left: 14px;
 }
+.app-titlebar h1 {
+  font: 400 12px var(--font-small);
+}
+.app-titlebar > .icon-button {
+  -webkit-app-region: no-drag;
+  width: 40px;
+  height: 32px;
+  margin-right: 2px;
+}
 .logo-mark {
-  width: 20px;
-  height: 20px;
+  width: 16px;
+  height: 16px;
   flex-shrink: 0;
 }
-.app-titlebar h1 {
-  font-size: 13.5px;
-  font-weight: 750;
-  letter-spacing: -0.01em;
-}
-.panel-scroll {
+
+/* Home: the shelf of phones, centred in the window. */
+.home {
+  display: grid;
+  /* safe: with more phones than fit, the shelf scrolls from the top instead of clipping */
+  align-content: safe center;
+  justify-items: center;
+  gap: 22px;
+  min-height: 0;
   overflow-y: auto;
-  scrollbar-gutter: stable;
+  padding: 20px 24px;
 }
-.panel-content {
-  display: grid;
-  gap: 28px;
-  max-width: 760px;
-  margin: 0 auto;
-  padding: 26px 24px 32px;
-}
-.panel-content h2 {
-  font-size: 15px;
-  font-weight: 750;
-  letter-spacing: -0.01em;
-}
-
-.section-head {
+.shelf {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-.section-head .count {
-  min-width: 22px;
-  padding: 1px 7px;
-  border-radius: var(--r-pill);
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  color: var(--text-2);
-  font-size: 12px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  text-align: center;
-}
-.section-head .icon-button {
-  margin-left: auto;
-}
-#refresh:active:not(:disabled) .icon {
-  transform: rotate(-120deg);
-  transition: transform var(--medium) var(--ease);
-}
-
-.device-list {
-  display: grid;
-  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 28px 40px;
 }
 .device {
   display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: center;
+  justify-items: center;
   gap: 14px;
-  padding: 14px 14px 14px 16px;
-  border: 1px solid var(--border);
-  border-radius: var(--r-lg);
-  background: var(--surface);
-  box-shadow: var(--shadow-1);
+  width: max-content;
+  max-width: 180px;
+}
+
+/*
+ * A drawn phone: the frame is the button, the screen sits inside a 5 px bezel, and
+ * the corners stay concentric (screen radius = frame radius - bezel).
+ */
+.phone {
+  --phone-r: calc(var(--phone-w, 85px) * 0.16);
+  --bezel: 5px;
+  display: grid;
+  width: var(--phone-w, 85px);
+  height: 188px;
+  padding: var(--bezel);
+  border: 2px solid var(--phone-edge);
+  border-radius: var(--phone-r);
   transition:
-    border-color var(--medium) var(--ease),
-    box-shadow var(--medium) var(--ease);
+    border-color var(--fast) var(--ease-out),
+    scale var(--fast) var(--ease-out);
 }
-.device:hover {
-  border-color: var(--border-strong);
-}
-.device.is-live,
-.device.is-recording {
-  border-color: color-mix(in srgb, var(--live) 55%, var(--border));
-}
-.device-art {
+.phone-screen {
   position: relative;
   display: grid;
   place-items: center;
-  width: 42px;
-  height: 42px;
-  border-radius: var(--r-md);
-  background: var(--surface-2);
-  color: var(--text-2);
-  transition:
-    background-color var(--medium) var(--ease),
-    color var(--medium) var(--ease);
+  border-radius: calc(var(--phone-r) - var(--bezel) - 2px);
+  background: var(--phone-screen);
+  color: var(--text);
+  transition: background-color 400ms var(--ease-out);
 }
-.device-art .icon {
-  width: 20px;
-  height: 20px;
+.phone:hover:not(:disabled) {
+  border-color: var(--phone-edge-hover);
 }
-.device.is-live .device-art,
-.device.is-recording .device-art {
-  background: var(--accent-soft);
-  color: var(--accent-text);
-}
-.device-dot {
+/* The front camera: the one detail that makes the outline read as a phone. */
+.phone-screen::before {
+  content: '';
   position: absolute;
-  right: -2px;
-  bottom: -2px;
+  top: 7px;
+  left: 50%;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--phone-edge);
+  opacity: 0.5;
+  translate: -50% 0;
+}
+.phone.is-placeholder .phone-screen::before {
+  content: none;
+}
+.phone:active:not(:disabled) {
+  scale: 0.96;
+}
+.phone:disabled {
+  opacity: 1;
+}
+.phone .icon {
+  width: 22px;
+  height: 22px;
+}
+/* The action glyph appears only while the pointer or focus is on the phone. */
+.phone-glyph {
+  display: grid;
+  opacity: 0;
+  transition: opacity var(--fast) var(--ease-out);
+}
+.phone:hover .phone-glyph,
+.phone:focus-visible .phone-glyph {
+  opacity: 1;
+}
+/* The play triangle sits optically centred, a little right of the box centre. */
+.is-ready .phone-glyph .icon {
+  translate: 1px 0;
+}
+.is-live .phone,
+.is-recording .phone,
+.is-live .phone:hover:not(:disabled),
+.is-recording .phone:hover:not(:disabled) {
+  border-color: var(--live);
+}
+.is-live .phone-screen,
+.is-recording .phone-screen {
+  background: var(--live-screen);
+  color: var(--live);
+}
+.is-busy .phone-screen {
+  color: var(--text-2);
+}
+.is-warning .phone {
+  border-style: dashed;
+  border-color: var(--text-3);
+}
+.phone-lock {
+  color: var(--warn);
+}
+.rec-mark {
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  border: 2px solid var(--surface);
-  display: none;
+  background: var(--rec);
 }
-.device.is-live .device-dot,
-.device.is-busy .device-dot,
-.device.is-recording .device-dot,
-.device.is-warning .device-dot {
-  display: block;
-}
-.device.is-live .device-dot,
-.device.is-busy .device-dot {
-  background: var(--live);
-}
-.device.is-recording .device-dot {
-  background: var(--coral);
-}
-.device.is-warning .device-dot {
-  background: var(--amber);
-}
-.device-text {
+
+.device-caption {
   display: grid;
-  gap: 3px;
-  min-width: 0;
+  justify-items: center;
+  gap: 1px;
+  max-width: 100%;
+  text-align: center;
 }
-.device-text strong {
-  font-size: 15px;
-  font-weight: 700;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.device-meta {
+.device-name-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  min-width: 0;
-  color: var(--text-2);
-  font-size: 12.5px;
+  gap: 2px;
+  max-width: 100%;
+  /* the options button hangs to the right; the name stays centred under the phone */
+  padding-left: 30px;
 }
-.chip {
-  padding: 1px 8px;
-  border-radius: var(--r-pill);
-  border: 1px solid var(--border);
-  background: var(--surface-2);
-  font-size: 11.5px;
-  font-weight: 700;
-  color: var(--text-2);
-}
-.device.is-live .device-state {
-  color: var(--accent-text);
-  font-weight: 650;
-}
-.device.is-recording .device-state {
-  color: var(--coral);
-  font-weight: 650;
-}
-.device.is-warning .device-state {
-  color: var(--amber);
-}
-.device-serial {
+.device-name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font: 600 15px/1.3 var(--font-display);
+}
+.device-options {
+  width: 28px;
+  height: 28px;
+}
+/* A 40 px hit area around the small options button. */
+.device-options::before {
+  content: '';
+  position: absolute;
+  inset: -6px;
+}
+.device-state {
+  font: 12px/1.4 var(--font-small);
+  color: var(--text-2);
+}
+.is-live .device-state,
+.is-recording .device-state {
+  color: var(--live);
+}
+.is-recording .device-state {
+  color: var(--rec);
+}
+.is-warning .device-state {
+  color: var(--warn);
+}
+.device-serial {
+  font: 12px/1.4 var(--font-small);
   color: var(--text-3);
   font-variant-numeric: tabular-nums;
 }
-.device-actions {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-.device-actions .mirror-button {
-  margin-left: 6px;
-  min-width: 112px;
+.home-hint {
+  color: var(--text-2);
+  font-size: 13px;
 }
 
 .empty {
   display: grid;
   justify-items: center;
-  gap: 6px;
-  padding: 34px 24px;
-  border: 1px dashed var(--border-strong);
-  border-radius: var(--r-lg);
+  gap: 8px;
+  max-width: 300px;
   text-align: center;
-  color: var(--text-2);
 }
-.empty-art {
-  display: grid;
-  place-items: center;
-  width: 52px;
-  height: 52px;
-  margin-bottom: 6px;
-  border-radius: var(--r-lg);
-  background: var(--surface-2);
+.phone.is-placeholder {
+  margin-bottom: 14px;
+  border-style: dashed;
+  border-color: var(--line-strong);
 }
-.empty-art .icon {
-  width: 24px;
-  height: 24px;
+.phone.is-placeholder .phone-screen {
+  background: none;
 }
-.empty h3 {
-  font-size: 15px;
-  color: var(--text);
+.empty h2 {
+  font: 600 16px/1.3 var(--font-display);
 }
 .empty p {
-  max-width: 38ch;
-}
-.hint {
-  margin-top: 10px;
-  color: var(--text-3);
-  font-size: 12.5px;
+  color: var(--text-2);
+  font-size: 13px;
 }
 
-.wireless {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
+.home-foot {
+  display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 14px 16px;
-  border: 1px solid var(--border);
-  border-radius: var(--r-lg);
-  background: var(--surface);
+  gap: 4px;
+  min-height: 48px;
+  padding: 0 10px;
+  border-top: 1px solid var(--line);
 }
-.wireless-art {
-  display: grid;
-  place-items: center;
-  width: 42px;
-  height: 42px;
-  border-radius: var(--r-md);
-  background: var(--surface-2);
-  color: var(--text-2);
-}
-.wireless-text {
-  display: grid;
-  gap: 2px;
-}
-.wireless-text p {
-  color: var(--text-2);
-  font-size: 12.5px;
+.home-foot #wifi {
+  margin-right: auto;
 }
 
-.preferences h2 {
-  margin-bottom: 12px;
+/* Preferences: a plain list, left-aligned, in the same window. */
+.preferences {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 4px 24px 24px;
+}
+.view-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px -8px;
+}
+.view-head h2 {
+  font: 600 20px/1.3 var(--font-display);
 }
 .pref-list {
-  border: 1px solid var(--border);
-  border-radius: var(--r-lg);
-  background: var(--surface);
-  overflow: hidden;
+  display: grid;
+  margin-bottom: 28px;
 }
 .pref-row {
   position: relative;
@@ -918,116 +866,65 @@ fieldset {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  min-height: 52px;
-  padding: 8px 16px;
-  border-top: 1px solid var(--border);
-}
-.pref-row:first-child {
-  border-top: 0;
+  min-height: 48px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
 }
 label.pref-row {
   cursor: pointer;
 }
-label.pref-row:hover {
-  background: var(--surface-2);
-}
 .pref-row select {
-  min-width: 150px;
+  min-width: 140px;
 }
-
-.activity {
-  border: 1px solid var(--border);
-  border-radius: var(--r-lg);
-  background: var(--surface);
-}
-.activity summary {
+.activity-head {
   display: flex;
   align-items: center;
-  gap: 8px;
-  min-height: 48px;
-  padding: 0 16px;
-  list-style: none;
-  cursor: pointer;
-  font-weight: 700;
-  border-radius: var(--r-lg);
+  gap: 4px;
+  margin-bottom: 6px;
 }
-.activity summary::-webkit-details-marker {
-  display: none;
-}
-.activity summary:hover {
-  background: var(--surface-2);
-}
-.activity summary .icon {
-  width: 16px;
-  height: 16px;
-  color: var(--text-3);
-  transition: transform var(--medium) var(--ease);
-}
-.activity[open] summary .icon {
-  transform: rotate(90deg);
-}
-.activity-summary {
-  margin-left: auto;
-  color: var(--text-3);
-  font-size: 12.5px;
+.activity-head h3 {
+  font-size: 14px;
   font-weight: 600;
 }
-.activity-summary.has-issues {
-  color: var(--amber);
-}
-.activity-tools {
-  display: flex;
-  gap: 4px;
-  padding: 0 10px 8px;
+.activity-summary {
+  margin-right: auto;
+  padding-left: 6px;
+  color: var(--warn);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
 }
 .logs {
-  max-height: 260px;
+  display: grid;
+  max-height: 220px;
   overflow-y: auto;
-  padding: 0 16px 14px;
-  font-size: 12.5px;
+  font-size: 13px;
 }
 .log-line {
   display: grid;
-  grid-template-columns: 64px 1fr;
-  gap: 10px;
+  grid-template-columns: auto 1fr;
+  gap: 12px;
   padding: 5px 0;
-  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--line);
 }
 .log-line time {
   color: var(--text-3);
   font-variant-numeric: tabular-nums;
 }
 .log-line.warning span {
-  color: var(--amber);
+  color: var(--warn);
 }
 .log-line.error span {
-  color: var(--coral);
+  color: var(--rec);
 }
 .log-empty {
-  color: var(--text-3);
-  padding: 4px 0 6px;
-}
-
-.statusbar {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0 10px 0 16px;
-  border-top: 1px solid var(--chrome-border);
-  background: var(--chrome);
+  padding: 8px 0;
   color: var(--text-2);
-  font-size: 12px;
+  font-size: 13px;
 }
-.statusbar-state {
-  margin-right: auto;
-}
-.statusbar .text-button {
-  height: 26px;
-  font-size: 12px;
-}
-.statusbar .version {
+.about {
+  margin-top: 24px;
   color: var(--text-3);
-  font-variant-numeric: tabular-nums;
+  font: 12px var(--font-small);
 }
 
 /* ---------- Mirror window ---------- */
@@ -1044,6 +941,7 @@ label.pref-row:hover {
 .mirror-titlebar {
   height: 38px;
   min-height: 38px;
+  border-bottom: 1px solid var(--line);
 }
 .mirror-device {
   padding-left: 4px;
@@ -1055,15 +953,14 @@ label.pref-row:hover {
   max-width: 100%;
   height: 28px;
   padding: 0 6px;
-  border-radius: var(--r-sm);
-  font-size: 12px;
-  font-weight: 750;
+  border-radius: var(--r-control);
+  font: 600 12px var(--font-small);
   white-space: nowrap;
   -webkit-app-region: no-drag;
-  transition: background-color var(--fast) var(--ease);
+  transition: background-color var(--fast) var(--ease-out);
 }
 #device-home:hover {
-  background: var(--chrome-hover);
+  background: var(--hover);
 }
 #mirror-name {
   overflow: hidden;
@@ -1075,11 +972,10 @@ label.pref-row:hover {
   flex-shrink: 0;
   border-radius: 50%;
   background: var(--text-3);
-  transition: background-color var(--slow) var(--ease);
+  transition: background-color var(--medium) var(--ease-out);
 }
 .is-live .live-dot {
   background: var(--live);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--live) 25%, transparent);
 }
 .mirror-actions {
   display: flex;
@@ -1090,26 +986,24 @@ label.pref-row:hover {
 .mirror-actions .icon-button {
   width: 28px;
   height: 30px;
-  color: var(--chrome-text);
+  color: var(--text);
 }
 .mirror-actions .icon-button .icon {
   width: 17px;
   height: 17px;
 }
-.mirror-actions .icon-button[aria-pressed='true'],
 .mirror-actions .icon-button[aria-expanded='true'] {
-  background: var(--accent-soft);
-  color: var(--accent-text);
+  background: var(--press);
 }
 .mirror-actions .is-recording {
-  color: var(--coral);
-  background: var(--coral-soft);
+  color: var(--rec);
+  background: var(--rec-soft);
 }
 .mirror-titlebar .window-buttons {
   margin-left: 2px;
 }
 .mirror-titlebar .window-buttons button {
-  width: 28px;
+  width: 30px;
 }
 .mirror-titlebar .window-buttons .icon {
   width: 12px;
@@ -1122,39 +1016,37 @@ label.pref-row:hover {
   right: 8px;
   z-index: 8;
   width: 252px;
-  padding: 6px;
-  border: 1px solid var(--border);
-  border-radius: var(--r-md);
-  background: var(--raised);
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-overlay);
+  background: var(--surface);
   color: var(--text);
-  box-shadow: var(--shadow-2);
+  box-shadow: var(--shadow-pop);
   transform-origin: top right;
-  animation: menu-in var(--medium) var(--ease);
+  animation: menu-in var(--fast) var(--ease-out);
 }
 .mirror-menu > button {
   display: flex;
   align-items: center;
-  gap: 11px;
+  gap: 10px;
   width: 100%;
-  min-height: 38px;
+  min-height: 36px;
   padding: 0 10px;
-  border-radius: 9px;
+  border-radius: var(--r-control);
   text-align: left;
-  font-weight: 600;
-  transition: background-color var(--fast) var(--ease);
+  transition: background-color var(--fast) var(--ease-out);
 }
 .mirror-menu > button:hover {
   background: var(--hover);
 }
 .mirror-menu > button[aria-pressed='true'] {
-  color: var(--accent-text);
-  background: var(--accent-soft);
+  background: var(--press);
 }
 .mirror-menu .icon {
   color: var(--text-2);
 }
 .mirror-menu > button[aria-pressed='true'] .icon {
-  color: inherit;
+  color: var(--text);
 }
 .mirror-menu kbd {
   margin-left: auto;
@@ -1162,13 +1054,12 @@ label.pref-row:hover {
 .volume-control {
   display: flex;
   align-items: center;
-  gap: 11px;
+  gap: 10px;
   min-height: 42px;
   margin: 4px 0;
   padding: 0 10px;
-  border-top: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
-  font-weight: 600;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
 }
 .volume-control label {
   white-space: nowrap;
@@ -1176,7 +1067,7 @@ label.pref-row:hover {
 .volume-control input {
   flex: 1;
   min-width: 0;
-  accent-color: var(--accent);
+  accent-color: var(--button);
 }
 
 .apk-drop {
@@ -1185,15 +1076,13 @@ label.pref-row:hover {
   left: 0;
   right: 0;
   z-index: 6;
-  padding: 11px 16px;
-  background: var(--accent);
-  color: var(--on-accent);
+  padding: 10px 16px;
+  background: var(--toast-bg);
+  color: var(--toast-text);
   font-size: 13px;
-  font-weight: 650;
   line-height: 1.4;
-  box-shadow: 0 2px 8px rgb(0 0 0 / 0.25);
   pointer-events: none;
-  animation: drop-banner var(--fast) var(--ease);
+  animation: drop-banner var(--fast) var(--ease-out);
 }
 
 .viewport {
@@ -1217,28 +1106,9 @@ label.pref-row:hover {
   touch-action: none;
   outline: 0;
 }
-/* The session's first frame gets one pass of reflected light. */
-.viewport::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: linear-gradient(
-    112deg,
-    transparent 30%,
-    rgb(220 248 249 / 0.24) 47%,
-    rgb(255 255 255 / 0.32) 50%,
-    rgb(220 248 249 / 0.24) 53%,
-    transparent 70%
-  );
-  opacity: 0;
-  transform: translateX(-110%);
-}
-.viewport.is-revealing::after {
-  animation: glint 900ms var(--ease) 80ms;
-}
+/* The first frame of a session fades in instead of cutting from the cover. */
 .viewport.is-revealing canvas {
-  animation: picture-in var(--slow) var(--ease);
+  animation: picture-in 240ms var(--ease-out);
 }
 
 #text-input {
@@ -1260,10 +1130,11 @@ label.pref-row:hover {
   border-radius: 50%;
   border: 2px solid #ff9a96;
   background: rgb(229 72 77 / 0.3);
-  transform: translate(-50%, -50%);
+  translate: -50% -50%;
   pointer-events: none;
 }
 
+/* The cover before the first frame; always dark, like the screen it stands in for. */
 .video-status {
   position: absolute;
   inset: 0;
@@ -1275,41 +1146,49 @@ label.pref-row:hover {
   gap: 14px;
   padding: 30px;
   text-align: center;
-  background: #0b1418;
-  color: #e6eef0;
+  background: #151819;
+  color: #e6e9e9;
   font-size: 13px;
   line-height: 1.6;
 }
 .video-status .spinner {
-  width: 22px;
-  height: 22px;
-  color: #6fd8dc;
+  width: 20px;
+  height: 20px;
+  color: #a2aaad;
 }
 .video-status #reconnect {
-  height: 34px;
+  height: 32px;
   min-width: 120px;
   padding: 0 16px;
-  border-radius: 10px;
-  background: #39c2c9;
-  color: #06262a;
-  font-weight: 700;
+  border-radius: var(--r-control);
+  background: #e6e9e9;
+  color: #151819;
+  font-weight: 600;
+  transition:
+    opacity var(--fast) var(--ease-out),
+    scale var(--fast) var(--ease-out);
 }
-/* A passing status over a live picture: a pill that does not hide the video. */
+.video-status #reconnect:hover {
+  opacity: 0.88;
+}
+.video-status #reconnect:active {
+  scale: 0.96;
+}
+/* A passing status over a live picture: a small note that does not hide the video. */
 .video-status.is-notice {
   inset: 10px auto auto 50%;
   flex-direction: row;
-  gap: 9px;
+  gap: 8px;
   max-width: calc(100% - 24px);
-  padding: 6px 14px;
-  border-radius: var(--r-pill);
-  background: rgb(11 20 24 / 0.72);
-  backdrop-filter: blur(8px);
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: rgb(21 24 25 / 0.82);
   font-size: 12px;
   line-height: 1.4;
   white-space: nowrap;
   pointer-events: none;
-  transform: translateX(-50%);
-  animation: notice-in var(--medium) var(--ease);
+  translate: -50% 0;
+  animation: notice-in var(--medium) var(--ease-out);
 }
 .video-status.is-notice .spinner {
   width: 12px;
@@ -1322,9 +1201,8 @@ label.pref-row:hover {
   justify-content: center;
   height: 48px;
   min-height: 48px;
-  background: var(--chrome);
-  border-top: 1px solid var(--chrome-border);
-  transition: background-color var(--slow) var(--ease);
+  background: var(--bg);
+  border-top: 1px solid var(--line);
 }
 .android-navigation .icon-button {
   position: relative;
@@ -1332,8 +1210,8 @@ label.pref-row:hover {
   isolation: isolate;
   width: 64px;
   height: 36px;
-  border-radius: 10px;
-  color: var(--chrome-text);
+  border-radius: 8px;
+  color: var(--text);
 }
 .android-navigation .icon-button .icon {
   width: 20px;
@@ -1366,97 +1244,61 @@ label.pref-row:hover {
     padding: 0 4px;
   }
 }
-@media (max-width: 640px) {
-  .panel-content {
-    padding: 20px 16px 28px;
-  }
-  .device {
-    grid-template-columns: auto 1fr;
-  }
-  .device-actions {
-    grid-column: 1 / -1;
-    justify-content: flex-end;
-  }
-}
 
 /* ---------- Motion ---------- */
 
-/* A device that arrives after the panel opened slides in; existing rows never replay. */
+/* A phone that arrives after the panel opened fades in; phones already there never replay. */
 .device.is-new {
-  animation: device-in var(--slow) var(--ease);
+  animation: device-in 240ms var(--ease-out);
 }
-/* The moment a device goes live, its status dot sends out one ring. */
-.device.went-live .device-dot::after {
-  content: '';
-  position: absolute;
-  inset: -2px;
-  border-radius: 50%;
-  border: 2px solid var(--live);
-  animation: ring 900ms var(--ease) forwards;
+/* The moment a phone goes live its screen lights up once, then settles on the live tint. */
+.device.went-live .phone-screen {
+  animation: screen-on 600ms var(--ease-out);
 }
 
 @keyframes spin {
   to {
-    transform: rotate(360deg);
+    rotate: 360deg;
   }
 }
 @keyframes toast-in {
   from {
     opacity: 0;
-    transform: translate(-50%, 8px);
+    translate: -50% 6px;
   }
 }
 @keyframes notice-in {
   from {
     opacity: 0;
-    transform: translate(-50%, -6px);
+    translate: -50% -4px;
   }
 }
 @keyframes menu-in {
   from {
     opacity: 0;
-    transform: scale(0.96) translateY(-4px);
+    scale: 0.97;
   }
 }
 @keyframes drop-banner {
   from {
     opacity: 0;
-    transform: translateY(-100%);
+    translate: 0 -100%;
   }
 }
 @keyframes device-in {
   from {
     opacity: 0;
-    transform: translateY(6px);
+    translate: 0 6px;
   }
 }
-@keyframes ring {
+@keyframes screen-on {
   from {
-    opacity: 0.9;
-    transform: scale(1);
-  }
-  to {
-    opacity: 0;
-    transform: scale(2.6);
-  }
-}
-@keyframes glint {
-  0% {
-    opacity: 0;
-    transform: translateX(-110%);
-  }
-  15% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0;
-    transform: translateX(110%);
+    background: var(--phone-edge-hover);
   }
 }
 @keyframes picture-in {
   from {
-    opacity: 0.4;
-    filter: saturate(0.6) brightness(1.15);
+    opacity: 0;
   }
 }
 @keyframes nav-expand {

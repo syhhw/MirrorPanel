@@ -216,9 +216,11 @@ function snapshot(): unknown {
 function broadcast(): void {
   if (panel && !panel.isDestroyed()) panel.webContents.send('state', snapshot());
 }
+/** The panel's canvas colour (style.css --bg), painted natively before the page loads. */
+const panelBackground = () => (nativeTheme.shouldUseDarkColors ? '#1B1E1F' : '#F3F4F4');
 function secureWindow(options: Electron.BrowserWindowConstructorOptions): BrowserWindow {
   const window = new BrowserWindow({
-    backgroundColor: nativeTheme.shouldUseDarkColors ? '#0E171C' : '#EEF3F4',
+    backgroundColor: panelBackground(),
     icon: join(__dirname, 'icon.png'),
     ...options,
     frame: false,
@@ -372,7 +374,7 @@ async function startSession(serial: string, attempt = 0, existing?: Entry): Prom
         minHeight: 200,
         title: settings.nicknames[serial] || device?.model || serial,
         alwaysOnTop: settings.alwaysOnTop,
-        backgroundColor: '#0B1418',
+        backgroundColor: '#151819', // the "connecting" cover (style.css .video-status)
         show: true,
       })
     : previousWindow!;
@@ -1153,18 +1155,18 @@ else {
         }),
       10000,
     );
+    // Sized for a shelf of one or two phones; the preferences view fits the same window.
     panel = secureWindow({
-      width: 820,
-      height: 850,
-      minWidth: 620,
-      minHeight: 560,
+      width: 480,
+      height: 600,
+      minWidth: 380,
+      minHeight: 480,
       title: 'MirrorPanel 2.0',
       show: true,
     });
     // Keep the native background in step with the theme so resizing never flashes the other one.
     nativeTheme.on('updated', () => {
-      if (!panel.isDestroyed())
-        panel.setBackgroundColor(nativeTheme.shouldUseDarkColors ? '#0E171C' : '#EEF3F4');
+      if (!panel.isDestroyed()) panel.setBackgroundColor(panelBackground());
     });
     await panel.loadFile(join(__dirname, 'index.html'));
     if (!existsSync(adb.executable) || !existsSync(join(resources, 'mirrorpanel-server.jar')))
