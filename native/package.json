@@ -16,6 +16,7 @@
     "test": "tsx --test tests/*.test.ts",
     "start": "npm run build && electron .",
     "package": "npm run build && node scripts/package.mjs",
+    "installer": "npm run build && node scripts/installer.mjs",
     "test:android": "python scripts/test-android.py"
   },
   "dependencies": {

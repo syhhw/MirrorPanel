@@ -1,9 +1,9 @@
 import { listPackage } from '@electron/asar';
-import { readdirSync, readFileSync, writeFileSync, statSync } from 'node:fs';
+import { mkdirSync, readdirSync, readFileSync, writeFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { createHash } from 'node:crypto';
 import assert from 'node:assert/strict';
-const root = join(process.cwd(), 'dist/MirrorPanel-win32-x64');
+const root = join(process.cwd(), process.argv[2] ?? 'dist', 'MirrorPanel-win32-x64');
 const entries = listPackage(join(root, 'resources/app.asar')).map((name) =>
   name.replaceAll('\\', '/'),
 );
@@ -62,5 +62,6 @@ const result = {
   noPrivateKeys: true,
   onlyKnownResources: true,
 };
+mkdirSync('build/smoke', { recursive: true });
 writeFileSync('build/smoke/package-manifest.json', JSON.stringify(result, null, 2));
 console.log('PACKAGE_AUDIT_OK', manifest.length, 'files; only known resources; no private keys');

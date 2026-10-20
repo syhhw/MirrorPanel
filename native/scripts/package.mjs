@@ -1,5 +1,7 @@
 import { packager } from '@electron/packager';
 import { existsSync } from 'node:fs';
+// Output folder: dist by default; the installer build passes its own.
+const out = process.argv[2] ?? 'dist';
 for (const resource of ['mirrorpanel-server.jar', 'mirrorpanel-companion.apk', 'adb/adb.exe'])
   if (!existsSync('resources/' + resource))
     throw Error('Missing resource: ' + resource + '; run npm run android');
@@ -8,7 +10,7 @@ const output = await packager({
   name: 'MirrorPanel',
   platform: 'win32',
   arch: 'x64',
-  out: 'dist',
+  out,
   overwrite: true,
   asar: true,
   prune: false,
