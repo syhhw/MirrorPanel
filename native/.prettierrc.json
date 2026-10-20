@@ -1,0 +1,12 @@
+{
+  "printWidth": 100,
+  "singleQuote": true,
+  "endOfLine": "auto",
+  "plugins": ["prettier-plugin-java"],
+  "overrides": [
+    {
+      "files": "*.java",
+      "options": { "tabWidth": 4, "printWidth": 120 }
+    }
+  ]
+}
