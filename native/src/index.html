@@ -1,4 +1,27 @@
-<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; media-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'">
-<meta name="viewport" content="width=device-width,initial-scale=1"><title>MirrorPanel</title><link rel="stylesheet" href="style.css"></head>
-<body><main id="app"></main><div id="toast" role="status" aria-live="polite" hidden></div><dialog id="dialog" aria-labelledby="dialog-title"><form method="dialog" id="dialog-form"><div id="dialog-content"></div><footer><button value="cancel" formnovalidate>Cancelar</button><button class="primary" id="confirm" value="default">Salvar</button></footer></form></dialog><script src="renderer.js"></script></body></html>
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; media-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'"
+    />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>MirrorPanel</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main id="app"></main>
+    <div id="toast" role="status" aria-live="polite" hidden></div>
+    <dialog id="dialog" aria-labelledby="dialog-title">
+      <form method="dialog" id="dialog-form">
+        <div id="dialog-content"></div>
+        <footer>
+          <button value="cancel" formnovalidate>Cancelar</button
+          ><button class="primary" id="confirm" value="default">Salvar</button>
+        </footer>
+      </form>
+    </dialog>
+    <script src="renderer.js"></script>
+  </body>
+</html>
