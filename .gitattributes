@@ -8,7 +8,6 @@
 
 *.png binary
 *.ico binary
-*.otf binary
 *.apk binary
 *.jar binary
 *.exe binary
