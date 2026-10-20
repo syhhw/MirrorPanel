@@ -2,6 +2,10 @@ import { AudioPlayer } from './audio-player';
 import { Gestures } from './gestures';
 import { bindRipple } from './ripple';
 import { html } from './html';
+import { admitFrame } from './video-gate';
+
+/** Minimum gap between keyframe requests sent from the mirror window. */
+const SYNC_INTERVAL_MS = 1000;
 interface DeviceRow {
   serial: string;
   state: string;
@@ -708,8 +712,14 @@ function mirror(): void {
     config = new Uint8Array(0),
     codec = 'avc1.42e01f',
     needsKey = true,
+    fresh = false,
     frames = 0,
     dropped = 0;
+  // Two decoder errors with no frame in between usually mean the GPU path cannot
+  // handle this stream; the software decoder is slower but keeps the mirror alive.
+  let acceleration: HardwareAcceleration = 'prefer-hardware',
+    failures = 0,
+    lastSyncRequest = 0;
   const status = $('video-status');
   let inputReady = false;
   const control = (value: unknown) => (inputReady ? api.control(value) : Promise.resolve());
@@ -776,15 +786,25 @@ function mirror(): void {
       api.ack(packet.id);
     }
   });
-  const reset = () => {
+  /** Asks Android for a keyframe, at most once per second unless forced. */
+  const requestSync = (force = false) => {
+    const now = performance.now();
+    if (!force && now - lastSyncRequest < SYNC_INTERVAL_MS) return;
+    lastSyncRequest = now;
+    act(control({ type: 'sync' }));
+  };
+  const reset = (): VideoDecoder => {
     if (decoder && decoder.state !== 'closed') decoder.close();
     needsKey = true;
-    decoder = new VideoDecoder({
+    fresh = true;
+    const created = new VideoDecoder({
       output: (frame) => {
-        canvas.width = frame.displayWidth;
-        canvas.height = frame.displayHeight;
+        // Assigning the canvas size clears it, so only do it when the stream size changes.
+        if (canvas.width !== frame.displayWidth) canvas.width = frame.displayWidth;
+        if (canvas.height !== frame.displayHeight) canvas.height = frame.displayHeight;
         context.drawImage(frame, 0, 0);
         frame.close();
+        failures = 0;
         frames++;
         canvas.dataset.frames = String(frames);
         canvas.dataset.dropped = String(dropped);
@@ -792,14 +812,17 @@ function mirror(): void {
       },
       error: (error) => {
         needsKey = true;
+        if (++failures >= 2) acceleration = 'no-preference';
         if (inputReady) {
           $('status-message').textContent = 'Falha ao decodificar: ' + error.message;
           status.hidden = false;
-          act(control({ type: 'sync' }));
+          requestSync(true);
         }
       },
     });
-    decoder.configure({ codec, optimizeForLatency: true, hardwareAcceleration: 'prefer-hardware' });
+    created.configure({ codec, optimizeForLatency: true, hardwareAcceleration: acceleration });
+    decoder = created;
+    return created;
   };
   api.onInfo((value: unknown) => {
     const info = value as Info;
@@ -837,22 +860,24 @@ function mirror(): void {
   api.onFrame((value: unknown) => {
     const packet = value as FramePacket;
     try {
-      if (!decoder || decoder.state === 'closed' || !config.length) return;
-      if (decoder.decodeQueueSize > 3) {
+      const key = Boolean(packet.flags & 1);
+      const state = {
+        exists: decoder !== undefined,
+        closed: decoder?.state === 'closed',
+        fresh,
+        queueSize: decoder?.decodeQueueSize ?? 0,
+      };
+      const action = admitFrame(state, config.length > 0, needsKey, key);
+      if (action === 'ignore') return;
+      if (action === 'drop' || action === 'drop-and-sync') {
         dropped++;
         needsKey = true;
-        act(control({ type: 'sync' }));
+        if (action === 'drop-and-sync') requestSync();
         return;
       }
-      const key = Boolean(packet.flags & 1);
-      if (needsKey && !key) {
-        dropped++;
-        return;
-      }
-      if (needsKey) {
-        reset();
-        needsKey = false;
-      }
+      const target = action === 'restart-and-decode' ? reset() : decoder!;
+      needsKey = false;
+      fresh = false;
       let bytes = new Uint8Array(packet.data);
       if (key) {
         const combined = new Uint8Array(config.length + bytes.length);
@@ -860,13 +885,13 @@ function mirror(): void {
         combined.set(bytes, config.length);
         bytes = combined;
       }
-      decoder!.decode(
+      target.decode(
         new EncodedVideoChunk({ type: key ? 'key' : 'delta', timestamp: packet.pts, data: bytes }),
       );
     } catch (error) {
       toast(error);
       needsKey = true;
-      act(control({ type: 'sync' }));
+      requestSync();
     } finally {
       api.ack(packet.id);
     }
