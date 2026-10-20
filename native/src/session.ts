@@ -1,5 +1,6 @@
 import { EventEmitter } from 'node:events';
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
 import { Socket } from 'node:net';
 import { join } from 'node:path';
 import { ChildProcessWithoutNullStreams } from 'node:child_process';
@@ -7,6 +8,18 @@ import { Adb } from './adb';
 import { PacketReader, Packet, VideoInfo, parseInfo, controlPacket, validText } from './protocol';
 import { Recording } from './recording';
 import { t } from './i18n';
+
+const COMPANION = 'com.mirrorpanel.companion';
+const bundledDigests = new Map<string, Promise<string>>();
+/** SHA-256 of the Companion APK shipped with this desktop build, read once per path. */
+function bundledDigest(apk: string): Promise<string> {
+  let digest = bundledDigests.get(apk);
+  if (!digest) {
+    digest = readFile(apk).then((bytes) => createHash('sha256').update(bytes).digest('hex'));
+    bundledDigests.set(apk, digest);
+  }
+  return digest;
+}
 
 export interface Quality {
   maxSize: number;
@@ -51,7 +64,7 @@ export class MirrorSession extends EventEmitter {
   private previousIme?: string;
   private imeSetup?: Promise<void>;
   private imeWasEnabled = false;
-  private readonly ime = 'com.mirrorpanel.companion/.MirrorInput';
+  private readonly ime = COMPANION + '/.MirrorInput';
   private textId = 0;
   private pendingText = new Map<
     number,
@@ -91,6 +104,9 @@ export class MirrorSession extends EventEmitter {
     if (this.stopping) throw Error(t('Sessão cancelada', 'Session canceled'));
   }
   async start(): Promise<void> {
+    const started = Date.now();
+    const mark = (step: string, details: Record<string, unknown> = {}) =>
+      this.emit('diagnostic', 'start-step', { step, ms: Date.now() - started, ...details });
     try {
       const api = Number(await this.adb.shell(this.serial, ['getprop', 'ro.build.version.sdk']));
       if (api < 29)
@@ -107,12 +123,10 @@ export class MirrorSession extends EventEmitter {
         30000,
       );
       this.checkpoint();
-      await this.adb.device(
-        this.serial,
-        ['install', '-r', '-g', join(this.resources, 'mirrorpanel-companion.apk')],
-        60000,
-      );
-      this.checkpoint();
+      mark('server-pushed');
+      // Booting the Android runtime for the server takes seconds on slower phones;
+      // the Companion is checked (and only reinstalled when it differs) meanwhile.
+      const companion = this.ensureCompanion();
       const token = randomBytes(32),
         noticeToken = randomBytes(32);
       this.noticeToken = noticeToken.toString('hex');
@@ -126,7 +140,7 @@ export class MirrorSession extends EventEmitter {
       );
       this.child = child;
       child.stdin.on('error', () => {});
-      const noticePort = await new Promise<number>((resolve, reject) => {
+      const serverReady = new Promise<number>((resolve, reject) => {
         let output = '';
         const timeout = setTimeout(
           () =>
@@ -159,6 +173,8 @@ export class MirrorSession extends EventEmitter {
         child.stderr.on('data', (data: Buffer) => this.emit('log', data.toString().slice(0, 4096)));
         child.stdin.write(token.toString('hex') + noticeToken.toString('hex'), 'ascii');
       });
+      const [noticePort, companionResult] = await Promise.all([serverReady, companion]);
+      mark('server-ready', { companion: companionResult });
       child.once('exit', (code, signal) => {
         this.emit('diagnostic', 'child-exit', { code, signal, stopping: this.stopping });
         if (!this.stopping) void this.end('process-exit');
@@ -178,7 +194,7 @@ export class MirrorSession extends EventEmitter {
           'start',
           '-W',
           '-n',
-          'com.mirrorpanel.companion/.ConnectActivity',
+          COMPANION + '/.ConnectActivity',
           '--ei',
           'port',
           String(noticePort),
@@ -189,6 +205,7 @@ export class MirrorSession extends EventEmitter {
         20000,
       );
       this.checkpoint();
+      mark('companion-started');
       await new Promise<void>((resolve, reject) => {
         const socket = new Socket();
         this.socket = socket;
@@ -239,9 +256,11 @@ export class MirrorSession extends EventEmitter {
         socket.connect(this.port!, '127.0.0.1', () => socket.write(token));
       });
       this.checkpoint();
+      mark('video-ready');
       this.imeSetup = this.enableIme();
       await this.imeSetup;
       this.checkpoint();
+      mark('ime-ready');
       this.state = 'mirroring';
       this.emit('state', this.state);
     } catch (error) {
@@ -404,6 +423,35 @@ export class MirrorSession extends EventEmitter {
     if (body.length > 131072) throw Error(t('Comando muito grande', 'Command too large'));
     this.socket.write(Buffer.concat([size, body]));
   }
+  /**
+   * Installs the bundled Companion only when the phone lacks that exact APK.
+   * Reinstalling every session cost about a second and restarted the Companion.
+   */
+  private async ensureCompanion(): Promise<'kept' | 'installed'> {
+    const apk = join(this.resources, 'mirrorpanel-companion.apk');
+    const installed = await this.adb.shell(this.serial, ['pm', 'path', COMPANION]).catch(() => '');
+    const remote = installed.match(/^package:(\S+)$/m)?.[1];
+    if (remote) {
+      const [phone, local] = await Promise.all([
+        this.adb.shell(this.serial, ['sha256sum', remote]).catch(() => ''),
+        bundledDigest(apk).catch(() => ''),
+      ]);
+      if (local && phone.split(/\s+/)[0] === local) return 'kept';
+    }
+    try {
+      await this.adb.device(this.serial, ['install', '-r', '-g', apk], 60000);
+    } catch (error) {
+      if (/INSTALL_FAILED_UPDATE_INCOMPATIBLE|signatures do not match/i.test(String(error)))
+        throw Error(
+          t(
+            'O MirrorPanel Companion do celular foi assinado por outra versão. Desinstale-o no Android e conecte de novo.',
+            'The MirrorPanel Companion on the phone was signed by another build. Uninstall it on Android and connect again.',
+          ),
+        );
+      throw error;
+    }
+    return 'installed';
+  }
   private async enableIme(): Promise<void> {
     this.previousIme = (
       await this.adb.shell(this.serial, ['settings', 'get', 'secure', 'default_input_method'])
@@ -466,7 +514,7 @@ export class MirrorSession extends EventEmitter {
           'start',
           '-W',
           '-n',
-          'com.mirrorpanel.companion/.AudioConsentActivity',
+          COMPANION + '/.AudioConsentActivity',
           '--es',
           'token',
           this.noticeToken,
