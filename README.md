@@ -1,12 +1,12 @@
 # MirrorPanel
 
-**MirrorPanel 2.0 preview 5** espelha e controla Android com motor próprio:
-Electron + WebCodecs no computador e servidor Java no aparelho. Executa sem
-Python nem programas de terceiros; o ADB oficial vem incluído.
+Espelha e controla celulares Android no Windows, com motor próprio: Electron +
+WebCodecs no computador e servidor Java no aparelho. Executa sem Python nem
+programas de terceiros; o ADB oficial vem incluído. Versão atual: prévia 5.
 
-Abra **Abrir MirrorPanel 2.0.vbs**. O executável fica em
+Abra **Abrir MirrorPanel.vbs**. O executável fica em
 `native/dist/MirrorPanel-win32-x64/MirrorPanel.exe`; mantenha a pasta inteira.
-Conecte um Android **10+**, autorize a depuração USB e clique no botão circular **Espelhar**.
+Conecte um Android **10+**, autorize a depuração USB e clique no celular desenhado no painel.
 
 Recursos: vídeo H.264, áudio estéreo com autorização no celular, Unicode e
 composição de texto, multitoque com Alt+clique, MP4 com som, PNG, fullscreen,
@@ -27,7 +27,7 @@ No celular, fechar a tela de orientação não interrompe o espelho.
 ## Desenvolvimento
 
 O código ativo está em [native](native/README.md). Os arquivos Python históricos
-não são iniciados nem incluídos no pacote 2.0. A documentação anterior fica em
+não são iniciados nem incluídos no pacote. A documentação anterior fica em
 [README 1.x](docs/README-1.x.md); releases públicas e tags anteriores não mudaram.
 
 ```powershell

@@ -4,7 +4,7 @@ Set fs = CreateObject("Scripting.FileSystemObject")
 folder = fs.GetParentFolderName(WScript.ScriptFullName)
 executable = fs.BuildPath(folder, "native\dist\MirrorPanel-win32-x64\MirrorPanel.exe")
 If Not fs.FileExists(executable) Then
-  MsgBox "MirrorPanel 2.0 nao foi empacotado. Execute npm run package na pasta do projeto.", 48, "MirrorPanel"
+  MsgBox "O MirrorPanel nao foi empacotado. Execute npm run package na pasta native do projeto.", 48, "MirrorPanel"
   WScript.Quit 1
 End If
 Set runner = CreateObject("WScript.Shell")

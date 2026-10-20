@@ -21,6 +21,8 @@ interface DeviceRow {
 }
 interface PanelState {
   devices: DeviceRow[];
+  /** The app's version, such as 2.0.0-preview.5. */
+  version: string;
   logs: { time: string; message: string; level: string }[];
   settings: {
     alwaysOnTop: boolean;
@@ -445,7 +447,7 @@ function buildPanel(): void {
           </header>
           <div id="logs" class="logs" role="log" aria-live="polite"></div>
         </section>
-        <p class="about">MirrorPanel 2.0</p>
+        <p class="about" id="about"></p>
       </section>
       ${settingsSheetMarkup('in-panel')}
       <footer class="home-foot" id="home-foot">
@@ -654,6 +656,12 @@ function renderPanel(next: unknown): void {
   $('home-hint').hidden = !idle;
   labelWindowButtons();
   labelSettingsSheet();
+  // The name is just MirrorPanel; the version reads like one: "2.0.0 (prévia 5)".
+  const [number, preview] = state.version.split('-preview.');
+  $('about').textContent =
+    t('MirrorPanel, versão ', 'MirrorPanel, version ') +
+    number +
+    (preview ? t(' (prévia ', ' (preview ') + preview + ')' : '');
   label($('open-preferences'), t('Preferências', 'Preferences'));
   label($('back'), t('Voltar', 'Back'));
   $<HTMLInputElement>('show-serial').checked = state.settings.showSerial;

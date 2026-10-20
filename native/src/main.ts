@@ -240,6 +240,7 @@ function snapshot(): unknown {
       ratio: displayRatios.get(d.serial) ?? null,
     })),
     logs,
+    version: app.getVersion(),
     settings: {
       alwaysOnTop: settings.alwaysOnTop,
       stayAwake: settings.stayAwake,
@@ -1289,7 +1290,7 @@ else {
       height: 600,
       minWidth: 380,
       minHeight: 480,
-      title: 'MirrorPanel 2.0',
+      title: 'MirrorPanel',
       show: true,
     });
     // Keep the native background in step with the theme so resizing never flashes the other one.

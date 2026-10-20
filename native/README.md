@@ -1,16 +1,16 @@
-# MirrorPanel 2.0 — preview 5
+# MirrorPanel — prévia 5
 
 Electron + TypeScript + WebCodecs, com motor Android próprio. O pacote executa
 sem Python nem programas de terceiros. Inclui o ADB oficial para transporte USB/Wi-Fi.
 
 ## Usar
 
-Abra `dist/MirrorPanel-win32-x64/MirrorPanel.exe` ou **Abrir MirrorPanel 2.0.vbs**
+Abra `dist/MirrorPanel-win32-x64/MirrorPanel.exe` ou **Abrir MirrorPanel.vbs**
 na raiz do projeto. Mantenha os arquivos da pasta portátil juntos.
 
 1. Android **10 ou superior**, depuração USB ativada e computador autorizado.
-2. Clique no botão circular **Espelhar** ao lado do aparelho. O app instala seu
-   Companion e mostra um indicador no celular.
+2. Clique no celular desenhado no painel. O app instala seu Companion e mostra
+   um indicador no celular.
 3. Clique num campo de texto para digitar ou colar. Acentos, idiomas, composição
    e sequências de emoji são enviados pelo IME MirrorPanel, sem normalização.
 4. **Alt+clique** fixa um dedo. Arraste com o mouse para usar o segundo; outro

@@ -1,4 +1,4 @@
-# MirrorPanel 2.0 — arquitetura
+# MirrorPanel — arquitetura
 
 Electron + TypeScript + WebCodecs, motor Android próprio. Preview 4, 19/10/2026.
 
@@ -70,7 +70,7 @@ orientação e conexão; a notificação não encerra o serviço quando dispensa
 - `native/docs/PROTOCOL.md`: contratos, limites, autenticação e timestamps.
 
 H.265, clipboard bidirecional, QR, bandeja e updater ainda não implementados.
-O pacote 2.0 não usa a versão Python. Nenhum código ou recurso de terceiros
+O pacote não usa a versão Python. Nenhum código ou recurso de terceiros
 participa do motor além do ADB oficial e do Electron. Chromium mantém seu componente interno ffmpeg.dll.
 
 ## APK, interação e diagnóstico (preview 5)
