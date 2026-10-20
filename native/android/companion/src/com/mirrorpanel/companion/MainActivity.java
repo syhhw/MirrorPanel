@@ -1,9 +1,7 @@
 package com.mirrorpanel.companion;
 
 import android.app.Activity;
-import android.app.NotificationManager;
 import android.content.Context;
-import android.content.Intent;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
@@ -17,6 +15,8 @@ import android.widget.TextView;
 
 /** Connection guidance only. Closing this screen never stops the desktop session. */
 public final class MainActivity extends Activity {
+
+    static final String EXTRA_INDICATOR_BLOCKED = "indicator-blocked";
 
     private TextView heading, description, connection;
 
@@ -88,20 +88,12 @@ public final class MainActivity extends Activity {
         layout.addView(footer);
         scroll.addView(layout);
         setContentView(scroll);
-        int port = getIntent().getIntExtra("port", 0);
-        String token = getIntent().getStringExtra("token");
-        if (port > 0 && port < 65536 && token != null && token.matches("[a-f0-9]{64}")) {
-            if (!getSystemService(NotificationManager.class).areNotificationsEnabled()) {
-                heading.setText("Ative o indicador de conexão");
-                description.setText(
-                    "Permita as notificações do MirrorPanel nas configurações do Android e tente conectar novamente pelo computador."
-                );
-                return;
-            }
-            startForegroundService(
-                new Intent(this, SessionService.class).putExtra("port", port).putExtra("token", token)
+        // Sessions start in ConnectActivity; this screen only explains why one could not.
+        if (getIntent().getBooleanExtra(EXTRA_INDICATOR_BLOCKED, false)) {
+            heading.setText("Ative o indicador de conexão");
+            description.setText(
+                "Permita as notificações do MirrorPanel nas configurações do Android e tente conectar novamente pelo computador."
             );
-            finish();
         }
     }
 

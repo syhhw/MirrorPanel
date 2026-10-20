@@ -1,6 +1,7 @@
 package com.mirrorpanel.companion;
 
 import android.app.*;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ServiceInfo;
 import android.media.projection.*;
@@ -16,6 +17,7 @@ import org.json.JSONObject;
 
 public final class SessionService extends Service {
 
+    private static final String CHANNEL = "mirroring";
     private static volatile SessionService active;
     private volatile Socket connection;
     private volatile DataOutputStream output;
@@ -59,40 +61,31 @@ public final class SessionService extends Service {
         if (service != null) service.status("audio", "off", "Captura de áudio não autorizada");
     }
 
+    static boolean validToken(String candidate) {
+        return candidate != null && candidate.matches("[a-f0-9]{64}");
+    }
+
+    /** The visible notification is the user's indicator; without it no session may start. */
+    static boolean indicatorAllowed(Context context) {
+        NotificationManager manager = context.getSystemService(NotificationManager.class);
+        manager.createNotificationChannel(
+            new NotificationChannel(CHANNEL, "Espelhamento", NotificationManager.IMPORTANCE_LOW)
+        );
+        return (
+            manager.areNotificationsEnabled() &&
+            manager.getNotificationChannel(CHANNEL).getImportance() != NotificationManager.IMPORTANCE_NONE
+        );
+    }
+
     @Override
     public IBinder onBind(Intent intent) {
         return null;
     }
 
     @Override
-    public int onStartCommand(Intent intent, int flags, int id) {
-        if (intent == null) {
-            stopSelf();
-            return START_NOT_STICKY;
-        }
-        if ("audio-start".equals(intent.getAction())) {
-            if (!authorized(intent.getStringExtra("token"))) return START_NOT_STICKY;
-            startAudio(intent);
-            return START_NOT_STICKY;
-        }
-        if (running) return START_NOT_STICKY;
-        int port = intent.getIntExtra("port", 0);
-        token = intent.getStringExtra("token");
-        if (port < 1 || port > 65535 || token == null || !token.matches("[a-f0-9]{64}")) {
-            stopSelf();
-            return START_NOT_STICKY;
-        }
-        NotificationManager manager = getSystemService(NotificationManager.class);
-        manager.createNotificationChannel(
-            new NotificationChannel("mirroring", "Espelhamento", NotificationManager.IMPORTANCE_LOW)
-        );
-        if (
-            !manager.areNotificationsEnabled() ||
-            manager.getNotificationChannel("mirroring").getImportance() == NotificationManager.IMPORTANCE_NONE
-        ) {
-            stopSelf();
-            return START_NOT_STICKY;
-        }
+    public void onCreate() {
+        super.onCreate();
+        indicatorAllowed(this);
         Intent details = new Intent(this, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
         PendingIntent action = PendingIntent.getActivity(
             this,
@@ -100,18 +93,48 @@ public final class SessionService extends Service {
             details,
             PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT
         );
-        notification = new Notification.Builder(this, "mirroring")
+        notification = new Notification.Builder(this, CHANNEL)
             .setSmallIcon(android.R.drawable.ic_menu_view)
             .setContentTitle("MirrorPanel está espelhando esta tela")
             .setContentText("Conectado ao computador. Toque para ver os detalhes.")
             .setOngoing(true)
             .setContentIntent(action)
             .build();
-        foreground(false);
+    }
+
+    @Override
+    public int onStartCommand(Intent intent, int flags, int id) {
+        // Every start comes from startForegroundService. Android kills the whole app if the service
+        // stops before calling startForeground, so it runs first, even for requests that are rejected.
+        foreground(audio != null);
+        if (intent == null) {
+            stopIfIdle();
+            return START_NOT_STICKY;
+        }
+        if ("audio-start".equals(intent.getAction())) {
+            if (authorized(intent.getStringExtra(ConnectActivity.EXTRA_TOKEN))) startAudio(intent);
+            else stopIfIdle();
+            return START_NOT_STICKY;
+        }
+        if (running) return START_NOT_STICKY;
+        int port = intent.getIntExtra(ConnectActivity.EXTRA_PORT, 0);
+        String candidate = intent.getStringExtra(ConnectActivity.EXTRA_TOKEN);
+        if (port < 1 || port > 65535 || !validToken(candidate) || !indicatorAllowed(this)) {
+            stopIfIdle();
+            return START_NOT_STICKY;
+        }
+        token = candidate;
         running = true;
         active = this;
         new Thread(() -> bridge(port), "mirrorpanel-companion").start();
         return START_NOT_STICKY;
+    }
+
+    /** Rejected requests must not end a session that is already running. */
+    private void stopIfIdle() {
+        if (running) return;
+        stopForeground(STOP_FOREGROUND_REMOVE);
+        stopSelf();
     }
 
     private void foreground(boolean capturing) {

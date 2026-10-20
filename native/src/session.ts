@@ -153,7 +153,7 @@ export class MirrorSession extends EventEmitter {
           'start',
           '-W',
           '-n',
-          'com.mirrorpanel.companion/.MainActivity',
+          'com.mirrorpanel.companion/.ConnectActivity',
           '--ei',
           'port',
           String(noticePort),

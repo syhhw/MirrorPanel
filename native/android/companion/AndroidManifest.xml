@@ -1,4 +1,4 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.mirrorpanel.companion" android:versionCode="4" android:versionName="2.0.0-preview.4">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.mirrorpanel.companion" android:versionCode="5" android:versionName="2.0.0-preview.5">
   <uses-sdk android:minSdkVersion="29" android:targetSdkVersion="35" />
   <uses-permission android:name="android.permission.INTERNET" />
   <uses-permission android:name="android.permission.RECORD_AUDIO" />
@@ -10,7 +10,10 @@
     <activity android:name=".MainActivity" android:exported="true">
       <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
     </activity>
-    <activity android:name=".AudioConsentActivity" android:exported="true" android:theme="@android:style/Theme.Material.Light.Dialog.NoActionBar" />
+    <!-- Session entry points opened by the desktop over ADB. INJECT_EVENTS is a signature permission
+         held by the ADB shell, so other apps on the phone cannot start sessions or audio consent. -->
+    <activity android:name=".ConnectActivity" android:exported="true" android:permission="android.permission.INJECT_EVENTS" android:theme="@android:style/Theme.NoDisplay" android:excludeFromRecents="true" android:noHistory="true" />
+    <activity android:name=".AudioConsentActivity" android:exported="true" android:permission="android.permission.INJECT_EVENTS" android:theme="@android:style/Theme.Material.Light.Dialog.NoActionBar" />
     <service android:name=".MirrorInput" android:label="MirrorPanel" android:permission="android.permission.BIND_INPUT_METHOD" android:exported="true">
       <intent-filter><action android:name="android.view.InputMethod" /></intent-filter>
       <meta-data android:name="android.view.im" android:resource="@xml/input_method" />
