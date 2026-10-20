@@ -131,7 +131,7 @@ setTimeout(async () => {
       '(()=>{const r=document.querySelector("canvas").getBoundingClientRect();return{x:r.x,y:r.y,width:r.width,height:r.height};})()',
     );
     await clickAt(rect.x + rect.width * 0.4, rect.y + rect.height * 0.13);
-    const basic = 'ação 😀 ';
+    const basic = 'façade 😀 ';
     await mirror.webContents.insertText(basic);
     await until(async () => (await fixture('text.txt')) === basic, 'Typed Unicode missing');
     const composing = '日本語 👩🏽‍💻';

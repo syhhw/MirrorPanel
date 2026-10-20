@@ -870,7 +870,7 @@ function mediaPath(extension: string): string {
   const directory = join(
     process.env.MIRRORPANEL_TEST_MEDIA_ROOT ?? app.getPath('videos'),
     'MirrorPanel Media',
-    extension === 'png' ? 'Capturas de tela' : 'Gravacoes',
+    extension === 'png' ? t('Screenshots', 'Capturas de tela') : t('Recordings', 'Gravacoes'),
   );
   mkdirSync(directory, { recursive: true });
   return join(

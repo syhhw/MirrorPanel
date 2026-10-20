@@ -57,7 +57,7 @@ export function phoneName(original: string, taken: ReadonlySet<string>): string 
       .replace(/[\u0000-\u001f\u007f/\\:*?"<>|]/g, '_')
       .trim()
       .replace(/^\.+/, '')
-      .slice(-120) || 'arquivo';
+      .slice(-120) || t('file', 'arquivo');
   if (!taken.has(clean)) return clean;
   const dot = clean.lastIndexOf('.');
   const stem = dot > 0 ? clean.slice(0, dot) : clean;

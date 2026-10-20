@@ -19,10 +19,10 @@ test('line breaks between words or attributes become one space', () => {
   assert.equal(
     html`
       <button type="button"
-        class="danger">Parar
-        espelhamento</button>
+        class="danger">Stop
+        mirroring</button>
     `,
-    '<button type="button" class="danger">Parar espelhamento</button>',
+    '<button type="button" class="danger">Stop mirroring</button>',
   );
   const disabled = 'disabled';
   assert.equal(

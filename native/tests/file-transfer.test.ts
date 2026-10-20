@@ -13,9 +13,12 @@ import {
   phoneName,
   validateDroppedFiles,
 } from '../src/file-transfer';
+import { setLanguage } from '../src/i18n';
+
+setLanguage('en');
 
 const folder = mkdtempSync(join(tmpdir(), 'mirrorpanel-files-'));
-const photo = join(folder, 'foto da praia.jpg');
+const photo = join(folder, 'beach photo.jpg');
 writeFileSync(photo, 'jpeg bytes');
 
 test('network shares and relative paths are not local files', () => {
@@ -26,24 +29,27 @@ test('network shares and relative paths are not local files', () => {
 });
 
 test('a UNC APK path is refused before Windows can open it', async () => {
-  await assert.rejects(validateApk('\\\\attacker\\share\\x.apk'), /APK local/);
+  await assert.rejects(validateApk('\\\\attacker\\share\\x.apk'), /local APK/);
 });
 
 test('dropped paths must be 1 to 20 existing local files', async () => {
   const [file] = await validateDroppedFiles([photo]);
-  assert.deepEqual(file, { path: photo, name: 'foto da praia.jpg', size: 10 });
+  assert.deepEqual(file, { path: photo, name: 'beach photo.jpg', size: 10 });
   await assert.rejects(validateDroppedFiles([]));
   await assert.rejects(validateDroppedFiles(Array(MAX_FILES + 1).fill(photo)));
-  await assert.rejects(validateDroppedFiles(['']), /salvos neste computador/);
-  await assert.rejects(validateDroppedFiles([folder]), /Pastas/);
-  await assert.rejects(validateDroppedFiles(['\\\\host\\share\\a.jpg']), /deste computador/);
+  await assert.rejects(validateDroppedFiles(['']), /saved on this computer/);
+  await assert.rejects(validateDroppedFiles([folder]), /Folders/);
+  await assert.rejects(
+    validateDroppedFiles(['\\\\host\\share\\a.jpg']),
+    /Only files on this computer/,
+  );
 });
 
 test('phone names are cleaned and never overwrite existing files', () => {
   assert.equal(phoneName('a:b*c?.txt', new Set()), 'a_b_c_.txt');
   assert.equal(phoneName('...hidden', new Set()), 'hidden');
-  assert.equal(phoneName('', new Set()), 'arquivo');
-  assert.equal(phoneName('foto.jpg', new Set(['foto.jpg', 'foto (1).jpg'])), 'foto (2).jpg');
+  assert.equal(phoneName('', new Set()), 'file');
+  assert.equal(phoneName('photo.jpg', new Set(['photo.jpg', 'photo (1).jpg'])), 'photo (2).jpg');
   assert.equal(phoneName('notes', new Set(['notes'])), 'notes (1)');
 });
 
@@ -65,18 +71,18 @@ class Phone extends Adb {
 }
 
 test('files are pushed by argument list into Download, one transfer per device', async () => {
-  const phone = new Phone('foto da praia.jpg\nother.txt\n');
+  const phone = new Phone('beach photo.jpg\nother.txt\n');
   const sender = new FileSender(phone);
-  const first = sender.send('serial', [{ path: photo, name: 'foto da praia.jpg', size: 10 }]);
+  const first = sender.send('serial', [{ path: photo, name: 'beach photo.jpg', size: 10 }]);
   await new Promise((resolve) => setImmediate(resolve));
-  await assert.rejects(sender.send('serial', []), /transferência atual/);
+  await assert.rejects(sender.send('serial', []), /current transfer/);
   phone.release!();
-  assert.deepEqual(await first, ['foto da praia (1).jpg']);
+  assert.deepEqual(await first, ['beach photo (1).jpg']);
   assert.deepEqual(
     phone.commands.find((c) => c[0] === 'push'),
-    ['push', photo, PHONE_FOLDER + '/foto da praia (1).jpg'],
+    ['push', photo, PHONE_FOLDER + '/beach photo (1).jpg'],
   );
   const scan = phone.commands.find((c) => c[0] === 'am')!;
-  assert.equal(scan.at(-1), 'file://' + PHONE_FOLDER + '/foto%20da%20praia%20(1).jpg');
+  assert.equal(scan.at(-1), 'file://' + PHONE_FOLDER + '/beach%20photo%20(1).jpg');
   assert.deepEqual(await sender.send('serial', []), []);
 });

@@ -5,6 +5,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Adb } from '../src/adb';
 import { ApkInstaller, validateApk } from '../src/apk-install';
+import { setLanguage } from '../src/i18n';
+
+setLanguage('en');
 
 test('APK validation rejects synthetic/non-APK paths and invalid containers', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'mp-apk-'));
@@ -13,7 +16,7 @@ test('APK validation rejects synthetic/non-APK paths and invalid containers', as
     await writeFile(invalid, 'not a zip');
     for (const input of [undefined, 'relative.apk', join(directory, 'bad.txt'), invalid])
       await assert.rejects(validateApk(input));
-    const valid = join(directory, 'teste com espaço & símbolos.apk');
+    const valid = join(directory, 'café app with spaces & symbols.apk');
     await writeFile(valid, Buffer.from([0x50, 0x4b, 3, 4]));
     assert.equal(await validateApk(valid), valid);
   } finally {
@@ -39,7 +42,7 @@ test('ADB receives a literal path; installs are locked per device and require Su
   try {
     const pending = installer.install('phone', path);
     await started;
-    await assert.rejects(installer.install('phone', path), /Aguarde/);
+    await assert.rejects(installer.install('phone', path), /Wait for the current installation/);
     release('Performing Streamed Install\nSuccess');
     assert.equal(await pending, 'a & b.apk');
     class FailedAdb extends Adb {
@@ -49,7 +52,7 @@ test('ADB receives a literal path; installs are locked per device and require Su
     }
     await assert.rejects(
       new ApkInstaller(new FailedAdb('unused')).install('phone', path),
-      /não confirmou/,
+      /did not confirm/,
     );
   } finally {
     await rm(directory, { recursive: true, force: true });

@@ -656,7 +656,7 @@ function renderPanel(next: unknown): void {
   $('home-hint').hidden = !idle;
   labelWindowButtons();
   labelSettingsSheet();
-  // The name is just MirrorPanel; the version reads like one: "2.0.0 (prévia 5)".
+  // The name is just MirrorPanel; the version reads like one: "2.0.0 (preview 5)".
   const [number, preview] = state.version.split('-preview.');
   $('about').textContent =
     t('MirrorPanel, version ', 'MirrorPanel, versão ') +

@@ -4,7 +4,7 @@ import { controlPacket, validText, validateControl } from '../src/protocol';
 import { Gestures } from '../src/gestures';
 
 test('Unicode survives UTF-8 framing without normalization or splitting surrogate pairs', () => {
-  const text = 'ação 日本語 中文 한국어 العربية עברית e\u0301 👩🏽‍💻 👨‍👩‍👧‍👦 𐐷\n';
+  const text = 'façade 日本語 中文 한국어 العربية עברית e\u0301 👩🏽‍💻 👨‍👩‍👧‍👦 𐐷\n';
   const bytes = controlPacket({ type: 'text', text });
   assert.equal(JSON.parse(bytes.subarray(4).toString('utf8')).text, text);
   assert.equal(validText('😀'.repeat(16384)), true);

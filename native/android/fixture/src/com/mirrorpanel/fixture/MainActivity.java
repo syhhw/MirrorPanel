@@ -32,7 +32,7 @@ public final class MainActivity extends Activity {
         layout.setOrientation(1);
         layout.setPadding(24, 40, 24, 24);
         TextView title = new TextView(this);
-        title.setText("MirrorPanel • verificação real");
+        title.setText("MirrorPanel • real-device check");
         title.setTextSize(24);
         layout.addView(title);
         EditText editor = new EditText(this);
@@ -53,7 +53,7 @@ public final class MainActivity extends Activity {
             }
         );
         Button clear = new Button(this);
-        clear.setText("Limpar teste");
+        clear.setText("Clear test");
         clear.setOnClickListener(v -> {
             editor.setText("");
             editor.requestFocus();
@@ -62,14 +62,14 @@ public final class MainActivity extends Activity {
         });
         layout.addView(clear);
         Button sound = new Button(this);
-        sound.setText("Tom de teste 440 Hz");
+        sound.setText("440 Hz test tone");
         sound.setOnClickListener(v -> {
             if (tone == null) startTone();
             else stopTone();
         });
         layout.addView(sound);
         TextView pad = new TextView(this);
-        pad.setText("Área de multitoque\nToque, arraste e teste Alt+clique");
+        pad.setText("Multi-touch area\nTap, drag and try Alt+click");
         pad.setTextSize(22);
         pad.setGravity(Gravity.CENTER);
         pad.setBackgroundColor(0xffdbeafe);
@@ -84,7 +84,7 @@ public final class MainActivity extends Activity {
                 row.put("pointers", pointers);
                 events.put(row);
                 save("touch.json", events.toString());
-                pad.setText("Pontos: " + e.getPointerCount() + " • ação: " + e.getActionMasked());
+                pad.setText("Points: " + e.getPointerCount() + " • action: " + e.getActionMasked());
             } catch (JSONException error) {
                 throw new IllegalStateException(error);
             }

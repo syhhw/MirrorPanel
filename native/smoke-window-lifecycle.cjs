@@ -150,7 +150,7 @@ setTimeout(async () => {
       const xml = await adb('shell', 'cat', uiFile);
       // The Companion screen follows the phone's language.
       assert.ok(/Your Android is on the computer|Seu Android está no computador/.test(xml));
-      assert.ok(!xml.includes('PARAR ESPELHAMENTO'));
+      assert.ok(!/STOP MIRRORING|PARAR ESPELHAMENTO/i.test(xml));
     } finally {
       await adb('shell', 'rm', '-f', uiFile);
     }
@@ -205,7 +205,7 @@ setTimeout(async () => {
     assert.equal(mirror.webContents.id, originalId);
     await fitted();
     await shot('preview5-disconnected');
-    // These exact controls previously failed with "Janela sem sessão".
+    // These exact controls previously failed with "This window has no session".
     await click('[data-window="minimize"]');
     assert.ok(mirror.isMinimized());
     mirror.restore();
@@ -228,7 +228,7 @@ setTimeout(async () => {
     await shot('preview5-reconnected');
     await losses(4);
     const logs = (await snapshot()).logs;
-    assert.ok(!logs.some((l) => l.message.includes('encerrado no aparelho')));
+    assert.ok(!logs.some((l) => /stopped on the device|interrompido no aparelho/.test(l.message)));
     await click('[data-window="close"]');
     await until(() => mirror.isDestroyed(), 'Close after terminal session failed');
     await delay(2200);

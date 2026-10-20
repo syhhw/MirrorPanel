@@ -79,7 +79,7 @@ async function main(): Promise<void> {
     'true',
   ]);
   await delay(600);
-  const text = 'ação 日本語 中文 한국어 العربية עברית e\u0301 👩🏽‍💻 👨‍👩‍👧‍👦 𐐷\nFim';
+  const text = 'façade 日本語 中文 한국어 العربية עברית e\u0301 👩🏽‍💻 👨‍👩‍👧‍👦 𐐷\nEnd';
   await session.text(text);
   await delay(300);
   assert.equal(await fixture('text.txt'), text, 'Unicode changed on the real device');

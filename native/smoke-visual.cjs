@@ -96,7 +96,7 @@ setTimeout(async () => {
     await shot(panel, 'preview3-panel');
     await assert.rejects(
       evalMirror('window.mirrorpanel.windowAction("arbitrary-window")'),
-      /inválida/,
+      /Invalid window action|Ação de janela inválida/,
     );
     await evalMirror('document.getElementById("more").click()');
     await shot(mirror, 'preview3-menu');
