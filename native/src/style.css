@@ -260,7 +260,8 @@ dialog footer button:active {
 }
 
 select,
-dialog input:not([type='range']) {
+dialog input:not([type='range']),
+.settings-card input:not([type='range']) {
   height: 32px;
   padding: 0 10px;
   border: 1px solid var(--line-strong);
@@ -1103,6 +1104,51 @@ label.pref-row {
   background: var(--surface);
   box-shadow: var(--shadow-pop);
   animation: sheet-in var(--medium) var(--ease-out);
+}
+/* Device settings over the mirror window: the same sheet as the screenshot preview. */
+.settings-card {
+  grid-template-rows: none;
+  align-content: start;
+  gap: 10px;
+  overflow-y: auto;
+}
+/* Labels may wrap in a narrow window; the three controls still line up. */
+.settings-card .quality-fields {
+  align-items: end;
+}
+.settings-card h3 {
+  margin-top: 4px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.sheet-field {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  color: var(--text-2);
+  font-size: 12px;
+}
+.sheet-field input,
+.sheet-field select {
+  width: 100%;
+  min-width: 0;
+  color: var(--text);
+  font-size: 13px;
+}
+.sheet-note {
+  color: var(--text-3);
+  font: 12px/1.4 var(--font-small);
+}
+.sheet-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.sheet-tools .secondary {
+  height: 30px;
+  min-width: 0;
+  padding: 0 10px;
+  font-weight: 400;
 }
 .shot-card h2 {
   font: 600 15px/1.3 var(--font-display);

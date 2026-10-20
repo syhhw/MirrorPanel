@@ -899,16 +899,9 @@ function handlers(): void {
     const window = event.sender === panel.webContents ? panel : mirrorWindow(event).window;
     if (
       typeof action !== 'string' ||
-      ![
-        'state',
-        'minimize',
-        'maximize',
-        'close',
-        'always-on-top',
-        'panel',
-        'settings',
-        'reconnect',
-      ].includes(action)
+      !['state', 'minimize', 'maximize', 'close', 'always-on-top', 'panel', 'reconnect'].includes(
+        action,
+      )
     )
       throw Error(t('Ação de janela inválida', 'Invalid window action'));
     if (window.isDestroyed()) return null;
@@ -928,12 +921,11 @@ function handlers(): void {
       const { serial } = mirrorWindow(event);
       void start(assertDevice(serial));
     }
-    if (action === 'panel' || action === 'settings') {
-      const { serial } = mirrorWindow(event);
+    if (action === 'panel') {
+      mirrorWindow(event);
       panel.restore();
       panel.show();
       panel.focus();
-      if (action === 'settings') panel.webContents.send('open-device-settings', serial);
     }
     return { maximized: window.isMaximized(), alwaysOnTop: window.isAlwaysOnTop() };
   });
@@ -974,9 +966,7 @@ function handlers(): void {
     saveSettings();
     broadcast();
   });
-  ipcMain.handle('rename', (event, serial, value) => {
-    assertPanel(event);
-    const key = assertDevice(serial);
+  const renameDevice = (key: string, value: unknown) => {
     if (typeof value !== 'string' || value.length > 80)
       throw Error(t('Nome inválido', 'Invalid name'));
     settings.nicknames[key] = value.trim();
@@ -988,6 +978,46 @@ function handlers(): void {
       sendMirror(entry, 'device-name', name);
     }
     broadcast();
+  };
+  ipcMain.handle('rename', (event, serial, value) => {
+    assertPanel(event);
+    renameDevice(assertDevice(serial), value);
+  });
+  // The mirror window's own settings sheet: the device is always the window's, never an argument.
+  ipcMain.handle('mirror-settings', (event) => {
+    const { serial } = mirrorWindow(event);
+    const device = devices.find((d) => d.serial === serial);
+    return {
+      serial,
+      name: settings.nicknames[serial] || device?.model || serial,
+      quality: settings.quality[serial] ?? DEFAULT_QUALITY,
+      wifi: serial.includes(':'),
+    };
+  });
+  ipcMain.handle('mirror-settings-save', async (event, value) => {
+    const key = assertDevice(mirrorWindow(event).serial);
+    const update = (value ?? {}) as { name?: unknown; quality?: unknown };
+    const next = quality(update.quality);
+    renameDevice(key, update.name);
+    const current = settings.quality[key] ?? DEFAULT_QUALITY;
+    if (
+      next.maxSize === current.maxSize &&
+      next.fps === current.fps &&
+      next.bitrate === current.bitrate
+    )
+      return { reconnecting: false };
+    settings.quality[key] = next;
+    saveSettings();
+    broadcast();
+    const entry = sessions.get(key);
+    if (!entry) return { reconnecting: false };
+    // The engine takes its quality when it starts: reconnect this window to apply it now.
+    log(t('Aplicando a nova qualidade em ', 'Applying the new quality on ') + key);
+    entry.requestedStop = true;
+    await entry.session.stop();
+    await finishEntry(key, entry);
+    void start(key);
+    return { reconnecting: true };
   });
   ipcMain.handle('preferences', (event, value) => {
     assertPanel(event);
@@ -1123,9 +1153,8 @@ function handlers(): void {
     );
     await refresh();
   });
-  ipcMain.handle('usb-wifi', async (event, serial) => {
-    assertPanel(event);
-    const valid = assertDevice(serial);
+  /** Switches a USB device to ADB over Wi-Fi on the network it is on, and connects to it. */
+  const useWifi = async (valid: string) => {
     const route = await adb.shell(valid, ['ip', 'route']);
     const ip = route.match(/\bsrc (\d+\.\d+\.\d+\.\d+)/)?.[1];
     if (!ip)
@@ -1144,11 +1173,14 @@ function handlers(): void {
     saveSettings();
     log(result);
     await refresh();
-  });
-  ipcMain.handle('install-apk', async (event, serial) => {
+  };
+  ipcMain.handle('usb-wifi', async (event, serial) => {
     assertPanel(event);
-    const valid = assertDevice(serial);
-    const result = await dialog.showOpenDialog(panel, {
+    await useWifi(assertDevice(serial));
+  });
+  ipcMain.handle('mirror-usb-wifi', (event) => useWifi(assertDevice(mirrorWindow(event).serial)));
+  const installApk = async (valid: string, parent: BrowserWindow) => {
+    const result = await dialog.showOpenDialog(parent, {
       title: t('Instalar APK no aparelho', 'Install APK on the device'),
       filters: [{ name: 'Android APK', extensions: ['apk'] }],
       properties: ['openFile'],
@@ -1156,6 +1188,15 @@ function handlers(): void {
     if (result.canceled) return;
     const name = await installer.install(valid, result.filePaths[0]);
     log(t('APK instalado: ', 'APK installed: ') + name);
+    return name;
+  };
+  ipcMain.handle('install-apk', async (event, serial) => {
+    assertPanel(event);
+    await installApk(assertDevice(serial), panel);
+  });
+  ipcMain.handle('mirror-install-apk', (event) => {
+    const { serial, window } = mirrorWindow(event);
+    return installApk(assertDevice(serial), window);
   });
   ipcMain.handle('send-files', async (event, paths: unknown) => {
     const { serial, window } = mirrorWindow(event);

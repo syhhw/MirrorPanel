@@ -431,10 +431,6 @@ function buildPanel(): void {
           : api.wifi(data.get('address')),
       t('Conectar', 'Connect'),
     );
-  api.onDeviceSettings((serial: unknown) => {
-    const d = state.devices.find((d) => d.serial === serial);
-    if (d) showDeviceSettings(d);
-  });
 }
 
 /** What the screen of a drawn phone shows for each tone. */
@@ -634,6 +630,32 @@ function mirror(): void {
         <button id="mirror-help">${icon('help')} <span id="mirror-help-text"></span></button>
       </div>
       <div id="apk-drop" class="apk-drop" hidden role="status"></div>
+      <div id="settings-sheet" class="shot" role="dialog" aria-modal="true" aria-labelledby="settings-title" hidden>
+        <form id="settings-form" class="shot-card settings-card">
+          <h2 id="settings-title"></h2>
+          <label class="sheet-field">
+            <span id="settings-name-label"></span>
+            <input name="name" maxlength="80">
+          </label>
+          <small id="settings-serial" class="sheet-note"></small>
+          <h3 id="settings-quality-title"></h3>
+          <div class="quality-fields">
+            <label class="sheet-field"><span id="settings-size-label"></span><select name="maxSize">${[720, 1080, 1280, 1920, 2560, 3840].map((v) => `<option>${v}</option>`).join('')}</select></label>
+            <label class="sheet-field"><span>FPS</span><select name="fps">${[15, 24, 30, 60, 90, 120].map((v) => `<option>${v}</option>`).join('')}</select></label>
+            <label class="sheet-field"><span>Mbps</span><input name="bitrate" type="number" min="0.5" max="50" step="0.5"></label>
+          </div>
+          <div class="presets">${[0, 1, 2].map((i) => `<button type="button" data-preset="${i}"></button>`).join('')}</div>
+          <p id="settings-quality-hint" class="sheet-note"></p>
+          <div class="sheet-tools">
+            <button type="button" id="settings-wifi" class="secondary">${icon('wifi')} <span id="settings-wifi-label"></span></button>
+            <button type="button" id="settings-apk" class="secondary"><span id="settings-apk-label"></span></button>
+          </div>
+          <div class="shot-actions">
+            <button type="button" id="settings-cancel" class="text-button"></button>
+            <button type="submit" id="settings-save" class="primary"></button>
+          </div>
+        </form>
+      </div>
       <div id="audio-hint" class="audio-hint" role="status" hidden>
         <strong id="audio-hint-title"></strong>
         <span id="audio-hint-text"></span>
@@ -687,6 +709,26 @@ function mirror(): void {
     $('shot-discard').textContent = t('Descartar', 'Discard');
     $('shot-save').textContent = t('Salvar', 'Save');
     $('shot-copy').textContent = t('Copiar', 'Copy');
+    $('settings-title').textContent = t('Configurações do aparelho', 'Device settings');
+    $('settings-name-label').textContent = t('Nome do aparelho', 'Device name');
+    $('settings-quality-title').textContent = t('Qualidade da imagem', 'Image quality');
+    $('settings-size-label').textContent = t('Resolução máxima', 'Maximum resolution');
+    $('settings-quality-hint').textContent = t(
+      'Ao salvar uma qualidade nova, o espelhamento reconecta para aplicar.',
+      'Saving a new quality reconnects the mirror to apply it.',
+    );
+    document
+      .querySelectorAll<HTMLButtonElement>('#settings-form [data-preset]')
+      .forEach(
+        (button, i) =>
+          (button.textContent = [t('Leve', 'Low'), t('Equilibrada', 'Balanced'), t('Alta', 'High')][
+            i
+          ]),
+      );
+    $('settings-wifi-label').textContent = t('Usar pela rede Wi-Fi', 'Use over Wi-Fi');
+    $('settings-apk-label').textContent = t('Instalar APK', 'Install APK');
+    $('settings-cancel').textContent = t('Cancelar', 'Cancel');
+    $('settings-save').textContent = t('Salvar', 'Save');
     label($('capture'), t('Capturar tela', 'Take screenshot'));
     label($('record'), recordLabel());
     label($('audio'), audioLabel());
@@ -859,10 +901,87 @@ function mirror(): void {
     closeMenu();
     act(api.windowAction('panel'));
   };
-  $('device-settings').onclick = () => {
-    closeMenu();
-    act(api.windowAction('settings'));
+  // Device settings open over this window, about this device; the panel is not involved.
+  const settingsSheet = $('settings-sheet'),
+    settingsForm = $<HTMLFormElement>('settings-form');
+  const field = (name: string) => settingsForm.elements.namedItem(name) as HTMLInputElement;
+  const closeSettings = () => {
+    settingsSheet.hidden = true;
+    canvas.focus({ preventScroll: true });
   };
+  const openSettings = async () => {
+    closeMenu();
+    const current = (await api.mirrorSettings()) as {
+      serial: string;
+      name: string;
+      quality: { maxSize: number; fps: number; bitrate: number };
+      wifi: boolean;
+    };
+    field('name').value = current.name;
+    $('settings-serial').textContent = current.serial;
+    field('maxSize').value = String(current.quality.maxSize);
+    field('fps').value = String(current.quality.fps);
+    field('bitrate').value = String(current.quality.bitrate / 1000000);
+    $('settings-wifi').hidden = current.wifi;
+    settingsSheet.hidden = false;
+    field('name').focus();
+  };
+  $('device-settings').onclick = () => act(openSettings());
+  $('settings-cancel').onclick = closeSettings;
+  settingsSheet.onclick = (event) => {
+    if (event.target === settingsSheet) closeSettings();
+  };
+  settingsForm.querySelectorAll<HTMLButtonElement>('[data-preset]').forEach(
+    (button) =>
+      (button.onclick = () => {
+        const [maxSize, fps, mbps] = [
+          [720, 30, 2],
+          [1280, 30, 4],
+          [1920, 60, 8],
+        ][Number(button.dataset.preset)];
+        field('maxSize').value = String(maxSize);
+        field('fps').value = String(fps);
+        field('bitrate').value = String(mbps);
+      }),
+  );
+  settingsForm.onsubmit = (event) => {
+    event.preventDefault();
+    const save = $<HTMLButtonElement>('settings-save');
+    save.disabled = true;
+    act(
+      api
+        .saveMirrorSettings({
+          name: field('name').value,
+          quality: {
+            maxSize: Number(field('maxSize').value),
+            fps: Number(field('fps').value),
+            bitrate: Number(field('bitrate').value) * 1000000,
+          },
+        })
+        .then((result) => {
+          closeSettings();
+          toast(
+            (result as { reconnecting: boolean }).reconnecting
+              ? t('Reconectando com a nova qualidade…', 'Reconnecting with the new quality…')
+              : t('Configurações salvas', 'Settings saved'),
+          );
+        })
+        .finally(() => (save.disabled = false)),
+    );
+  };
+  $('settings-wifi').onclick = () =>
+    act(
+      api.mirrorUsbWifi().then(() => {
+        closeSettings();
+        toast(t('Conectado pela rede Wi-Fi', 'Connected over Wi-Fi'));
+      }),
+    );
+  $('settings-apk').onclick = () =>
+    act(
+      api.mirrorInstallApk().then((name) => {
+        if (name) toast(t('APK instalado: ', 'APK installed: ') + String(name));
+      }),
+    );
   $('paste-text').onclick = () => {
     closeMenu();
     act(api.paste());
@@ -1308,6 +1427,13 @@ function mirror(): void {
   };
   window.onkeydown = (event) => {
     if (dialog.open || composing || event.isComposing) return;
+    if (!settingsSheet.hidden) {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        closeSettings();
+      }
+      return; // typing goes to the form, never to the phone
+    }
     if (!$('shot').hidden) {
       const key = event.key.toLowerCase();
       if (event.key === 'Escape') closeShot();
