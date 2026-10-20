@@ -194,7 +194,10 @@ function loadSettings(): void {
     }
   } catch {
     // Import compatible 1.x preferences once; never modify the Python settings file.
-    const legacy = join(app.getAppPath(), '..', 'settings.json');
+    // 1.x kept settings.json next to its exe, in the folder the installer reuses.
+    const legacy = app.isPackaged
+      ? join(dirname(process.execPath), 'settings.json')
+      : join(app.getAppPath(), '..', 'settings.json');
     try {
       const old = JSON.parse(readFileSync(legacy, 'utf8')) as Record<string, unknown>;
       settings.alwaysOnTop = old.always_on_top === true;
