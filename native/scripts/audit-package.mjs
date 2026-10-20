@@ -18,6 +18,19 @@ assert.ok(
   ),
   'Unexpected source in app.asar',
 );
+// Every extra resource must be one MirrorPanel ships on purpose; anything else
+// (other apps, test fixtures, stray downloads) fails the audit.
+const RESOURCES = new Set([
+  'LICENSE-MirrorPanel.txt',
+  'LICENSE-mp4-muxer.txt',
+  'adb/adb.exe',
+  'adb/AdbWinApi.dll',
+  'adb/AdbWinUsbApi.dll',
+  'adb/NOTICE.txt',
+  'mirrorpanel-companion.apk',
+  'mirrorpanel-companion.apk.idsig',
+  'mirrorpanel-server.jar',
+]);
 const manifest = [];
 function walk(dir) {
   for (const name of readdirSync(dir)) {
@@ -25,10 +38,12 @@ function walk(dir) {
     if (statSync(path).isDirectory()) walk(path);
     else {
       const rel = relative(root, path).replaceAll('\\', '/');
-      assert.ok(
-        !/scrcpy|fixture|\.(keystore|jks|p12|pfx)$/i.test(rel),
-        'Forbidden package artifact: ' + rel,
-      );
+      if (rel.startsWith('resources/resources/'))
+        assert.ok(
+          RESOURCES.has(rel.slice('resources/resources/'.length)),
+          'Unexpected resource: ' + rel,
+        );
+      assert.ok(!/\.(keystore|jks|p12|pfx)$/i.test(rel), 'Private key in package: ' + rel);
       const bytes = readFileSync(path);
       manifest.push({
         path: rel,
@@ -45,12 +60,7 @@ const result = {
   asarEntries: entries,
   files: manifest,
   noPrivateKeys: true,
-  noScrcpy: true,
-  noFixture: true,
+  onlyKnownResources: true,
 };
 writeFileSync('build/smoke/package-manifest.json', JSON.stringify(result, null, 2));
-console.log(
-  'PACKAGE_AUDIT_OK',
-  manifest.length,
-  'files; only production resources; no private keys/scrcpy/fixture',
-);
+console.log('PACKAGE_AUDIT_OK', manifest.length, 'files; only known resources; no private keys');

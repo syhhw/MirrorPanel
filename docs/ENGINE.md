@@ -68,11 +68,6 @@ orientação e conexão; a notificação não encerra o serviço quando dispensa
 ## Referências e estado
 
 - `native/docs/PROTOCOL.md`: contratos, limites, autenticação e timestamps.
-- `native/docs/PREVIEW5.md`: recuperação do renderer, diagnóstico, resize e APK drop.
-- `native/docs/PREVIEW4.md`: resize e controles após falha, Companion de orientação.
-- `native/docs/PREVIEW3.md`: correção de ociosidade e revisão visual.
-- `native/docs/VALIDATION.md`: evidência dos testes e compatibilidade observada.
-- `.Codex/HANDOFF.md`: próximo passo e estado de integração.
 
 H.265, clipboard bidirecional, QR, bandeja e updater ainda não implementados.
 O pacote 2.0 não usa a versão Python. Nenhum código ou recurso de terceiros

@@ -16,15 +16,13 @@ por arraste para a pasta Download do celular.
 O ícone de fone ativa áudio. Alt+clique fixa um dedo; arraste para usar o outro.
 Esc cancela contatos ou volta. O Companion mostra orientação e estado; encerrar o espelhamento é feito pelo computador.
 
-É uma preview: a [matriz de validação](native/docs/VALIDATION.md) registra testes
-reais e limites. Áudio depende da política do aplicativo Android. H.265,
+É uma preview. Áudio depende da política do aplicativo Android. H.265,
 clipboard bidirecional, QR, bandeja e atualização automática ainda não existem.
 Rotação e mudança do áudio finalizam a gravação atual.
 
 A preview 5 acomoda a proporção depois de soltar a borda, recupera falhas do
 renderer sem fechar a janela, aceita APK por arraste e anima os botões de navegação.
 No celular, fechar a tela de orientação não interrompe o espelho.
-[Detalhes e testes desta revisão](native/docs/PREVIEW5.md).
 
 ## Desenvolvimento
 

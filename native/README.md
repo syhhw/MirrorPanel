@@ -66,7 +66,6 @@ O Companion é visível e pode ser desinstalado normalmente.
 ## Compatibilidade e limites
 
 O caminho Android 10–13 usa SurfaceControl; Android 14+ usa DisplayManager.
-A matriz exata de testes e falhas corrigidas está em `docs/VALIDATION.md`.
 O mínimo API 29 é uma decisão de implementação, não certificação de todas as ROMs.
 
 Áudio depende da política do aplicativo Android: apps podem impedir captura;
@@ -121,7 +120,7 @@ O fixture produz texto, eventos e um tom de 440 Hz; seus dados são privados ao 
 falhas de renderer e verifica recuperação, ripple, resize e controles.
 `smoke-renderer-crash.cjs` é um alias dessa suíte. `smoke-window-lifecycle.cjs`
 testa perda do Companion e geometria por Electron.setBounds; isso não substitui
-arrastar bordas com mouse. Veja os limites e evidências em `docs/PREVIEW5.md`.
+arrastar bordas com mouse.
 O teste de lifecycle muda temporariamente rotação no primeiro aparelho e encerra
 o Companion no segundo. O fixture, evidências e chaves não entram no portátil.
 
@@ -129,10 +128,7 @@ o Companion no segundo. O fixture, evidências e chaves não entram no portátil
 
 `docs/PROTOCOL.md` descreve o protocolo MPV1. O MirrorPanel usa código e interface próprios.
 
-`docs/PREVIEW3.md` registra a correção de reconexões, a referência visual e os
-testes desta revisão. O teste TCP precisa de acesso local a 127.0.0.1.
-`docs/PREVIEW4.md` documenta o resize nativo, a vida independente das janelas e
-os testes com falhas provocadas no Companion.
+O teste TCP precisa de acesso local a 127.0.0.1.
 
 Código original Apache-2.0; Electron e mp4-muxer MIT. Avisos Chromium acompanham
 o Electron e os do ADB ficam em `resources/adb`. Chromium inclui `ffmpeg.dll`
