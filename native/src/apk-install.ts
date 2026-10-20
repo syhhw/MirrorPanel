@@ -1,15 +1,11 @@
-import { extname, isAbsolute, basename } from 'node:path';
+import { extname, basename } from 'node:path';
 import { open } from 'node:fs/promises';
 import { Adb } from './adb';
+import { isLocalPath } from './file-transfer';
 import { t } from './i18n';
 
 export async function validateApk(path: unknown): Promise<string> {
-  if (
-    typeof path !== 'string' ||
-    !isAbsolute(path) ||
-    extname(path).toLowerCase() !== '.apk' ||
-    path.includes('\0')
-  )
+  if (typeof path !== 'string' || !isLocalPath(path) || extname(path).toLowerCase() !== '.apk')
     throw Error(t('Escolha um arquivo APK local.', 'Choose a local APK file.'));
   const file = await open(path, 'r');
   try {

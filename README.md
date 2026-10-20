@@ -10,7 +10,8 @@ Conecte um Android **10+**, autorize a depuração USB e clique no botão circul
 
 Recursos: vídeo H.264, áudio estéreo com autorização no celular, Unicode e
 composição de texto, multitoque com Alt+clique, MP4 com som, PNG, fullscreen,
-janelas por aparelho, qualidade, Wi-Fi e instalação de APK.
+janelas por aparelho, qualidade, Wi-Fi, instalação de APK e envio de arquivos
+por arraste para a pasta Download do celular.
 
 O ícone de fone ativa áudio. Alt+clique fixa um dedo; arraste para usar o outro.
 Esc cancela contatos ou volta. O Companion mostra orientação e estado; encerrar o espelhamento é feito pelo computador.

@@ -639,8 +639,8 @@ function mirror(): void {
     $('volume').setAttribute('aria-label', t('Volume no computador', 'Computer volume'));
     $('mirror-help-text').textContent = t('Mouse e atalhos', 'Mouse and shortcuts');
     $('apk-drop').textContent = t(
-      'Solte o APK para instalar neste aparelho',
-      'Drop the APK to install it on this device',
+      'Solte para enviar ao Download do aparelho. Um APK sozinho é instalado.',
+      "Drop to send to the device's Download folder. A single APK is installed.",
     );
     $('video').setAttribute(
       'aria-label',
@@ -680,7 +680,7 @@ function mirror(): void {
   });
   const drop = $('apk-drop');
   let dragDepth = 0,
-    installing = false;
+    transferring = false;
   const hideDrop = () => {
     dragDepth = 0;
     drop.hidden = true;
@@ -694,7 +694,7 @@ function mirror(): void {
   });
   document.addEventListener('dragover', (event) => {
     event.preventDefault();
-    if (event.dataTransfer) event.dataTransfer.dropEffect = installing ? 'none' : 'copy';
+    if (event.dataTransfer) event.dataTransfer.dropEffect = transferring ? 'none' : 'copy';
   });
   document.addEventListener('dragleave', () => {
     if (--dragDepth <= 0) hideDrop();
@@ -704,31 +704,58 @@ function mirror(): void {
     event.preventDefault();
     hideDrop();
     const files = Array.from(event.dataTransfer?.files ?? []);
-    if (installing) {
+    if (!files.length) return;
+    if (transferring) {
       toast(
-        t('Aguarde a instalação atual terminar.', 'Wait for the current installation to finish.'),
+        t('Aguarde a transferência atual terminar.', 'Wait for the current transfer to finish.'),
       );
       return;
     }
-    if (files.length !== 1 || !files[0].name.toLowerCase().endsWith('.apk')) {
-      toast(t('Arraste um único arquivo APK para instalar.', 'Drop a single APK file to install.'));
+    transferring = true;
+    // A single APK is installed; anything else is copied to the phone's Download folder.
+    if (files.length === 1 && files[0].name.toLowerCase().endsWith('.apk')) {
+      document.body.dataset.apkInstall = 'installing';
+      toast(t('Instalando ', 'Installing ') + files[0].name + '…');
+      clearTimeout(toastTimer);
+      void Promise.resolve()
+        .then(() => api.installDroppedApk(files[0]))
+        .then((name) => {
+          document.body.dataset.apkInstall = 'success';
+          toast(t('Instalado: ', 'Installed: ') + String(name));
+        })
+        .catch((error) => {
+          document.body.dataset.apkInstall = 'error';
+          toast(error);
+        })
+        .finally(() => (transferring = false));
       return;
     }
-    installing = true;
-    document.body.dataset.apkInstall = 'installing';
-    toast(t('Instalando ', 'Installing ') + files[0].name + '…');
+    document.body.dataset.fileTransfer = 'sending';
+    toast(
+      files.length === 1
+        ? t('Enviando ', 'Sending ') + files[0].name + '…'
+        : t(`Enviando ${files.length} arquivos…`, `Sending ${files.length} files…`),
+    );
     clearTimeout(toastTimer);
     void Promise.resolve()
-      .then(() => api.installDroppedApk(files[0]))
-      .then((name) => {
-        document.body.dataset.apkInstall = 'success';
-        toast(t('Instalado: ', 'Installed: ') + String(name));
+      .then(() => api.sendDroppedFiles(files))
+      .then((names) => {
+        document.body.dataset.fileTransfer = 'success';
+        const saved = names as string[];
+        toast(
+          saved.length === 1
+            ? t('Salvo em Download: ', 'Saved to Download: ') + saved[0]
+            : t(
+                `${saved.length} arquivos salvos em Download`,
+                `${saved.length} files saved to Download`,
+              ),
+        );
       })
       .catch((error) => {
-        document.body.dataset.apkInstall = 'error';
+        document.body.dataset.fileTransfer = 'error';
         toast(error);
       })
-      .finally(() => (installing = false));
+      .finally(() => (transferring = false));
   });
   const menu = $('mirror-menu'),
     closeMenu = () => {

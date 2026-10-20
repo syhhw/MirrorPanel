@@ -13,6 +13,11 @@ contextBridge.exposeInMainWorld('mirrorpanel', {
   // the interface language.
   installDroppedApk: (file: File) =>
     ipcRenderer.invoke('install-dropped-apk', webUtils.getPathForFile(file)),
+  sendDroppedFiles: (files: File[]) =>
+    ipcRenderer.invoke(
+      'send-files',
+      files.map((file) => webUtils.getPathForFile(file)),
+    ),
   onLanguage: (cb: (v: unknown) => void) => on('language', cb),
   onWindowLayout: (cb: (v: unknown) => void) => on('window-layout', cb),
   windowAction: invoke('window-action'),
