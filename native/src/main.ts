@@ -27,6 +27,7 @@ import { Diagnostics } from './diagnostics';
 import { ApkInstaller } from './apk-install';
 import { FileSender, validateDroppedFiles } from './file-transfer';
 import { findBySender } from './window-owner';
+import { revealPanel } from './single-instance';
 import { setLanguage, t } from './i18n';
 
 type Settings = {
@@ -60,7 +61,8 @@ let devices: Device[] = [];
 let settings: Settings;
 let settingsFile: string;
 let polling = false,
-  quitting = false;
+  quitting = false,
+  reopenAfterQuit = false;
 let diagnostics: Diagnostics, installer: ApkInstaller, fileSender: FileSender;
 let healthTimer: ReturnType<typeof setInterval>;
 const startOperations = new Map<string, Promise<void>>();
@@ -1081,13 +1083,15 @@ function handlers(): void {
 }
 
 app.setName('MirrorPanel');
+// One app per userData folder: opening the shortcut again only brings this panel forward.
+// Smoke and verification profiles set their own userData first, so they run alongside.
 if (!app.requestSingleInstanceLock()) app.quit();
 else {
   app.on('second-instance', () => {
-    if (panel) {
-      panel.restore();
-      panel.focus();
-    }
+    diagnose('second-instance', { quitting });
+    // While closing there is no panel left to show; open again once cleanup finishes.
+    if (quitting) reopenAfterQuit = true;
+    else revealPanel(panel);
   });
   void app.whenReady().then(async () => {
     resources = app.isPackaged
@@ -1159,6 +1163,9 @@ else {
         await entry.session.stop('app-quit');
         await finishEntry(serial, entry);
       }),
-    ).then(() => app.exit(Number(process.exitCode ?? 0)));
+    ).then(() => {
+      if (reopenAfterQuit) app.relaunch();
+      app.exit(Number(process.exitCode ?? 0));
+    });
   });
 }
