@@ -70,6 +70,11 @@ export function refusalMessage(reason: string): string | undefined {
   return undefined;
 }
 
+/** Text for a failed start: the error's own message, without String(e)'s "Error: " prefix. */
+export function failureText(error: unknown): string {
+  return (error instanceof Error && error.message) || String(error);
+}
+
 /** Owns only its child process, forward and remote temporary JAR. Never kills ADB. */
 export class MirrorSession extends EventEmitter {
   state: SessionState = 'starting';

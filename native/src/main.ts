@@ -14,7 +14,7 @@ import { join, dirname } from 'node:path';
 import { existsSync, readFileSync, writeFileSync, mkdirSync, renameSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import { Adb, Device } from './adb';
-import { MirrorSession, Quality, DEFAULT_QUALITY, quality } from './session';
+import { MirrorSession, Quality, DEFAULT_QUALITY, quality, failureText } from './session';
 import { Packet, validateControl } from './protocol';
 import {
   accommodatedBounds,
@@ -499,6 +499,9 @@ async function startSession(serial: string, attempt = 0, existing?: Entry): Prom
     broadcast();
     entry.frames.clear();
     entry.audioFrames.clear();
+    // start() rejects right after ending as start-failed and startSession shows its reason;
+    // the generic text here would only flash before it.
+    const reportedByStart = reason === 'start-failed';
     let message = t('Não foi possível manter o espelhamento.', 'Mirroring could not continue.');
     if (!window.isDestroyed()) {
       sendMirror(entry, 'audio-state', { state: 'off' });
@@ -530,9 +533,11 @@ async function startSession(serial: string, attempt = 0, existing?: Entry): Prom
         ),
       };
       message = messages[reason] ?? message;
-      sendMirror(entry, 'session-status', message);
-      if (!entry.requestedStop)
-        log((device?.model ?? serial) + ': ' + (messages[reason] ?? reason), 'warning');
+      if (!reportedByStart) {
+        sendMirror(entry, 'session-status', message);
+        if (!entry.requestedStop)
+          log((device?.model ?? serial) + ': ' + (messages[reason] ?? reason), 'warning');
+      }
     }
     if (
       !entry.requestedStop &&
@@ -565,9 +570,10 @@ async function startSession(serial: string, attempt = 0, existing?: Entry): Prom
         }
       })();
     } else
-      void finishEntry(serial, entry).then(() =>
-        sendMirror(entry, 'session-status', { message, retry: !entry.requestedStop }),
-      );
+      void finishEntry(serial, entry).then(() => {
+        if (!reportedByStart)
+          sendMirror(entry, 'session-status', { message, retry: !entry.requestedStop });
+      });
   });
   if (fresh) {
     window.on('closed', () => {
@@ -739,9 +745,9 @@ async function startSession(serial: string, attempt = 0, existing?: Entry): Prom
     entry.requestedStop = true;
     await session.stop();
     await finishEntry(serial, entry);
-    log(String(e), 'error');
-    if (!window.isDestroyed())
-      sendMirror(entry, 'session-status', { message: String(e), retry: true });
+    const message = failureText(e);
+    log((device?.model ?? serial) + ': ' + message, 'error');
+    if (!window.isDestroyed()) sendMirror(entry, 'session-status', { message, retry: true });
   }
 }
 async function finishEntry(serial: string, entry: Entry): Promise<void> {

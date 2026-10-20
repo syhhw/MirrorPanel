@@ -4,7 +4,7 @@ import { createServer, AddressInfo } from 'node:net';
 import { spawn, ChildProcessWithoutNullStreams } from 'node:child_process';
 import { once } from 'node:events';
 import { Adb } from '../src/adb';
-import { MirrorSession, DEFAULT_QUALITY, refusalMessage } from '../src/session';
+import { MirrorSession, DEFAULT_QUALITY, refusalMessage, failureText } from '../src/session';
 import { setLanguage } from '../src/i18n';
 
 test('busy and blocked-indicator refusals have distinct messages in both languages', () => {
@@ -121,4 +121,12 @@ test('the refusal is reported in English when the interface is in English', asyn
   } finally {
     setLanguage('pt');
   }
+});
+
+test('a failed start shows the refusal itself, without the "Error: " prefix', async () => {
+  const result = await refusedStart('companion-busy');
+  assert.equal(failureText(result.error), refusalMessage('companion-busy'));
+  assert.match(String(result.error), /^Error: /, 'String(e) is what used to leak the prefix');
+  assert.equal(failureText('adb: device offline'), 'adb: device offline');
+  assert.equal(failureText(Error('')), 'Error', 'An empty message must not blank the status');
 });
