@@ -167,97 +167,175 @@ function showHelp(): void {
     true,
   );
 }
-function showDeviceSettings(d: DeviceRow): void {
-  if (dialog.open) dialog.close();
-  ask(
-    html`
-      <h2>${t('Configurações do aparelho', 'Device settings')}</h2>
-      <div class="settings-section">
-        <h3>${t('Janela', 'Window')}</h3>
-        <label>
-          ${t('Nome do aparelho', 'Device name')}
-          <input name="name" maxlength="80" value="${escape(d.name)}">
-        </label>
-        <small>${escape(d.serial)}</small>
+type Quality = { maxSize: number; fps: number; bitrate: number };
+/** Where the device settings sheet reads and writes: a mirror window, or the panel. */
+interface SettingsHost {
+  load(): Promise<{ serial: string; name: string; quality: Quality; wifi: boolean }>;
+  /** Saves and says what happened, for the toast. */
+  save(value: { name: string; quality: Quality }): Promise<string>;
+  useWifi(): Promise<unknown>;
+  installApk(): Promise<unknown>;
+  /** What saving a new quality does in this place. */
+  hint: string;
+  afterClose(): void;
+}
+/** The one device settings sheet, the same in a mirror window and in the panel. */
+const settingsSheetMarkup = (place = '') => html`
+  <div id="settings-sheet" class="shot ${place}" role="dialog" aria-modal="true" aria-labelledby="settings-title" hidden>
+    <form id="settings-form" class="shot-card settings-card">
+      <h2 id="settings-title"></h2>
+      <label class="sheet-field">
+        <span id="settings-name-label"></span>
+        <input name="name" maxlength="80">
+      </label>
+      <small id="settings-serial" class="sheet-note"></small>
+      <h3 id="settings-quality-title"></h3>
+      <div class="quality-fields">
+        <label class="sheet-field"><span id="settings-size-label"></span><select name="maxSize">${[720, 1080, 1280, 1920, 2560, 3840].map((v) => `<option>${v}</option>`).join('')}</select></label>
+        <label class="sheet-field"><span>FPS</span><select name="fps">${[15, 24, 30, 60, 90, 120].map((v) => `<option>${v}</option>`).join('')}</select></label>
+        <label class="sheet-field"><span>Mbps</span><input name="bitrate" type="number" min="0.5" max="50" step="0.5"></label>
       </div>
-      <div class="settings-section">
-        <h3>${t('Qualidade da imagem', 'Image quality')}</h3>
-        <fieldset ${d.session ? 'disabled' : ''}>
-          <div class="quality-fields">
-            <label>
-              ${t('Resolução máxima', 'Maximum resolution')}
-              <select name="maxSize">
-                ${[720, 1080, 1280, 1920, 2560, 3840].map((v) => `<option ${v === d.quality.maxSize ? 'selected' : ''}>${v}</option>`).join('')}
-              </select>
-            </label>
-            <label>
-              FPS
-              <select name="fps">
-                ${[15, 24, 30, 60, 90, 120].map((v) => `<option ${v === d.quality.fps ? 'selected' : ''}>${v}</option>`).join('')}
-              </select>
-            </label>
-            <label>
-              Mbps
-              <input name="bitrate" type="number" min="0.5" max="50" step="0.5"
-                value="${d.quality.bitrate / 1000000}">
-            </label>
-          </div>
-          <div class="presets">
-            ${[t('Leve', 'Low'), t('Equilibrada', 'Balanced'), t('Alta', 'High')].map((s, i) => `<button type="button" data-preset="${i}">${s}</button>`).join('')}
-          </div>
-        </fieldset>
-        <p class="field-hint">
-          ${d.session ? t('Pare o espelhamento para alterar a qualidade.', 'Stop mirroring to change quality.') : t('A qualidade escolhida será usada na próxima conexão.', 'The selected quality applies on the next connection.')}
-        </p>
+      <div class="presets">${[0, 1, 2].map((i) => `<button type="button" data-preset="${i}"></button>`).join('')}</div>
+      <p id="settings-quality-hint" class="sheet-note"></p>
+      <div class="sheet-tools">
+        <button type="button" id="settings-wifi" class="secondary">${icon('wifi')} <span id="settings-wifi-label"></span></button>
+        <button type="button" id="settings-apk" class="secondary"><span id="settings-apk-label"></span></button>
       </div>
-      <div class="settings-section">
-        <h3>${t('Aparelho', 'Device')}</h3>
-        <div class="device-settings-actions">
-          <button type="button" data-device-tool="usbWifi"
-            ${d.serial.includes(':') || d.state !== 'device' ? 'disabled' : ''}>
-            ${icon('wifi')} ${t('Usar Wi-Fi', 'Use Wi-Fi')}
-          </button>
-          <button type="button" data-device-tool="installApk" ${d.state !== 'device' ? 'disabled' : ''}>
-            ${t('Instalar APK', 'Install APK')}
-          </button>
-          ${d.session ? `<button type="button" class="danger" data-device-tool="stop">${t('Parar espelhamento', 'Stop mirroring')}</button>` : ''}
-        </div>
+      <div class="shot-actions">
+        <button type="button" id="settings-cancel" class="text-button"></button>
+        <button type="submit" id="settings-save" class="primary"></button>
       </div>
-    `,
-    async (data) => {
-      await api.rename(d.serial, String(data.get('name')));
-      if (!d.session)
-        await api.quality(d.serial, {
-          maxSize: Number(data.get('maxSize')),
-          fps: Number(data.get('fps')),
-          bitrate: Number(data.get('bitrate')) * 1000000,
-        });
-    },
-    t('Salvar', 'Save'),
-  );
-  dialog.querySelectorAll<HTMLButtonElement>('[data-preset]').forEach(
+    </form>
+  </div>
+`;
+/** Fixed texts of the settings sheet; runs again when the language changes. */
+function labelSettingsSheet(): void {
+  $('settings-title').textContent = t('Configurações do aparelho', 'Device settings');
+  $('settings-name-label').textContent = t('Nome do aparelho', 'Device name');
+  $('settings-quality-title').textContent = t('Qualidade da imagem', 'Image quality');
+  $('settings-size-label').textContent = t('Resolução máxima', 'Maximum resolution');
+  const presets = [t('Leve', 'Low'), t('Equilibrada', 'Balanced'), t('Alta', 'High')];
+  document
+    .querySelectorAll<HTMLButtonElement>('#settings-form [data-preset]')
+    .forEach((button, i) => (button.textContent = presets[i]));
+  $('settings-wifi-label').textContent = t('Usar pela rede Wi-Fi', 'Use over Wi-Fi');
+  $('settings-apk-label').textContent = t('Instalar APK', 'Install APK');
+  $('settings-cancel').textContent = t('Cancelar', 'Cancel');
+  $('settings-save').textContent = t('Salvar', 'Save');
+}
+/** Wires the sheet once per page; `open` takes the host for the device being edited. */
+function settingsSheet() {
+  const sheet = $('settings-sheet'),
+    form = $<HTMLFormElement>('settings-form');
+  const field = (name: string) => form.elements.namedItem(name) as HTMLInputElement;
+  let host: SettingsHost | undefined;
+  const close = () => {
+    sheet.hidden = true;
+    host?.afterClose();
+    host = undefined;
+  };
+  const open = async (next: SettingsHost) => {
+    const current = await next.load();
+    host = next;
+    field('name').value = current.name;
+    $('settings-serial').textContent = current.serial;
+    field('maxSize').value = String(current.quality.maxSize);
+    field('fps').value = String(current.quality.fps);
+    field('bitrate').value = String(current.quality.bitrate / 1000000);
+    $('settings-quality-hint').textContent = next.hint;
+    $('settings-wifi').hidden = current.wifi;
+    sheet.hidden = false;
+    field('name').focus();
+  };
+  $('settings-cancel').onclick = close;
+  sheet.onclick = (event) => {
+    if (event.target === sheet) close();
+  };
+  form.querySelectorAll<HTMLButtonElement>('[data-preset]').forEach(
     (button) =>
       (button.onclick = () => {
-        const preset = [
+        const [maxSize, fps, mbps] = [
           [720, 30, 2],
           [1280, 30, 4],
           [1920, 60, 8],
         ][Number(button.dataset.preset)];
-        ['maxSize', 'fps', 'bitrate'].forEach(
-          (name, i) =>
-            ((form.elements.namedItem(name) as HTMLInputElement).value = String(preset[i])),
-        );
+        field('maxSize').value = String(maxSize);
+        field('fps').value = String(fps);
+        field('bitrate').value = String(mbps);
       }),
   );
-  dialog.querySelectorAll<HTMLButtonElement>('[data-device-tool]').forEach(
-    (button) =>
-      (button.onclick = () =>
-        act(
-          (async () => {
-            await api[button.dataset.deviceTool!](d.serial);
-            dialog.close();
-          })(),
-        )),
+  form.onsubmit = (event) => {
+    event.preventDefault();
+    if (!host) return;
+    const save = $<HTMLButtonElement>('settings-save');
+    save.disabled = true;
+    act(
+      host
+        .save({
+          name: field('name').value,
+          quality: {
+            maxSize: Number(field('maxSize').value),
+            fps: Number(field('fps').value),
+            bitrate: Number(field('bitrate').value) * 1000000,
+          },
+        })
+        .then((message) => {
+          close();
+          toast(message);
+        })
+        .finally(() => (save.disabled = false)),
+    );
+  };
+  $('settings-wifi').onclick = () => {
+    if (host)
+      act(
+        host.useWifi().then(() => {
+          close();
+          toast(t('Conectado pela rede Wi-Fi', 'Connected over Wi-Fi'));
+        }),
+      );
+  };
+  $('settings-apk').onclick = () => {
+    if (host)
+      act(
+        host.installApk().then((name) => {
+          if (name) toast(t('APK instalado: ', 'APK installed: ') + String(name));
+        }),
+      );
+  };
+  return { open, close, isOpen: () => !sheet.hidden };
+}
+let panelSettings: ReturnType<typeof settingsSheet> | undefined;
+/**
+ * The adjust button on a drawn phone. A phone that is mirroring has its settings over its own
+ * window, where a new quality applies at once; otherwise they open over the panel.
+ */
+function openDeviceSettings(d: DeviceRow): void {
+  if (d.session) {
+    act(api.showMirrorSettings(d.serial));
+    return;
+  }
+  act(
+    panelSettings!.open({
+      load: async () => ({
+        serial: d.serial,
+        name: d.name,
+        quality: d.quality,
+        wifi: d.serial.includes(':'),
+      }),
+      save: async (value) => {
+        await api.rename(d.serial, value.name);
+        await api.quality(d.serial, value.quality);
+        return t('Configurações salvas', 'Settings saved');
+      },
+      useWifi: () => api.usbWifi(d.serial),
+      installApk: () => api.installApk(d.serial),
+      hint: t(
+        'A qualidade vale a partir da próxima vez que espelhar.',
+        'The quality applies the next time you mirror.',
+      ),
+      afterClose: () => {},
+    }),
   );
 }
 /**
@@ -369,6 +447,7 @@ function buildPanel(): void {
         </section>
         <p class="about">MirrorPanel 2.0</p>
       </section>
+      ${settingsSheetMarkup('in-panel')}
       <footer class="home-foot" id="home-foot">
         <button id="wifi" class="text-button">${icon('wifi')}<span id="wifi-label"></span></button>
         <button id="issues" class="text-button is-warning" hidden></button>
@@ -377,6 +456,7 @@ function buildPanel(): void {
     </section>
   `;
   bindWindowButtons();
+  panelSettings = settingsSheet();
   $('open-preferences').onclick = () => showView(view === 'home' ? 'preferences' : 'home');
   $('back').onclick = () => showView('home');
   $('issues').onclick = () => {
@@ -384,7 +464,9 @@ function buildPanel(): void {
     $('activity').scrollIntoView({ block: 'start' });
   };
   document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape' && view === 'preferences' && !dialog.open) showView('home');
+    if (event.key !== 'Escape' || dialog.open) return;
+    if (panelSettings?.isOpen()) panelSettings.close();
+    else if (view === 'preferences') showView('home');
   });
   $('media').onclick = () => act(api.openMedia());
   $('copy').onclick = () => act(api.copyLogs());
@@ -512,7 +594,7 @@ function renderDevices(): void {
       d = state.devices[Number(article.dataset.index)];
     button.onclick = () =>
       button.dataset.action === 'settings'
-        ? showDeviceSettings(d)
+        ? openDeviceSettings(d)
         : act(api[button.dataset.action!](d.serial));
     if (d.serial === focusSerial && button.dataset.action === focusAction)
       button.focus({ preventScroll: true });
@@ -571,6 +653,7 @@ function renderPanel(next: unknown): void {
   for (const [id, text] of Object.entries(labels)) $(id).textContent = text;
   $('home-hint').hidden = !idle;
   labelWindowButtons();
+  labelSettingsSheet();
   label($('open-preferences'), t('Preferências', 'Preferences'));
   label($('back'), t('Voltar', 'Back'));
   $<HTMLInputElement>('show-serial').checked = state.settings.showSerial;
@@ -630,32 +713,7 @@ function mirror(): void {
         <button id="mirror-help">${icon('help')} <span id="mirror-help-text"></span></button>
       </div>
       <div id="apk-drop" class="apk-drop" hidden role="status"></div>
-      <div id="settings-sheet" class="shot" role="dialog" aria-modal="true" aria-labelledby="settings-title" hidden>
-        <form id="settings-form" class="shot-card settings-card">
-          <h2 id="settings-title"></h2>
-          <label class="sheet-field">
-            <span id="settings-name-label"></span>
-            <input name="name" maxlength="80">
-          </label>
-          <small id="settings-serial" class="sheet-note"></small>
-          <h3 id="settings-quality-title"></h3>
-          <div class="quality-fields">
-            <label class="sheet-field"><span id="settings-size-label"></span><select name="maxSize">${[720, 1080, 1280, 1920, 2560, 3840].map((v) => `<option>${v}</option>`).join('')}</select></label>
-            <label class="sheet-field"><span>FPS</span><select name="fps">${[15, 24, 30, 60, 90, 120].map((v) => `<option>${v}</option>`).join('')}</select></label>
-            <label class="sheet-field"><span>Mbps</span><input name="bitrate" type="number" min="0.5" max="50" step="0.5"></label>
-          </div>
-          <div class="presets">${[0, 1, 2].map((i) => `<button type="button" data-preset="${i}"></button>`).join('')}</div>
-          <p id="settings-quality-hint" class="sheet-note"></p>
-          <div class="sheet-tools">
-            <button type="button" id="settings-wifi" class="secondary">${icon('wifi')} <span id="settings-wifi-label"></span></button>
-            <button type="button" id="settings-apk" class="secondary"><span id="settings-apk-label"></span></button>
-          </div>
-          <div class="shot-actions">
-            <button type="button" id="settings-cancel" class="text-button"></button>
-            <button type="submit" id="settings-save" class="primary"></button>
-          </div>
-        </form>
-      </div>
+      ${settingsSheetMarkup()}
       <div id="audio-hint" class="audio-hint" role="status" hidden>
         <strong id="audio-hint-title"></strong>
         <span id="audio-hint-text"></span>
@@ -709,26 +767,7 @@ function mirror(): void {
     $('shot-discard').textContent = t('Descartar', 'Discard');
     $('shot-save').textContent = t('Salvar', 'Save');
     $('shot-copy').textContent = t('Copiar', 'Copy');
-    $('settings-title').textContent = t('Configurações do aparelho', 'Device settings');
-    $('settings-name-label').textContent = t('Nome do aparelho', 'Device name');
-    $('settings-quality-title').textContent = t('Qualidade da imagem', 'Image quality');
-    $('settings-size-label').textContent = t('Resolução máxima', 'Maximum resolution');
-    $('settings-quality-hint').textContent = t(
-      'Ao salvar uma qualidade nova, o espelhamento reconecta para aplicar.',
-      'Saving a new quality reconnects the mirror to apply it.',
-    );
-    document
-      .querySelectorAll<HTMLButtonElement>('#settings-form [data-preset]')
-      .forEach(
-        (button, i) =>
-          (button.textContent = [t('Leve', 'Low'), t('Equilibrada', 'Balanced'), t('Alta', 'High')][
-            i
-          ]),
-      );
-    $('settings-wifi-label').textContent = t('Usar pela rede Wi-Fi', 'Use over Wi-Fi');
-    $('settings-apk-label').textContent = t('Instalar APK', 'Install APK');
-    $('settings-cancel').textContent = t('Cancelar', 'Cancel');
-    $('settings-save').textContent = t('Salvar', 'Save');
+    labelSettingsSheet();
     label($('capture'), t('Capturar tela', 'Take screenshot'));
     label($('record'), recordLabel());
     label($('audio'), audioLabel());
@@ -901,87 +940,38 @@ function mirror(): void {
     closeMenu();
     act(api.windowAction('panel'));
   };
-  // Device settings open over this window, about this device; the panel is not involved.
-  const settingsSheet = $('settings-sheet'),
-    settingsForm = $<HTMLFormElement>('settings-form');
-  const field = (name: string) => settingsForm.elements.namedItem(name) as HTMLInputElement;
-  const closeSettings = () => {
-    settingsSheet.hidden = true;
-    canvas.focus({ preventScroll: true });
-  };
-  const openSettings = async () => {
+  // Device settings over this window, about this device; the panel's adjust button opens them
+  // here too while this phone is mirroring.
+  const settings = settingsSheet();
+  const openSettings = () => {
     closeMenu();
-    const current = (await api.mirrorSettings()) as {
-      serial: string;
-      name: string;
-      quality: { maxSize: number; fps: number; bitrate: number };
-      wifi: boolean;
-    };
-    field('name').value = current.name;
-    $('settings-serial').textContent = current.serial;
-    field('maxSize').value = String(current.quality.maxSize);
-    field('fps').value = String(current.quality.fps);
-    field('bitrate').value = String(current.quality.bitrate / 1000000);
-    $('settings-wifi').hidden = current.wifi;
-    settingsSheet.hidden = false;
-    field('name').focus();
-  };
-  $('device-settings').onclick = () => act(openSettings());
-  $('settings-cancel').onclick = closeSettings;
-  settingsSheet.onclick = (event) => {
-    if (event.target === settingsSheet) closeSettings();
-  };
-  settingsForm.querySelectorAll<HTMLButtonElement>('[data-preset]').forEach(
-    (button) =>
-      (button.onclick = () => {
-        const [maxSize, fps, mbps] = [
-          [720, 30, 2],
-          [1280, 30, 4],
-          [1920, 60, 8],
-        ][Number(button.dataset.preset)];
-        field('maxSize').value = String(maxSize);
-        field('fps').value = String(fps);
-        field('bitrate').value = String(mbps);
-      }),
-  );
-  settingsForm.onsubmit = (event) => {
-    event.preventDefault();
-    const save = $<HTMLButtonElement>('settings-save');
-    save.disabled = true;
-    act(
-      api
-        .saveMirrorSettings({
-          name: field('name').value,
-          quality: {
-            maxSize: Number(field('maxSize').value),
-            fps: Number(field('fps').value),
-            bitrate: Number(field('bitrate').value) * 1000000,
-          },
-        })
-        .then((result) => {
-          closeSettings();
-          toast(
+    return settings.open({
+      load: () =>
+        api.mirrorSettings() as Promise<{
+          serial: string;
+          name: string;
+          quality: Quality;
+          wifi: boolean;
+        }>,
+      save: (value) =>
+        api
+          .saveMirrorSettings(value)
+          .then((result) =>
             (result as { reconnecting: boolean }).reconnecting
               ? t('Reconectando com a nova qualidade…', 'Reconnecting with the new quality…')
               : t('Configurações salvas', 'Settings saved'),
-          );
-        })
-        .finally(() => (save.disabled = false)),
-    );
+          ),
+      useWifi: () => api.mirrorUsbWifi(),
+      installApk: () => api.mirrorInstallApk(),
+      hint: t(
+        'Ao salvar uma qualidade nova, o espelhamento reconecta para aplicar.',
+        'Saving a new quality reconnects the mirror to apply it.',
+      ),
+      afterClose: () => canvas.focus({ preventScroll: true }),
+    });
   };
-  $('settings-wifi').onclick = () =>
-    act(
-      api.mirrorUsbWifi().then(() => {
-        closeSettings();
-        toast(t('Conectado pela rede Wi-Fi', 'Connected over Wi-Fi'));
-      }),
-    );
-  $('settings-apk').onclick = () =>
-    act(
-      api.mirrorInstallApk().then((name) => {
-        if (name) toast(t('APK instalado: ', 'APK installed: ') + String(name));
-      }),
-    );
+  $('device-settings').onclick = () => act(openSettings());
+  api.onOpenSettings(() => act(openSettings()));
   $('paste-text').onclick = () => {
     closeMenu();
     act(api.paste());
@@ -1427,10 +1417,10 @@ function mirror(): void {
   };
   window.onkeydown = (event) => {
     if (dialog.open || composing || event.isComposing) return;
-    if (!settingsSheet.hidden) {
+    if (settings.isOpen()) {
       if (event.key === 'Escape') {
         event.preventDefault();
-        closeSettings();
+        settings.close();
       }
       return; // typing goes to the form, never to the phone
     }

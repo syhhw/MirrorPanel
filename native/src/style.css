@@ -445,8 +445,7 @@ dialog[open]::backdrop {
   margin-bottom: 4px;
 }
 #dialog-content p,
-.dialog-lead,
-.field-hint {
+.dialog-lead {
   color: var(--text-2);
 }
 #dialog-content label {
@@ -464,16 +463,6 @@ dialog footer {
   gap: 8px;
   padding: 16px 22px 20px;
 }
-.settings-section {
-  display: grid;
-  gap: 10px;
-  padding-top: 14px;
-  border-top: 1px solid var(--line);
-}
-.settings-section:first-of-type {
-  border-top: 0;
-  padding-top: 0;
-}
 fieldset {
   border: 0;
   margin: 0;
@@ -486,14 +475,12 @@ fieldset {
   grid-template-columns: repeat(3, 1fr);
   gap: 10px;
 }
-.presets,
-.device-settings-actions {
+.presets {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
 }
-.presets button,
-.device-settings-actions button {
+.presets button {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -503,15 +490,8 @@ fieldset {
   border: 1px solid var(--line-strong);
   transition: background-color var(--fast) var(--ease-out);
 }
-.presets button:hover,
-.device-settings-actions button:hover:not(:disabled) {
+.presets button:hover {
   background: var(--hover);
-}
-.device-settings-actions .danger {
-  color: var(--rec);
-}
-.device-settings-actions .danger:hover {
-  background: var(--rec-soft);
 }
 .shortcuts {
   display: grid;
@@ -1105,7 +1085,11 @@ label.pref-row {
   box-shadow: var(--shadow-pop);
   animation: sheet-in var(--medium) var(--ease-out);
 }
-/* Device settings over the mirror window: the same sheet as the screenshot preview. */
+/* Device settings: one sheet, over a mirror window or over the panel (below its title bar). */
+.shot.in-panel {
+  inset: 40px 0 0;
+  z-index: 20;
+}
 .settings-card {
   grid-template-rows: none;
   align-content: start;

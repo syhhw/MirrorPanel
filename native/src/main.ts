@@ -1190,9 +1190,20 @@ function handlers(): void {
     log(t('APK instalado: ', 'APK installed: ') + name);
     return name;
   };
-  ipcMain.handle('install-apk', async (event, serial) => {
+  ipcMain.handle('install-apk', (event, serial) => {
     assertPanel(event);
-    await installApk(assertDevice(serial), panel);
+    return installApk(assertDevice(serial), panel);
+  });
+  // The panel's adjust button on a phone that is mirroring: the settings open over its window.
+  ipcMain.handle('show-mirror-settings', (event, serial) => {
+    assertPanel(event);
+    const window = mirrorWindows.get(assertDevice(serial));
+    if (!window || window.isDestroyed())
+      throw Error(t('Inicie o espelhamento', 'Start mirroring first'));
+    window.restore();
+    window.show();
+    window.focus();
+    window.webContents.send('open-device-settings');
   });
   ipcMain.handle('mirror-install-apk', (event) => {
     const { serial, window } = mirrorWindow(event);

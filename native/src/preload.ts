@@ -44,6 +44,8 @@ contextBridge.exposeInMainWorld('mirrorpanel', {
   usbWifi: invoke('usb-wifi'),
   installApk: invoke('install-apk'),
   mirrorSettings: invoke('mirror-settings'),
+  showMirrorSettings: invoke('show-mirror-settings'),
+  onOpenSettings: (cb: () => void) => on('open-device-settings', cb),
   saveMirrorSettings: invoke('mirror-settings-save'),
   mirrorUsbWifi: invoke('mirror-usb-wifi'),
   mirrorInstallApk: invoke('mirror-install-apk'),
