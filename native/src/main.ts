@@ -90,7 +90,10 @@ function displayRatio(serial: string): Promise<number | undefined> {
       .shell(serial, ['wm', 'size'], 3000)
       .then((output) => {
         const ratio = parseDisplayRatio(output);
-        if (ratio && !displayRatios.has(serial)) displayRatios.set(serial, ratio);
+        if (ratio && !displayRatios.has(serial)) {
+          displayRatios.set(serial, ratio);
+          broadcast(); // the panel draws each phone with its screen's shape
+        }
         return displayRatios.get(serial);
       })
       .catch(() => undefined)
@@ -101,6 +104,8 @@ function displayRatio(serial: string): Promise<number | undefined> {
 }
 const logs: { time: string; message: string; level: string }[] = [];
 const identity = new Map<string, string>();
+/** Model as the maker writes it ("moto g(30)"); `adb devices -l` mangles it ("moto_g_30_"). */
+const productModels = new Map<string, string>();
 let blocker: number | undefined;
 let pollTimer: ReturnType<typeof setInterval>;
 const pause = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -196,6 +201,7 @@ function snapshot(): unknown {
       session: sessions.get(d.serial)?.session.state ?? null,
       recording: sessions.get(d.serial)?.session.recording?.path ?? null,
       quality: settings.quality[d.serial] ?? DEFAULT_QUALITY,
+      ratio: displayRatios.get(d.serial) ?? null,
     })),
     logs,
     settings: {
@@ -288,12 +294,17 @@ async function refresh(): Promise<void> {
       found
         .filter((d) => d.state === 'device' && !identity.has(d.serial))
         .map(async (d) => {
-          const id = d.serial.startsWith('emulator-')
-            ? d.serial
-            : await adb.shell(d.serial, ['getprop', 'ro.serialno']).catch(() => d.serial);
+          const [id, model] = await Promise.all([
+            d.serial.startsWith('emulator-')
+              ? d.serial
+              : adb.shell(d.serial, ['getprop', 'ro.serialno']).catch(() => d.serial),
+            adb.shell(d.serial, ['getprop', 'ro.product.model']).catch(() => ''),
+          ]);
           identity.set(d.serial, !id || id === 'unknown' ? d.serial : id);
+          if (model.trim()) productModels.set(d.serial, model.trim());
         }),
     );
+    for (const device of found) device.model = productModels.get(device.serial) ?? device.model;
     const preferred = new Map<string, Device>();
     for (const device of found) {
       const id = identity.get(device.serial) ?? device.serial,

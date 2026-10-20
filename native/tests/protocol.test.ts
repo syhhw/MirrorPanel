@@ -90,3 +90,9 @@ test('ADB preserves unauthorized devices and shell escapes quotes and substituti
   assert.equal(devices[1].state, 'unauthorized');
   assert.equal(shellQuote("a'b$()`"), "'a'\\''b$()`'");
 });
+test('a model name that adb ended with "_" has no trailing space', () => {
+  const [device] = parseDevices(
+    'List of devices attached\nZF523 device usb:1-1 product:rhode model:moto_g_30_ device:rhode\n',
+  );
+  assert.equal(device.model, 'moto g 30');
+});

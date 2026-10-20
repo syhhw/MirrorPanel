@@ -19,10 +19,10 @@ export function parseDevices(text: string): Device[] {
         {
           serial: parts[0],
           state: parts[1],
-          model: (parts.find((p) => p.startsWith('model:'))?.slice(6) ?? parts[0]).replaceAll(
-            '_',
-            ' ',
-          ),
+          // adb writes "moto g(30)" as "moto_g_30_"; the panel later swaps in the real name.
+          model: (parts.find((p) => p.startsWith('model:'))?.slice(6) ?? parts[0])
+            .replaceAll('_', ' ')
+            .trim(),
         },
       ];
     });
