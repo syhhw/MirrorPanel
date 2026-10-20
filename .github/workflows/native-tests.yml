@@ -31,7 +31,12 @@ jobs:
       - run: npm test
       - run: npm run test:android
       - run: npm run build
+      # sdkmanager is not on PATH in the Windows runner; it lives under ANDROID_HOME.
       - name: Android SDK packages
         shell: pwsh
-        run: sdkmanager "platforms;android-35" "build-tools;36.0.0" "platform-tools"
+        run: |
+          $sdkmanager = Join-Path $env:ANDROID_HOME 'cmdline-tools\latest\bin\sdkmanager.bat'
+          ("y`n" * 20) | & $sdkmanager --licenses | Out-Null
+          & $sdkmanager "platforms;android-35" "build-tools;36.0.0" "platform-tools"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - run: npm run android
