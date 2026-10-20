@@ -4,6 +4,7 @@ import { bindRipple } from './ripple';
 import { html } from './html';
 import { admitFrame } from './video-gate';
 import { setLanguage, t, type Language } from './i18n';
+import { icon, logoMark } from './icons';
 
 /** Minimum gap between keyframe requests sent from the mirror window. */
 const SYNC_INTERVAL_MS = 1000;
@@ -24,6 +25,7 @@ interface PanelState {
     stayAwake: boolean;
     showSerial: boolean;
     language: 'pt' | 'en';
+    theme: 'system' | 'light' | 'dark';
   };
 }
 interface Info {
@@ -84,14 +86,20 @@ function label(element: HTMLElement, text: string): void {
   element.title = text;
   element.setAttribute('aria-label', text);
 }
+/**
+ * Opens the shared dialog. `single` keeps only the confirm button, for dialogs
+ * that inform rather than ask (help).
+ */
 function ask(
   content: string,
   submit: (data: FormData) => Promise<unknown>,
   confirm = t('Salvar', 'Save'),
+  single = false,
 ): void {
   $('dialog-content').innerHTML = content;
   $('confirm').textContent = confirm;
   $('cancel').textContent = t('Cancelar', 'Cancel');
+  $('cancel').hidden = single;
   const heading = $('dialog-content').querySelector('h2');
   if (heading) heading.id = 'dialog-title';
   form.onsubmit = (event) => {
@@ -106,32 +114,6 @@ function ask(
   };
   dialog.showModal();
 }
-const icons: Record<string, string> = {
-  back: 'M15 5l-7 7 7 7',
-  home: 'M20 12a8 8 0 1 1-16 0 8 8 0 0 1 16 0',
-  recent: 'M5 6h14M5 12h14M5 18h14',
-  capture: 'M8 5l2-2h4l2 2h4v15H4V5z M16 12a4 4 0 1 1-8 0 4 4 0 0 1 8 0',
-  record: 'M15 8l6-3v14l-6-3z M3 6h12v12H3z',
-  audio: 'M4 14v-3a8 8 0 0 1 16 0v3 M4 12h3v8H4z M17 12h3v8h-3z',
-  fullscreen: 'M8 3H3v5 M16 3h5v5 M21 16v5h-5 M8 21H3v-5',
-  settings: 'M9 3h6l1 4 4 1v8l-4 1-1 4H9l-1-4-4-1V8l4-1z M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0',
-  wifi: 'M3 8a15 15 0 0 1 18 0M6 12a10 10 0 0 1 12 0M9 16a5 5 0 0 1 6 0M12 20h.01',
-  play: 'M8 4l12 8-12 8z',
-  stop: 'M6 6h12v12H6z',
-  refresh: 'M20 10a8 8 0 1 0-2 8M20 3v7h-7',
-  phone: 'M7 2h10v20H7zM10 18h4',
-  folder: 'M3 6h7l2 3h9v11H3z',
-  help: 'M9 8a3 3 0 1 1 5 2c-2 1-2 2-2 4M12 18h.01 M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0',
-  pin: 'M8 3h8l-1 6 4 4v2H5v-2l4-4zM12 15v7',
-  power: 'M12 2v10M6 5a9 9 0 1 0 12 0',
-  paste: 'M8 5H5v17h14V5h-3M8 2h8v5H8z',
-  minimize: 'M4 12h16',
-  maximize: 'M5 5h14v14H5z',
-  close: 'M5 5l14 14M19 5L5 19',
-  chevron: 'M9 5l7 7-7 7',
-};
-const icon = (name: string) =>
-  `<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="${icons[name] ?? icons.phone}"/></svg>`;
 const iconButton = (id: string, label: string, name = id, extra = '') =>
   `<button type="button" id="${id}" class="icon-button" title="${label}" aria-label="${label}" ${extra}>${icon(name)}</button>`;
 const windowButtons = () =>
@@ -158,27 +140,29 @@ function bindWindowButtons(): void {
     ?.addEventListener('dblclick', () => act(api.windowAction('maximize')));
 }
 function showHelp(): void {
+  const shortcut = (keys: string, action: string) =>
+    `<div><dt>${keys}</dt><dd>${action}</dd></div>`;
   ask(
     html`
-      <h2>${t('Controlar seu Android', 'Control your Android')}</h2>
-      <div class="settings-section">
-        <h3>${t('Mouse e teclado', 'Mouse and keyboard')}</h3>
-        <p>
-          Alt + clique ${t('fixa um dedo. Arraste o segundo ponto para multitoque.', 'anchors one finger. Drag the second point for multitouch.')}<br>
-          Esc · ${t('Voltar ou soltar os contatos', 'Back or release contacts')}<br>
-          Ctrl + V · ${t('Colar texto', 'Paste text')}<br>
-          F11 · ${t('Tela cheia', 'Fullscreen')}
-        </p>
-      </div>
-      <div class="settings-section">
-        <h3>${t('Conexão USB', 'USB connection')}</h3>
-        <p>
-          ${t('Ative a depuração USB nas Opções do desenvolvedor e autorize este computador no aparelho. Para áudio, aceite a autorização de captura no Android.', 'Enable USB debugging in Developer options and authorize this computer on your device. For audio, accept Android capture permission.')}
-        </p>
-      </div>
+      <h2>${t('Mouse e atalhos', 'Mouse and shortcuts')}</h2>
+      <dl class="shortcuts">
+        ${shortcut('<kbd>Alt</kbd> + ' + t('clique', 'click'), t('Fixa um dedo; arraste o segundo ponto para multitoque', 'Anchors one finger; drag the second point for multitouch'))}
+        ${shortcut(t('Botão direito', 'Right button'), t('Voltar', 'Back'))}
+        ${shortcut(t('Botão do meio', 'Middle button'), t('Início', 'Home'))}
+        ${shortcut('<kbd>Esc</kbd>', t('Voltar ou soltar os contatos', 'Back, or release the contacts'))}
+        ${shortcut('<kbd>Home</kbd>', t('Início', 'Home'))}
+        ${shortcut('<kbd>End</kbd>', t('Apps recentes', 'Recent apps'))}
+        ${shortcut('<kbd>Ctrl</kbd> + <kbd>V</kbd>', t('Cola o texto do computador no celular', 'Pastes the computer text on the phone'))}
+        ${shortcut('<kbd>F11</kbd>', t('Tela cheia', 'Fullscreen'))}
+      </dl>
+      <h3>${t('Conexão USB', 'USB connection')}</h3>
+      <p>
+        ${t('Ative a depuração USB nas opções do desenvolvedor e autorize este computador no celular. Para ouvir o áudio, aceite a captura quando o Android pedir.', 'Turn on USB debugging in developer options and authorize this computer on the phone. To hear audio, accept the capture when Android asks.')}
+      </p>
     `,
     async () => {},
-    'OK',
+    t('Entendi', 'Got it'),
+    true,
   );
 }
 function showDeviceSettings(d: DeviceRow): void {
@@ -274,83 +258,98 @@ function showDeviceSettings(d: DeviceRow): void {
         )),
   );
 }
-function renderPanel(next: unknown): void {
-  state = next as PanelState;
-  applyLanguage(state.settings.language);
-  if (!$('panel')) {
-    root.innerHTML = html`
-      <section id="panel">
-        <header class="app-titlebar">
-          <div class="title-drag">
-            <span class="brand-mark">${icon('phone')}</span>
-            <h1>MirrorPanel</h1>
-            <span class="version">2.0</span>
-          </div>
-          ${windowButtons()}
-        </header>
-        <div class="panel-scroll">
-          <div class="connection-grid">
-            <section class="android-card">
-              <header class="card-heading">
-                <h2 id="devices-title"></h2>
-                ${iconButton('refresh', 'Atualizar aparelhos', 'refresh')}
-              </header>
-              <div id="device-list" class="device-list"></div>
-              <div class="connection-help">
-                <strong id="usb-title"></strong>
-                <p id="usb-help"></p>
-                <span class="connection-count" id="count"></span>
-              </div>
-            </section>
-            <section class="network-card">
-              <div class="network-symbol">${icon('wifi')}</div>
+/** How a device row reads: its state text and the tone that colours it. */
+function deviceState(d: DeviceRow): { text: string; tone: string } {
+  if (d.recording) return { text: t('Gravando', 'Recording'), tone: 'recording' };
+  if (d.session === 'mirroring') return { text: t('Espelhando', 'Mirroring'), tone: 'live' };
+  if (d.session === 'starting') return { text: t('Conectando…', 'Connecting…'), tone: 'busy' };
+  if (d.state === 'device') return { text: t('Pronto', 'Ready'), tone: 'ready' };
+  if (d.state === 'unauthorized')
+    return { text: t('Autorize no celular', 'Allow it on the phone'), tone: 'warning' };
+  return { text: t('Desconectado', 'Offline'), tone: 'warning' };
+}
+const connectionLabel = (d: DeviceRow) =>
+  d.serial.includes(':')
+    ? 'Wi-Fi'
+    : d.serial.startsWith('emulator-')
+      ? t('Emulador', 'Emulator')
+      : 'USB';
+// Rows are rebuilt on every state broadcast; remembering the previous tones keeps
+// the arrival and "now live" animations to the moment they actually happen.
+let previousTones: Map<string, string> | undefined;
+
+function buildPanel(): void {
+  root.innerHTML = html`
+    <section id="panel">
+      <header class="app-titlebar">
+        <div class="title-drag">
+          ${logoMark()}
+          <h1>MirrorPanel</h1>
+        </div>
+        ${windowButtons()}
+      </header>
+      <main class="panel-scroll">
+        <div class="panel-content">
+          <section class="devices" aria-labelledby="devices-title">
+            <header class="section-head">
+              <h2 id="devices-title"></h2>
+              <span class="count" id="count"></span>
+              ${iconButton('refresh', '', 'refresh')}
+            </header>
+            <div id="device-list" class="device-list"></div>
+            <p class="hint" id="usb-help"></p>
+          </section>
+          <section class="wireless">
+            <span class="wireless-art">${icon('wifi')}</span>
+            <div class="wireless-text">
               <h2 id="network-title"></h2>
               <p id="network-help"></p>
-              <button id="wifi" class="surface-button"></button>
-              <p class="network-note" id="network-note"></p>
-            </section>
-          </div>
-          <section class="surface-card preferences-card">
-            <header>
-              <h2 id="preferences-title"></h2>
-              <span class="section-caption" id="preferences-caption"></span>
-            </header>
-            <div class="switch-grid">
-              <label class="switch-row">
-                <input id="show-serial" type="checkbox" data-setting="showSerial">
-                <span class="switch-track"></span>
-                <span id="serial-label"></span>
-              </label>
-              <label class="switch-row">
-                <input id="always-top" type="checkbox" data-setting="alwaysOnTop">
-                <span class="switch-track"></span>
-                <span id="top-label"></span>
-              </label>
-              <label class="switch-row">
-                <input id="stay-awake" type="checkbox" data-setting="stayAwake">
-                <span class="switch-track"></span>
-                <span id="awake-label"></span>
-              </label>
             </div>
-            <div class="preferences-bottom">
-              <label>
-                <span id="language-label"></span> <select id="language">
+            <button id="wifi" class="secondary-button"></button>
+          </section>
+          <section class="preferences" aria-labelledby="preferences-title">
+            <h2 id="preferences-title"></h2>
+            <div class="pref-list">
+              <div class="pref-row">
+                <span id="theme-label"></span>
+                <div class="segmented" role="radiogroup" aria-labelledby="theme-label">
+                  <label><input type="radio" name="theme" value="system"><span id="theme-system"></span></label>
+                  <label><input type="radio" name="theme" value="light"><span id="theme-light"></span></label>
+                  <label><input type="radio" name="theme" value="dark"><span id="theme-dark"></span></label>
+                </div>
+              </div>
+              <label class="pref-row">
+                <span id="language-label"></span>
+                <select id="language">
                   <option value="pt">Português</option>
                   <option value="en">English</option>
                 </select>
               </label>
-              <button id="media" class="text-button"></button>
+              <label class="pref-row">
+                <span id="awake-label"></span>
+                <input id="stay-awake" type="checkbox" data-setting="stayAwake">
+                <span class="switch-track" aria-hidden="true"></span>
+              </label>
+              <label class="pref-row">
+                <span id="top-label"></span>
+                <input id="always-top" type="checkbox" data-setting="alwaysOnTop">
+                <span class="switch-track" aria-hidden="true"></span>
+              </label>
+              <label class="pref-row">
+                <span id="serial-label"></span>
+                <input id="show-serial" type="checkbox" data-setting="showSerial">
+                <span class="switch-track" aria-hidden="true"></span>
+              </label>
+              <div class="pref-row">
+                <span id="media-label"></span>
+                <button id="media" class="text-button">${icon('folder')}<span id="media-open"></span></button>
+              </div>
             </div>
           </section>
-          <section class="surface-card about-card">
-            <h2>MirrorPanel <span class="version">2.0 preview 5</span></h2>
-            <p id="about-copy"></p>
-            <button class="text-button" id="help"></button>
-          </section>
-          <details class="surface-card activity" id="activity">
+          <details class="activity" id="activity">
             <summary>
-              <span id="activity-title"></span>
-              <span id="activity-summary"></span>
+              ${icon('chevron')}<span id="activity-title"></span>
+              <span class="activity-summary" id="activity-summary"></span>
             </summary>
             <div class="activity-tools">
               <button id="filter" class="text-button"></button>
@@ -360,173 +359,133 @@ function renderPanel(next: unknown): void {
             <div id="logs" class="logs" role="log" aria-live="polite"></div>
           </details>
         </div>
-        <footer class="panel-footer">
-          <button id="footer-home">${icon('home')}<span>MirrorPanel</span></button>
-          <button id="footer-help"></button>
-          <button id="footer-activity"></button>
-          <span id="footer-status"></span>
-        </footer>
-      </section>
-    `;
-    bindWindowButtons();
-    $('media').onclick = () => act(api.openMedia());
-    $('refresh').onclick = () => act(api.refresh());
-    $('copy').onclick = () => act(api.copyLogs());
-    $('clear').onclick = () => act(api.clearLogs());
-    $('filter').onclick = () => {
-      issuesOnly = !issuesOnly;
-      renderPanel(state);
-    };
-    $('help').onclick = showHelp;
-    $('footer-help').onclick = showHelp;
-    $('footer-home').onclick = () =>
-      document.querySelector('.panel-scroll')!.scrollTo({ top: 0, behavior: 'smooth' });
-    $('footer-activity').onclick = () => {
-      ($('activity') as HTMLDetailsElement).open = true;
-      $('activity').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-    };
-    document
-      .querySelectorAll<HTMLInputElement>('[data-setting]')
-      .forEach(
-        (input) =>
-          (input.onchange = () =>
-            act(api.preferences({ ...state.settings, [input.dataset.setting!]: input.checked }))),
-      );
-    $<HTMLSelectElement>('language').onchange = () =>
-      act(api.preferences({ ...state.settings, language: $<HTMLSelectElement>('language').value }));
-    $('wifi').onclick = () =>
-      ask(
-        html`
-          <h2>${t('Conectar pela rede', 'Connect over network')}</h2>
-          <div class="settings-section">
-            <p>
-              ${t('Use o endereço de conexão mostrado em Depuração sem fio no Android. Para o primeiro pareamento, informe o endereço de pareamento e o código.', 'Use the connection address shown in Android Wireless debugging. To pair for the first time, enter the pairing address and code.')}
-            </p>
-            <label>
-              IP:${t('porta', 'port')}
-              <input required name="address" placeholder="192.168.1.10:5555">
-            </label>
-            <label>
-              ${t('Código de pareamento (opcional)', 'Pairing code (optional)')}
-              <input name="code" inputmode="numeric" maxlength="6">
-            </label>
-          </div>
-        `,
-        (data) =>
-          String(data.get('code')).trim()
-            ? api.pair(data.get('address'), data.get('code'))
-            : api.wifi(data.get('address')),
-        t('Conectar', 'Connect'),
-      );
-    api.onDeviceSettings((serial: unknown) => {
-      const d = state.devices.find((d) => d.serial === serial);
-      if (d) showDeviceSettings(d);
-    });
-  }
-  const labels: Record<string, string> = {
-    'devices-title': t('Aparelhos Android', 'Android devices'),
-    'network-title': t('Conectar sem cabo', 'Connect wirelessly'),
-    'network-help': t(
-      'Seu Android também pode ficar ao alcance do mouse pela rede Wi-Fi.',
-      'Your Android can also be within mouse reach over Wi-Fi.',
-    ),
-    wifi: t('Conectar pela rede', 'Connect over network'),
-    'network-note': t(
-      'Mantenha o computador e o aparelho na mesma rede.',
-      'Keep your computer and device on the same network.',
-    ),
-    'usb-title': t('Não encontrou seu aparelho?', 'Can’t find your device?'),
-    'usb-help': t(
-      'Conecte por USB, ative a depuração USB e autorize este computador no celular.',
-      'Connect over USB, enable USB debugging and authorize this computer on your phone.',
-    ),
-    'preferences-title': t('Configurações', 'Settings'),
-    'preferences-caption': t('Do seu jeito', 'Make it yours'),
-    'serial-label': t('Mostrar números de série', 'Show serial numbers'),
-    'top-label': t('Janelas sempre no topo', 'Always on top'),
-    'awake-label': t('Manter a tela ligada por USB', 'Keep screen awake over USB'),
-    'language-label': t('Idioma', 'Language'),
-    media: t('Abrir capturas e gravações', 'Open screenshots and recordings'),
-    'about-copy': t(
-      'Controle seu Android, escreva com o teclado e capture o que acontece na tela.',
-      'Control your Android, type with your keyboard and capture what happens on screen.',
-    ),
-    help: t('Como usar e atalhos', 'Help and keyboard shortcuts'),
-    'activity-title': t('Atividade', 'Activity'),
-    filter: issuesOnly ? t('Mostrar tudo', 'Show all') : t('Só avisos', 'Warnings only'),
-    copy: t('Copiar', 'Copy'),
-    clear: t('Limpar', 'Clear'),
-    'footer-help': t('Ajuda', 'Help'),
-    'footer-activity': t('Diagnóstico', 'Diagnostics'),
-    'footer-status': t('Android · USB e Wi-Fi', 'Android · USB and Wi-Fi'),
+      </main>
+      <footer class="statusbar">
+        <span class="statusbar-state" id="footer-status"></span>
+        <button id="help" class="text-button">${icon('help')}<span id="help-label"></span></button>
+        <span class="version">2.0</span>
+      </footer>
+    </section>
+  `;
+  bindWindowButtons();
+  $('media').onclick = () => act(api.openMedia());
+  $('refresh').onclick = () => act(api.refresh());
+  $('copy').onclick = () => act(api.copyLogs());
+  $('clear').onclick = () => act(api.clearLogs());
+  $('filter').onclick = () => {
+    issuesOnly = !issuesOnly;
+    renderPanel(state);
   };
-  for (const [id, text] of Object.entries(labels)) $(id).textContent = text;
-  labelWindowButtons();
-  label($('refresh'), t('Atualizar aparelhos', 'Refresh devices'));
-  $('count').textContent =
-    state.devices.length + ' ' + t('aparelho(s) detectado(s)', 'device(s) detected');
-  $<HTMLInputElement>('show-serial').checked = state.settings.showSerial;
-  $<HTMLInputElement>('always-top').checked = state.settings.alwaysOnTop;
-  $<HTMLInputElement>('stay-awake').checked = state.settings.stayAwake;
-  $<HTMLSelectElement>('language').value = state.settings.language;
+  $('help').onclick = showHelp;
+  document
+    .querySelectorAll<HTMLInputElement>('[data-setting]')
+    .forEach(
+      (input) =>
+        (input.onchange = () =>
+          act(api.preferences({ ...state.settings, [input.dataset.setting!]: input.checked }))),
+    );
+  document
+    .querySelectorAll<HTMLInputElement>('input[name="theme"]')
+    .forEach(
+      (input) =>
+        (input.onchange = () => act(api.preferences({ ...state.settings, theme: input.value }))),
+    );
+  $<HTMLSelectElement>('language').onchange = () =>
+    act(api.preferences({ ...state.settings, language: $<HTMLSelectElement>('language').value }));
+  $('wifi').onclick = () =>
+    ask(
+      html`
+        <h2>${t('Conectar pela rede', 'Connect over the network')}</h2>
+        <p class="dialog-lead">
+          ${t('Use o endereço mostrado em Depuração sem fio, no Android. No primeiro pareamento, informe também o código.', 'Use the address shown in Wireless debugging on Android. To pair for the first time, also enter the code.')}
+        </p>
+        <label>
+          ${t('Endereço (IP:porta)', 'Address (IP:port)')}
+          <input required name="address" placeholder="192.168.1.10:5555">
+        </label>
+        <label>
+          ${t('Código de pareamento (opcional)', 'Pairing code (optional)')}
+          <input name="code" inputmode="numeric" maxlength="6">
+        </label>
+      `,
+      (data) =>
+        String(data.get('code')).trim()
+          ? api.pair(data.get('address'), data.get('code'))
+          : api.wifi(data.get('address')),
+      t('Conectar', 'Connect'),
+    );
+  api.onDeviceSettings((serial: unknown) => {
+    const d = state.devices.find((d) => d.serial === serial);
+    if (d) showDeviceSettings(d);
+  });
+}
+
+function renderDevices(): void {
   const list = $('device-list'),
     focused = list.querySelector<HTMLButtonElement>('button:focus');
   const focusSerial = focused?.closest<HTMLElement>('[data-serial]')?.dataset.serial,
     focusAction = focused?.dataset.action;
+  const tones = new Map<string, string>();
   list.innerHTML = state.devices.length
     ? state.devices
         .map((d, index) => {
-          const active = d.session === 'mirroring',
-            busy = d.session === 'starting',
+          const { text, tone } = deviceState(d);
+          tones.set(d.serial, tone);
+          const before = previousTones?.get(d.serial);
+          const motion =
+            previousTones && before === undefined
+              ? 'is-new'
+              : tone === 'live' && before !== 'live' && before !== 'recording'
+                ? 'went-live'
+                : '';
+          const live = tone === 'live' || tone === 'recording',
+            busy = tone === 'busy',
             authorized = d.state === 'device';
-          const status = d.recording
-            ? t('Gravando', 'Recording')
-            : active
-              ? t('Espelhando', 'Mirroring')
-              : busy
-                ? t('Conectando…', 'Connecting…')
-                : authorized
-                  ? d.serial.includes(':')
-                    ? 'Wi-Fi'
-                    : d.serial.startsWith('emulator-')
-                      ? t('Emulador', 'Emulator')
-                      : 'USB'
-                  : d.state === 'unauthorized'
-                    ? t('Autorize no aparelho', 'Authorize on your device')
-                    : d.state;
           return html`
-            <article class="device ${active ? 'device-live' : ''}" data-index="${index}"
+            <article class="device is-${tone} ${motion}" data-index="${index}"
               data-serial="${escape(d.serial)}">
-              <div class="device-symbol">${icon('phone')}</div>
-              <div class="device-name">
+              <span class="device-art">${icon('phone')}<span class="device-dot"></span></span>
+              <div class="device-text">
                 <strong title="${escape(d.name)}">${escape(d.name)}</strong>
-                <small class="status ${d.recording ? 'recording' : ''}">${escape(status)}${state.settings.showSerial ? ' · ' + escape(d.serial) : ''}</small>
+                <span class="device-meta">
+                  <span class="chip">${connectionLabel(d)}</span>
+                  <span class="device-state">${escape(text)}</span>
+                  ${state.settings.showSerial ? `<span class="device-serial">${escape(d.serial)}</span>` : ''}
+                </span>
               </div>
               <div class="device-actions">
-                <button class="round-action" data-action="settings"
-                  title="${t('Configurações', 'Settings')}"
-                  aria-label="${t('Configurações', 'Settings')}"
+                <button class="icon-button" data-action="settings"
+                  title="${t('Configurações do aparelho', 'Device settings')}"
+                  aria-label="${t('Configurações do aparelho', 'Device settings')}"
                   ${!authorized ? 'disabled' : ''}>
-                  ${icon('settings')}
+                  ${icon('sliders')}
                 </button>
-                <button class="round-action" data-action="usbWifi"
-                  title="${t('Usar Wi-Fi', 'Use Wi-Fi')}"
-                  aria-label="${t('Usar Wi-Fi', 'Use Wi-Fi')}"
+                <button class="icon-button" data-action="usbWifi"
+                  title="${t('Usar pela rede Wi-Fi', 'Use over Wi-Fi')}"
+                  aria-label="${t('Usar pela rede Wi-Fi', 'Use over Wi-Fi')}"
                   ${!authorized || d.serial.includes(':') ? 'disabled' : ''}>
                   ${icon('wifi')}
                 </button>
-                <button class="round-action start-action" data-action="start"
-                  title="${active ? t('Abrir tela', 'Open screen') : t('Espelhar', 'Mirror')}"
-                  aria-label="${active ? t('Abrir tela', 'Open screen') : t('Espelhar', 'Mirror')}"
+                <button class="mirror-button ${live ? 'is-live' : ''}" data-action="start"
                   ${!authorized || busy ? 'disabled' : ''}>
-                  ${busy ? '<span class="spinner"></span>' : icon(active ? 'fullscreen' : 'play')}
+                  ${busy ? '<span class="spinner"></span>' : icon(live ? 'show' : 'play')}
+                  <span>${live ? t('Mostrar', 'Show') : busy ? t('Abrindo', 'Opening') : t('Espelhar', 'Mirror')}</span>
                 </button>
               </div>
             </article>
           `;
         })
         .join('')
-    : `<div class="empty">${icon('phone')}<h3>${t('Seu Android aparece aqui', 'Your Android will appear here')}</h3><p>${t('Conecte o aparelho para começar.', 'Connect your device to get started.')}</p></div>`;
+    : html`
+        <div class="empty">
+          <span class="empty-art">${icon('phone')}</span>
+          <h3>${t('Conecte um Android', 'Connect an Android')}</h3>
+          <p>
+            ${t('Use um cabo USB e autorize este computador quando o celular pedir.', 'Use a USB cable and authorize this computer when the phone asks.')}
+          </p>
+        </div>
+      `;
+  previousTones = tones;
   list.querySelectorAll<HTMLButtonElement>('button[data-action]').forEach((button) => {
     const row = button.closest<HTMLElement>('[data-index]')!,
       d = state.devices[Number(row.dataset.index)];
@@ -537,19 +496,84 @@ function renderPanel(next: unknown): void {
     if (d.serial === focusSerial && button.dataset.action === focusAction)
       button.focus({ preventScroll: true });
   });
-  const logs = $('logs');
-  logs.innerHTML =
-    state.logs
-      .filter((l) => !issuesOnly || l.level !== 'info')
+}
+
+function renderActivity(): void {
+  const shown = state.logs.filter((l) => !issuesOnly || l.level !== 'info');
+  $('logs').innerHTML =
+    shown
       .map(
         (l) =>
           `<div class="log-line ${escape(l.level)}"><time>${escape(l.time)}</time><span>${escape(l.message)}</span></div>`,
       )
       .join('') ||
     `<p class="log-empty">${t('Nenhum evento nesta sessão.', 'No events in this session.')}</p>`;
-  $('activity-summary').textContent = state.logs.length
-    ? String(state.logs.length)
+  const issues = state.logs.filter((l) => l.level !== 'info').length;
+  const summary = $('activity-summary');
+  summary.textContent = issues
+    ? issues === 1
+      ? t('1 aviso', '1 warning')
+      : `${issues} ${t('avisos', 'warnings')}`
     : t('Tudo certo', 'All clear');
+  summary.classList.toggle('has-issues', issues > 0);
+}
+
+function renderPanel(next: unknown): void {
+  state = next as PanelState;
+  applyLanguage(state.settings.language);
+  if (!$('panel')) buildPanel();
+  const count = state.devices.length;
+  const labels: Record<string, string> = {
+    'devices-title': t('Aparelhos', 'Devices'),
+    'usb-help': t(
+      'Não aparece? Ative a depuração USB nas opções do desenvolvedor e autorize este computador no celular.',
+      'Not listed? Turn on USB debugging in developer options and authorize this computer on the phone.',
+    ),
+    'network-title': t('Sem cabo', 'Wireless'),
+    'network-help': t(
+      'Conecte pela rede Wi-Fi quando o celular e o computador estiverem na mesma rede.',
+      'Connect over Wi-Fi when the phone and the computer share the same network.',
+    ),
+    wifi: t('Conectar pela rede', 'Connect over the network'),
+    'preferences-title': t('Preferências', 'Preferences'),
+    'theme-label': t('Tema', 'Theme'),
+    'theme-system': t('Automático', 'Automatic'),
+    'theme-light': t('Claro', 'Light'),
+    'theme-dark': t('Escuro', 'Dark'),
+    'language-label': t('Idioma', 'Language'),
+    'awake-label': t(
+      'Manter a tela do celular ligada pelo USB',
+      'Keep the phone screen on over USB',
+    ),
+    'top-label': t('Janelas de espelho sempre no topo', 'Keep mirror windows on top'),
+    'serial-label': t('Mostrar números de série', 'Show serial numbers'),
+    'media-label': t('Capturas e gravações', 'Screenshots and recordings'),
+    'media-open': t('Abrir pasta', 'Open folder'),
+    'activity-title': t('Atividade', 'Activity'),
+    filter: issuesOnly ? t('Mostrar tudo', 'Show all') : t('Só avisos', 'Warnings only'),
+    copy: t('Copiar', 'Copy'),
+    clear: t('Limpar', 'Clear'),
+    'help-label': t('Ajuda', 'Help'),
+    count: String(count),
+    'footer-status':
+      count === 0
+        ? t('Nenhum aparelho conectado', 'No device connected')
+        : count === 1
+          ? t('1 aparelho conectado', '1 device connected')
+          : `${count} ${t('aparelhos conectados', 'devices connected')}`,
+  };
+  for (const [id, text] of Object.entries(labels)) $(id).textContent = text;
+  labelWindowButtons();
+  label($('refresh'), t('Atualizar a lista', 'Refresh the list'));
+  $<HTMLInputElement>('show-serial').checked = state.settings.showSerial;
+  $<HTMLInputElement>('always-top').checked = state.settings.alwaysOnTop;
+  $<HTMLInputElement>('stay-awake').checked = state.settings.stayAwake;
+  $<HTMLSelectElement>('language').value = state.settings.language;
+  document
+    .querySelectorAll<HTMLInputElement>('input[name="theme"]')
+    .forEach((input) => (input.checked = input.value === state.settings.theme));
+  renderDevices();
+  renderActivity();
 }
 
 function mirror(): void {
@@ -564,7 +588,7 @@ function mirror(): void {
       iconButton(
         id,
         '',
-        id === 'more' ? 'settings' : id,
+        id,
         id === 'audio'
           ? 'aria-pressed="false"'
           : id === 'more'
@@ -578,14 +602,14 @@ function mirror(): void {
       <header class="mirror-titlebar">
         <div class="mirror-device title-drag">
           <button id="device-home">
-            <span id="mirror-name"></span>
+            <span class="live-dot" aria-hidden="true"></span><span id="mirror-name"></span>
           </button>
         </div>
         <div class="mirror-actions">${toolbar}</div>
         ${windowButtons()}
       </header>
       <div id="mirror-menu" class="mirror-menu" hidden>
-        <button id="device-settings">${icon('settings')} <span id="device-settings-text"></span></button>
+        <button id="device-settings">${icon('sliders')} <span id="device-settings-text"></span></button>
         <button id="paste-text">${icon('paste')} <span id="paste-text-label"></span> <kbd>Ctrl+V</kbd></button>
         <button id="screen-power">${icon('power')} <span id="screen-power-text"></span></button>
         <button id="pin-window" aria-pressed="false">${icon('pin')} <span id="pin-window-text"></span></button>
@@ -847,9 +871,18 @@ function mirror(): void {
    * With the picture already on screen a passing status is a small note over it;
    * before the first frame, or when the user has to act, it covers the video.
    */
+  /** The one orchestrated moment: a sweep of light across the first frame of a session. */
+  const reveal = () => {
+    const viewport = document.querySelector<HTMLElement>('.viewport')!;
+    viewport.classList.add('is-revealing');
+    viewport.addEventListener('animationend', () => viewport.classList.remove('is-revealing'), {
+      once: true,
+    });
+  };
   const showStatus = (message: string, retry = false) => {
     $('status-message').textContent = message;
     status.hidden = !message;
+    if (message) document.body.classList.remove('is-live');
     status.classList.toggle('is-notice', Boolean(message) && frames > 0 && !retry);
     $('status-spinner').hidden = retry;
     $('reconnect').hidden = !retry;
@@ -934,7 +967,11 @@ function mirror(): void {
         frames++;
         canvas.dataset.frames = String(frames);
         canvas.dataset.dropped = String(dropped);
-        if (inputReady) status.hidden = true;
+        if (frames === 1) reveal();
+        if (inputReady) {
+          status.hidden = true;
+          document.body.classList.add('is-live');
+        }
       },
       error: (error) => {
         needsKey = true;

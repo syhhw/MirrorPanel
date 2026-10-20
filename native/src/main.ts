@@ -7,6 +7,7 @@ import {
   clipboard,
   powerSaveBlocker,
   screen,
+  nativeTheme,
   IpcMainInvokeEvent,
 } from 'electron';
 import { join, dirname } from 'node:path';
@@ -30,11 +31,15 @@ import { findBySender } from './window-owner';
 import { revealPanel } from './single-instance';
 import { setLanguage, t } from './i18n';
 
+/** Appearance: follow Windows, or force light or dark. Applied through nativeTheme. */
+type Theme = 'system' | 'light' | 'dark';
+const THEMES: Theme[] = ['system', 'light', 'dark'];
 type Settings = {
   alwaysOnTop: boolean;
   stayAwake: boolean;
   showSerial: boolean;
   language: 'pt' | 'en';
+  theme: Theme;
   quality: Record<string, Quality>;
   nicknames: Record<string, string>;
   wifi: string[];
@@ -107,6 +112,7 @@ function loadSettings(): void {
     stayAwake: true,
     showSerial: false,
     language: 'pt',
+    theme: 'system',
     quality: {},
     nicknames: {},
     wifi: [],
@@ -120,6 +126,7 @@ function loadSettings(): void {
       stayAwake: saved.stayAwake !== false,
       showSerial: saved.showSerial === true,
       language: saved.language === 'en' ? 'en' : 'pt',
+      theme: THEMES.includes(saved.theme as Theme) ? (saved.theme as Theme) : 'system',
       quality: {},
       nicknames: Object.fromEntries(
         Object.entries(saved.nicknames ?? {}).filter(
@@ -161,6 +168,7 @@ function loadSettings(): void {
     }
   }
   setLanguage(settings.language);
+  nativeTheme.themeSource = settings.theme;
 }
 function saveSettings(): void {
   mkdirSync(dirname(settingsFile), { recursive: true });
@@ -195,6 +203,7 @@ function snapshot(): unknown {
       stayAwake: settings.stayAwake,
       showSerial: settings.showSerial,
       language: settings.language,
+      theme: settings.theme,
     },
   };
 }
@@ -203,7 +212,7 @@ function broadcast(): void {
 }
 function secureWindow(options: Electron.BrowserWindowConstructorOptions): BrowserWindow {
   const window = new BrowserWindow({
-    backgroundColor: '#f5f6f8',
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#0E171C' : '#EEF3F4',
     icon: join(__dirname, 'icon.png'),
     ...options,
     frame: false,
@@ -352,7 +361,7 @@ async function startSession(serial: string, attempt = 0, existing?: Entry): Prom
         minHeight: 200,
         title: settings.nicknames[serial] || device?.model || serial,
         alwaysOnTop: settings.alwaysOnTop,
-        backgroundColor: '#151821',
+        backgroundColor: '#0B1418',
         show: true,
       })
     : previousWindow!;
@@ -907,13 +916,18 @@ function handlers(): void {
       !value ||
       typeof value.alwaysOnTop !== 'boolean' ||
       typeof value.stayAwake !== 'boolean' ||
-      !['pt', 'en'].includes(value.language)
+      !['pt', 'en'].includes(value.language) ||
+      (value.theme !== undefined && !THEMES.includes(value.theme))
     )
       throw Error(t('Preferências inválidas', 'Invalid preferences'));
     settings.alwaysOnTop = value.alwaysOnTop;
     settings.stayAwake = value.stayAwake;
     settings.language = value.language;
     setLanguage(settings.language);
+    if (value.theme) {
+      settings.theme = value.theme;
+      nativeTheme.themeSource = settings.theme;
+    }
     if (typeof value.showSerial === 'boolean') settings.showSerial = value.showSerial;
     saveSettings();
     for (const window of mirrorWindows.values()) {
@@ -1129,6 +1143,11 @@ else {
       minHeight: 560,
       title: 'MirrorPanel 2.0',
       show: true,
+    });
+    // Keep the native background in step with the theme so resizing never flashes the other one.
+    nativeTheme.on('updated', () => {
+      if (!panel.isDestroyed())
+        panel.setBackgroundColor(nativeTheme.shouldUseDarkColors ? '#0E171C' : '#EEF3F4');
     });
     await panel.loadFile(join(__dirname, 'index.html'));
     if (!existsSync(adb.executable) || !existsSync(join(resources, 'mirrorpanel-server.jar')))

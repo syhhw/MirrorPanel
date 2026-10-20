@@ -23,6 +23,7 @@
   },
   "devDependencies": {
     "@electron/packager": "20.3.0",
+    "@fontsource-variable/manrope": "5.3.0",
     "@types/dom-webcodecs": "^0.1.16",
     "@types/node": "^24.0.0",
     "electron": "44.9.0",
