@@ -52,6 +52,24 @@ function audioMessage(state: string): string {
   return state === 'off' ? t('Áudio desligado', 'Audio off') : '';
 }
 
+/**
+ * Why the Companion refused a session, in the interface language. It refuses instead of
+ * showing the indicator, and the server passes the reason on before any video.
+ */
+export function refusalMessage(reason: string): string | undefined {
+  if (reason === 'companion-busy')
+    return t(
+      'Este celular já está espelhando em outro MirrorPanel. Encerre o espelhamento lá e tente de novo.',
+      'This phone is already mirroring in another MirrorPanel. Stop mirroring there and try again.',
+    );
+  if (reason === 'indicator-blocked')
+    return t(
+      'As notificações do MirrorPanel Companion estão desligadas no Android. Ative-as para o aviso de espelhamento aparecer e tente de novo.',
+      'MirrorPanel Companion notifications are off on Android. Turn them on so the mirroring notice can show, then try again.',
+    );
+  return undefined;
+}
+
 /** Owns only its child process, forward and remote temporary JAR. Never kills ADB. */
 export class MirrorSession extends EventEmitter {
   state: SessionState = 'starting';
@@ -225,6 +243,10 @@ export class MirrorSession extends EventEmitter {
           clearTimeout(timeout);
           resolve();
         });
+        this.once('refused', (message: string) => {
+          clearTimeout(timeout);
+          reject(Error(message));
+        });
         socket.setNoDelay(true);
         socket.setTimeout(15000);
         socket.once('error', (e) => {
@@ -287,6 +309,14 @@ export class MirrorSession extends EventEmitter {
     if (packet.type === 2) this.videoPackets++;
     if (packet.type === 4) {
       const reason = packet.data.toString('utf8');
+      const refusal = refusalMessage(reason);
+      // A refusal only comes before the video: start() fails with its explanation and ends
+      // the session as start-failed, which the app does not retry.
+      if (refusal && this.state === 'starting') {
+        this.notify('diagnostic', 'companion-refused', { reason });
+        this.notify('refused', refusal);
+        return;
+      }
       void this.end(
         reason === 'companion-lost'
           ? 'companion-lost'

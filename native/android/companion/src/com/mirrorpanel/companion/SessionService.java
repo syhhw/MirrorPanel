@@ -6,6 +6,7 @@ import android.content.Intent;
 import android.content.pm.ServiceInfo;
 import android.media.projection.*;
 import android.os.*;
+import com.mirrorpanel.protocol.Handshake;
 import com.mirrorpanel.protocol.Wire;
 import java.io.*;
 import java.net.*;
@@ -116,10 +117,21 @@ public final class SessionService extends Service {
             else stopIfIdle();
             return START_NOT_STICKY;
         }
-        if (running) return START_NOT_STICKY;
         int port = intent.getIntExtra(ConnectActivity.EXTRA_PORT, 0);
         String candidate = intent.getStringExtra(ConnectActivity.EXTRA_TOKEN);
-        if (port < 1 || port > 65535 || !validToken(candidate) || !indicatorAllowed(this)) {
+        if (port < 1 || port > 65535 || !validToken(candidate)) {
+            stopIfIdle();
+            return START_NOT_STICKY;
+        }
+        // One session at a time. A new request is refused instead of taking over: two desktops would
+        // fight over the keyboard, audio consent and this notification, and a second MirrorPanel or a
+        // test profile could end a mirror someone is using. The refusal says why to the new desktop.
+        if (running) {
+            refuse(port, candidate, Handshake.BUSY);
+            return START_NOT_STICKY;
+        }
+        if (!indicatorAllowed(this)) {
+            refuse(port, candidate, Handshake.NO_INDICATOR);
             stopIfIdle();
             return START_NOT_STICKY;
         }
@@ -128,6 +140,22 @@ public final class SessionService extends Service {
         active = this;
         new Thread(() -> bridge(port), "mirrorpanel-companion").start();
         return START_NOT_STICKY;
+    }
+
+    /**
+     * Answers a valid request that will not start on its server's indicator socket, so the desktop
+     * learns the reason at once instead of waiting for an indicator that never comes.
+     */
+    static void refuse(int port, String token, String reason) {
+        android.util.Log.i("MirrorPanel", "SESSION_REFUSED " + reason);
+        new Thread(() -> {
+            try (Socket socket = new Socket()) {
+                socket.connect(new InetSocketAddress("127.0.0.1", port), 4000);
+                Handshake.refuse(new DataOutputStream(socket.getOutputStream()), token, reason);
+            } catch (IOException error) {
+                android.util.Log.w("MirrorPanel", "REFUSAL_UNDELIVERED " + error.getClass().getSimpleName());
+            }
+        }, "mirrorpanel-refusal").start();
     }
 
     /** Rejected requests must not end a session that is already running. */
@@ -150,10 +178,8 @@ public final class SessionService extends Service {
             socket.setSoTimeout(5000);
             socket.setTcpNoDelay(true);
             DataOutputStream out = new DataOutputStream(socket.getOutputStream());
-            byte[] bytes = new byte[32];
-            for (int i = 0; i < 32; i++) bytes[i] = (byte) Integer.parseInt(token.substring(i * 2, i * 2 + 2), 16);
-            out.write(bytes);
-            out.flush();
+            // The answer comes before anything else on this socket: the server captures only after it.
+            Handshake.accept(out, token);
             output = out;
             Thread heartbeat = new Thread(() -> {
                 try {

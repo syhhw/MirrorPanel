@@ -12,6 +12,7 @@ import android.os.SystemClock;
 import android.view.InputEvent;
 import android.view.KeyEvent;
 import android.view.Surface;
+import com.mirrorpanel.protocol.Handshake;
 import com.mirrorpanel.protocol.Wire;
 import java.io.*;
 import java.lang.reflect.*;
@@ -84,6 +85,14 @@ public final class Main {
             System.out.println("MIRRORPANEL_READY " + notice.getLocalPort());
             System.out.flush();
             Socket indicator = acceptNotice(notice, noticeToken);
+            // Nothing is captured until the Companion confirms the indicator for this session.
+            indicator.setSoTimeout(5000);
+            String refusal = Handshake.refusal(new DataInputStream(indicator.getInputStream()));
+            if (refusal != null) {
+                indicator.close();
+                refuse(listener, token, refusal);
+                return;
+            }
             companionOut = new DataOutputStream(indicator.getOutputStream());
             Thread watchdog = new Thread(() -> {
                 try (Socket socket = indicator) {
@@ -109,41 +118,7 @@ public final class Main {
             }, "indicator-watchdog");
             watchdog.setDaemon(true);
             watchdog.start();
-            // Closing the listener unblocks accept when the phone stops the session.
-            Thread acceptGuard = new Thread(() -> {
-                while (running) SystemClock.sleep(100);
-                try {
-                    listener.close();
-                } catch (IOException ignored) {}
-            });
-            acceptGuard.setDaemon(true);
-            acceptGuard.start();
-            long connectDeadline = SystemClock.uptimeMillis() + 20000;
-            Thread expiry = new Thread(() -> {
-                while (running && client == null && SystemClock.uptimeMillis() < connectDeadline)
-                    SystemClock.sleep(100);
-                if (client == null) stop();
-            });
-            expiry.setDaemon(true);
-            expiry.start();
-            while (running) {
-                LocalSocket candidate = listener.accept();
-                try {
-                    candidate.setSoTimeout(3000);
-                    byte[] supplied = new byte[32];
-                    new DataInputStream(candidate.getInputStream()).readFully(supplied);
-                    if (!MessageDigest.isEqual(token, supplied)) {
-                        candidate.close();
-                        continue;
-                    }
-                    candidate.setSoTimeout(0);
-                    client = candidate;
-                    break;
-                } catch (IOException e) {
-                    candidate.close();
-                }
-            }
-            if (client == null) return;
+            if (acceptDesktop(listener, token) == null) return;
             Thread controls = new Thread(this::controls, "control");
             controls.setDaemon(true);
             controls.start();
@@ -160,6 +135,59 @@ public final class Main {
         } finally {
             stop();
         }
+    }
+
+    /** The desktop's authenticated connection, or null when the session stops or 20 s pass first. */
+    private LocalSocket acceptDesktop(LocalServerSocket listener, byte[] token) throws IOException {
+        // Closing the listener unblocks accept when the phone stops the session.
+        Thread acceptGuard = new Thread(() -> {
+            while (running) SystemClock.sleep(100);
+            try {
+                listener.close();
+            } catch (IOException ignored) {}
+        });
+        acceptGuard.setDaemon(true);
+        acceptGuard.start();
+        long connectDeadline = SystemClock.uptimeMillis() + 20000;
+        Thread expiry = new Thread(() -> {
+            while (running && client == null && SystemClock.uptimeMillis() < connectDeadline) SystemClock.sleep(100);
+            if (client == null) stop();
+        });
+        expiry.setDaemon(true);
+        expiry.start();
+        while (running) {
+            LocalSocket candidate = listener.accept();
+            try {
+                candidate.setSoTimeout(3000);
+                byte[] supplied = new byte[32];
+                new DataInputStream(candidate.getInputStream()).readFully(supplied);
+                if (!MessageDigest.isEqual(token, supplied)) {
+                    candidate.close();
+                    continue;
+                }
+                candidate.setSoTimeout(0);
+                client = candidate;
+                break;
+            } catch (IOException e) {
+                candidate.close();
+            }
+        }
+        return client;
+    }
+
+    /** Tells the desktop why the Companion refused, so it does not wait for the indicator. */
+    private void refuse(LocalServerSocket listener, byte[] token, String reason) throws IOException {
+        LocalSocket desktop = acceptDesktop(listener, token);
+        if (desktop == null) return;
+        packet(new DataOutputStream(desktop.getOutputStream()), 4, 0, 0, reason.getBytes(StandardCharsets.UTF_8));
+        // Exit only after the desktop closes: its ADB shell could otherwise report the exit first and
+        // the desktop would drop the connection before reading the reason.
+        desktop.setSoTimeout(5000);
+        try {
+            InputStream in = desktop.getInputStream();
+            byte[] rest = new byte[256];
+            while (in.read(rest) >= 0) {}
+        } catch (IOException ignored) {}
     }
 
     private Socket acceptNotice(ServerSocket server, byte[] token) throws IOException {

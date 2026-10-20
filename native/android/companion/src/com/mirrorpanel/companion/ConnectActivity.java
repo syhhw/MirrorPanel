@@ -3,6 +3,7 @@ package com.mirrorpanel.companion;
 import android.app.Activity;
 import android.content.Intent;
 import android.os.Bundle;
+import com.mirrorpanel.protocol.Handshake;
 
 /**
  * Entry point the desktop opens over ADB to start a session.
@@ -22,11 +23,13 @@ public final class ConnectActivity extends Activity {
         int port = getIntent().getIntExtra(EXTRA_PORT, 0);
         String token = getIntent().getStringExtra(EXTRA_TOKEN);
         if (port > 0 && port < 65536 && SessionService.validToken(token)) {
-            if (SessionService.indicatorAllowed(this)) {
+            // A running session answers first, so a busy phone is never reported as notifications off.
+            if (SessionService.isRunning() || SessionService.indicatorAllowed(this)) {
                 startForegroundService(
                     new Intent(this, SessionService.class).putExtra(EXTRA_PORT, port).putExtra(EXTRA_TOKEN, token)
                 );
             } else {
+                SessionService.refuse(port, token, Handshake.NO_INDICATOR);
                 startActivity(
                     new Intent(this, MainActivity.class)
                         .putExtra(MainActivity.EXTRA_INDICATOR_BLOCKED, true)
