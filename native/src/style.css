@@ -1131,6 +1131,33 @@ label.pref-row {
   min-width: 0;
 }
 
+/* While Android asks for the audio permission: what to tap, and why its dialog says recording. */
+.audio-hint {
+  position: absolute;
+  top: 56px;
+  left: 50%;
+  z-index: 5;
+  display: grid;
+  gap: 2px;
+  width: min(calc(100% - 24px), 290px);
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: rgb(21 24 25 / 0.92);
+  color: #e6e9e9;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.35);
+  translate: -50% 0;
+  pointer-events: none;
+  animation: notice-in var(--medium) var(--ease-out);
+}
+.audio-hint strong {
+  font: 600 13px/1.35 var(--font);
+}
+.audio-hint span {
+  font-size: 12px;
+  line-height: 1.45;
+  color: #b4bcbf;
+}
+
 .viewport {
   position: relative;
   flex: 1;

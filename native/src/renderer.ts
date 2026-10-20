@@ -634,6 +634,10 @@ function mirror(): void {
         <button id="mirror-help">${icon('help')} <span id="mirror-help-text"></span></button>
       </div>
       <div id="apk-drop" class="apk-drop" hidden role="status"></div>
+      <div id="audio-hint" class="audio-hint" role="status" hidden>
+        <strong id="audio-hint-title"></strong>
+        <span id="audio-hint-text"></span>
+      </div>
       <div id="shot" class="shot" role="dialog" aria-modal="true" aria-labelledby="shot-title" hidden>
         <div class="shot-card">
           <h2 id="shot-title"></h2>
@@ -695,6 +699,14 @@ function mirror(): void {
     $('volume-label').textContent = t('Volume no PC', 'PC volume');
     $('volume').setAttribute('aria-label', t('Volume no computador', 'Computer volume'));
     $('mirror-help-text').textContent = t('Mouse e atalhos', 'Mouse and shortcuts');
+    $('audio-hint-title').textContent = t(
+      'Toque em “Iniciar” no celular',
+      'Tap “Start now” on the phone',
+    );
+    $('audio-hint-text').textContent = t(
+      'O Android chama a liberação do som de “gravação ou transmissão”. O MirrorPanel usa só o áudio.',
+      'Android calls letting the sound out “recording or casting”. MirrorPanel only uses the audio.',
+    );
     $('apk-drop').textContent = t(
       'Solte para enviar os arquivos ao Android (pasta Download). Um APK sozinho é instalado.',
       'Drop to send the files to Android (Download folder). A single APK is installed.',
@@ -968,8 +980,10 @@ function mirror(): void {
     label($('audio'), audioLabel());
     $('audio').setAttribute('aria-pressed', String(audioState === 'started'));
     $<HTMLButtonElement>('audio').disabled = audioState === 'starting';
+    // Android's permission dialog speaks of recording or casting; say what to tap and why.
+    $('audio-hint').hidden = audioState !== 'starting';
     if (audioState === 'off' || audioState === 'error') audio.reset();
-    if (audioState === 'error' || audioState === 'starting') toast(status.message);
+    if (audioState === 'error') toast(status.message);
   });
   api.onAudioConfig((value: unknown) => {
     try {
