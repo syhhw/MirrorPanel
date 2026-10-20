@@ -37,7 +37,7 @@ export function quality(value: unknown): Quality {
     q.bitrate < 500000 ||
     q.bitrate > 50000000
   )
-    throw Error(t('Qualidade inválida', 'Invalid quality'));
+    throw Error(t('Invalid quality', 'Qualidade inválida'));
   return { maxSize: q.maxSize, fps: q.fps, bitrate: q.bitrate };
 }
 export type SessionState = 'starting' | 'mirroring' | 'stopping' | 'stopped';
@@ -46,10 +46,10 @@ export type SessionState = 'starting' | 'mirroring' | 'stopping' | 'stopped';
 function audioMessage(state: string): string {
   if (state === 'error')
     return t(
-      'A captura de áudio não está disponível neste aparelho.',
       'Audio capture is not available on this device.',
+      'A captura de áudio não está disponível neste aparelho.',
     );
-  return state === 'off' ? t('Áudio desligado', 'Audio off') : '';
+  return state === 'off' ? t('Audio off', 'Áudio desligado') : '';
 }
 
 /**
@@ -59,13 +59,13 @@ function audioMessage(state: string): string {
 export function refusalMessage(reason: string): string | undefined {
   if (reason === 'companion-busy')
     return t(
-      'Este celular já está espelhando em outro MirrorPanel. Encerre o espelhamento lá e tente de novo.',
       'This phone is already mirroring in another MirrorPanel. Stop mirroring there and try again.',
+      'Este celular já está espelhando em outro MirrorPanel. Encerre o espelhamento lá e tente de novo.',
     );
   if (reason === 'indicator-blocked')
     return t(
-      'As notificações do MirrorPanel Companion estão desligadas no Android. Ative-as para o aviso de espelhamento aparecer e tente de novo.',
       'MirrorPanel Companion notifications are off on Android. Turn them on so the mirroring notice can show, then try again.',
+      'As notificações do MirrorPanel Companion estão desligadas no Android. Ative-as para o aviso de espelhamento aparecer e tente de novo.',
     );
   return undefined;
 }
@@ -133,7 +133,7 @@ export class MirrorSession extends EventEmitter {
     this.remote = '/data/local/tmp/' + this.name + '.jar';
   }
   private checkpoint(): void {
-    if (this.stopping) throw Error(t('Sessão cancelada', 'Session canceled'));
+    if (this.stopping) throw Error(t('Session canceled', 'Sessão cancelada'));
   }
   async start(): Promise<void> {
     const started = Date.now();
@@ -144,8 +144,8 @@ export class MirrorSession extends EventEmitter {
       if (api < 29)
         throw Error(
           t(
-            'Este motor requer Android 10 ou mais recente.',
             'This engine requires Android 10 or newer.',
+            'Este motor requer Android 10 ou mais recente.',
           ),
         );
       this.checkpoint();
@@ -179,8 +179,8 @@ export class MirrorSession extends EventEmitter {
             reject(
               Error(
                 t(
-                  'O servidor Android não iniciou em 15 segundos.',
                   'The Android server did not start within 15 seconds.',
+                  'O servidor Android não iniciou em 15 segundos.',
                 ),
               ),
             ),
@@ -192,7 +192,7 @@ export class MirrorSession extends EventEmitter {
         });
         child.once('exit', (code) => {
           clearTimeout(timeout);
-          reject(Error(t('Servidor Android encerrou: ', 'Android server exited: ') + code));
+          reject(Error(t('Android server exited: ', 'Servidor Android encerrou: ') + code));
         });
         child.stdout.on('data', (data: Buffer) => {
           output = (output + data.toString()).slice(-8192);
@@ -216,7 +216,7 @@ export class MirrorSession extends EventEmitter {
         await this.adb.device(this.serial, ['forward', 'tcp:0', 'localabstract:' + this.name]),
       );
       if (!Number.isInteger(this.port) || this.port < 1 || this.port > 65535)
-        throw Error(t('ADB retornou uma porta inválida', 'ADB returned an invalid port'));
+        throw Error(t('ADB returned an invalid port', 'ADB retornou uma porta inválida'));
       this.checkpoint();
       // Separate token authenticates the visible Companion and its audio/IME bridge.
       await this.adb.shell(
@@ -246,8 +246,8 @@ export class MirrorSession extends EventEmitter {
             reject(
               Error(
                 t(
-                  'O Companion não confirmou o indicador de espelhamento. Verifique as notificações no Android.',
                   'The Companion did not confirm the mirroring indicator. Check notifications on Android.',
+                  'O Companion não confirmou o indicador de espelhamento. Verifique as notificações no Android.',
                 ),
               ),
             ),
@@ -272,13 +272,13 @@ export class MirrorSession extends EventEmitter {
         });
         socket.on('timeout', () => {
           clearTimeout(timeout);
-          reject(Error(t('Vídeo sem resposta', 'Video stopped responding')));
+          reject(Error(t('Video stopped responding', 'Vídeo sem resposta')));
           void this.end('timeout');
         });
         socket.once('close', (hadError) => {
           this.emit('diagnostic', 'socket-close', { hadError, stopping: this.stopping });
           clearTimeout(timeout);
-          reject(Error(t('Conexão de vídeo encerrada', 'Video connection closed')));
+          reject(Error(t('Video connection closed', 'Conexão de vídeo encerrada')));
           if (!this.stopping) void this.end('stream-ended');
         });
         socket.on('data', (data: Buffer) => {
@@ -357,7 +357,7 @@ export class MirrorSession extends EventEmitter {
           else
             pending.reject(
               Error(
-                t('Selecione um campo de texto no aparelho.', 'Select a text field on the device.'),
+                t('Select a text field on the device.', 'Selecione um campo de texto no aparelho.'),
               ),
             );
         }
@@ -385,7 +385,7 @@ export class MirrorSession extends EventEmitter {
           this.recording.addAudio(packet);
         } catch (e) {
           this.stopRecordingSafely();
-          this.notify('log', t('Falha ao gravar áudio: ', 'Audio recording failed: ') + String(e));
+          this.notify('log', t('Audio recording failed: ', 'Falha ao gravar áudio: ') + String(e));
         }
       this.notify('audio', packet);
       return;
@@ -396,8 +396,8 @@ export class MirrorSession extends EventEmitter {
         this.notify(
           'log',
           t(
-            'Gravação encerrada porque a tela girou. Inicie outra gravação para a nova orientação.',
             'Recording stopped because the screen rotated. Start a new recording for the new orientation.',
+            'Gravação encerrada porque a tela girou. Inicie outra gravação para a nova orientação.',
           ),
         );
       }
@@ -412,7 +412,7 @@ export class MirrorSession extends EventEmitter {
           this.recording.add(packet);
         } catch (e) {
           this.stopRecordingSafely();
-          this.notify('log', t('Erro ao gravar: ', 'Recording failed: ') + String(e));
+          this.notify('log', t('Recording failed: ', 'Erro ao gravar: ') + String(e));
         }
       }
       this.notify('video', packet);
@@ -441,7 +441,7 @@ export class MirrorSession extends EventEmitter {
     } catch (e) {
       this.notify(
         'log',
-        t('Falha ao finalizar arquivo: ', 'Could not finish the file: ') + String(e),
+        t('Could not finish the file: ', 'Falha ao finalizar arquivo: ') + String(e),
       );
     }
   }
@@ -452,19 +452,19 @@ export class MirrorSession extends EventEmitter {
     }
     if (this.socket && !this.socket.destroyed) {
       if (this.socket.writableLength > 128 * 1024)
-        throw Error(t('Fila de controle cheia', 'Control queue is full'));
+        throw Error(t('Control queue is full', 'Fila de controle cheia'));
       this.socket.write(controlPacket(value));
     }
   }
   private send(value: object): void {
     if (!this.socket || this.socket.destroyed || this.stopping)
-      throw Error(t('Sessão encerrada', 'Session ended'));
+      throw Error(t('Session ended', 'Sessão encerrada'));
     if (this.socket.writableLength > 128 * 1024)
-      throw Error(t('Fila de controle cheia', 'Control queue is full'));
+      throw Error(t('Control queue is full', 'Fila de controle cheia'));
     const body = Buffer.from(JSON.stringify(value), 'utf8'),
       size = Buffer.alloc(4);
     size.writeUInt32BE(body.length);
-    if (body.length > 131072) throw Error(t('Comando muito grande', 'Command too large'));
+    if (body.length > 131072) throw Error(t('Command too large', 'Comando muito grande'));
     this.socket.write(Buffer.concat([size, body]));
   }
   /**
@@ -488,8 +488,8 @@ export class MirrorSession extends EventEmitter {
       if (/INSTALL_FAILED_UPDATE_INCOMPATIBLE|signatures do not match/i.test(String(error)))
         throw Error(
           t(
-            'O MirrorPanel Companion do celular foi assinado por outra versão. Desinstale-o no Android e conecte de novo.',
             'The MirrorPanel Companion on the phone was signed by another build. Uninstall it on Android and connect again.',
+            'O MirrorPanel Companion do celular foi assinado por outra versão. Desinstale-o no Android e conecte de novo.',
           ),
         );
       throw error;
@@ -510,9 +510,9 @@ export class MirrorSession extends EventEmitter {
   }
   async text(text: string): Promise<void> {
     if (!validText(text))
-      throw Error(t('Texto inválido ou maior que 64 KiB', 'Invalid text or larger than 64 KiB'));
+      throw Error(t('Invalid text or larger than 64 KiB', 'Texto inválido ou maior que 64 KiB'));
     if (!text.length) return;
-    if (this.pendingText.size >= 256) throw Error(t('Fila de texto cheia', 'Text queue is full'));
+    if (this.pendingText.size >= 256) throw Error(t('Text queue is full', 'Fila de texto cheia'));
     const id = ++this.textId;
     return new Promise<void>((resolve, reject) => {
       const timer = setTimeout(() => {
@@ -520,8 +520,8 @@ export class MirrorSession extends EventEmitter {
         reject(
           Error(
             t(
-              'O aparelho não confirmou a entrada de texto',
               'The device did not confirm the text input',
+              'O aparelho não confirmou a entrada de texto',
             ),
           ),
         );
@@ -537,7 +537,7 @@ export class MirrorSession extends EventEmitter {
     });
   }
   async setAudio(enabled: boolean): Promise<void> {
-    if (this.stopping) throw Error(t('Sessão encerrada', 'Session ended'));
+    if (this.stopping) throw Error(t('Session ended', 'Sessão encerrada'));
     if (this.recording) this.stopRecording();
     if (!enabled) {
       this.send({ type: 'audio-stop' });
@@ -547,7 +547,7 @@ export class MirrorSession extends EventEmitter {
     this.audioState = 'starting';
     this.emit('audio-state', {
       state: 'starting',
-      message: t('Autorize a captura de áudio no aparelho.', 'Allow audio capture on the device.'),
+      message: t('Allow audio capture on the device.', 'Autorize a captura de áudio no aparelho.'),
     });
     try {
       await this.adb.shell(
@@ -569,8 +569,8 @@ export class MirrorSession extends EventEmitter {
       this.emit('audio-state', {
         state: 'error',
         message: t(
-          'Não foi possível abrir a autorização de áudio.',
           'Could not open the audio permission.',
+          'Não foi possível abrir a autorização de áudio.',
         ),
       });
       throw error;
@@ -599,12 +599,12 @@ export class MirrorSession extends EventEmitter {
   startRecording(path: string): void {
     if (this.recording)
       throw Error(
-        t('Já existe uma gravação nesta sessão', 'A recording is already running in this session'),
+        t('A recording is already running in this session', 'Já existe uma gravação nesta sessão'),
       );
     if (!this.info || !this.config)
-      throw Error(t('Aguarde o vídeo iniciar', 'Wait for the video to start'));
+      throw Error(t('Wait for the video to start', 'Aguarde o vídeo iniciar'));
     if (this.audioState === 'started' && !this.audioConfig)
-      throw Error(t('Aguarde o áudio iniciar', 'Wait for the audio to start'));
+      throw Error(t('Wait for the audio to start', 'Aguarde o áudio iniciar'));
     this.recording = new Recording(
       path,
       this.info,
@@ -645,7 +645,7 @@ export class MirrorSession extends EventEmitter {
       } catch (e) {
         this.emit(
           'log',
-          t('Falha ao finalizar arquivo: ', 'Could not finish the file: ') + String(e),
+          t('Could not finish the file: ', 'Falha ao finalizar arquivo: ') + String(e),
         );
       }
       const child = this.child;
@@ -659,7 +659,7 @@ export class MirrorSession extends EventEmitter {
       this.socket?.destroy();
       for (const pending of this.pendingText.values()) {
         clearTimeout(pending.timer);
-        pending.reject(Error(t('Sessão encerrada', 'Session ended')));
+        pending.reject(Error(t('Session ended', 'Sessão encerrada')));
       }
       this.pendingText.clear();
       await this.imeSetup?.catch(() => {});

@@ -104,8 +104,8 @@ function awaitDevice(serial: string): void {
 }
 const disconnectedMessage = () =>
   t(
-    'Aparelho desconectado. O espelhamento volta sozinho quando ele for reconectado.',
     'Device disconnected. Mirroring resumes by itself once it is connected again.',
+    'Aparelho desconectado. O espelhamento volta sozinho quando ele for reconectado.',
   );
 const closeOrigins = new WeakMap<BrowserWindow, string>();
 const diagnose = (event: string, data: Record<string, unknown> = {}) =>
@@ -217,7 +217,7 @@ function saveSettings(): void {
   renameSync(settingsFile + '.tmp', settingsFile);
 }
 function log(message: string, level = 'info'): void {
-  logs.push({ time: new Date().toLocaleTimeString(t('pt-BR', 'en-US')), message, level });
+  logs.push({ time: new Date().toLocaleTimeString(t('en-US', 'pt-BR')), message, level });
   if (logs.length > 300) logs.shift();
   broadcast();
 }
@@ -302,16 +302,16 @@ function secureWindow(options: Electron.BrowserWindowConstructorOptions): Browse
 }
 function assertPanel(event: IpcMainInvokeEvent): void {
   if (event.sender !== panel.webContents)
-    throw Error(t('Ação restrita ao painel', 'Only the panel can do this'));
+    throw Error(t('Only the panel can do this', 'Ação restrita ao painel'));
 }
 function mirrorWindow(event: IpcMainInvokeEvent): { serial: string; window: BrowserWindow } {
   for (const [serial, window] of mirrorWindows)
     if (!window.isDestroyed() && window.webContents === event.sender) return { serial, window };
-  throw Error(t('Janela desconhecida', 'Unknown window'));
+  throw Error(t('Unknown window', 'Janela desconhecida'));
 }
 function owner(event: IpcMainInvokeEvent): Entry {
   const entry = findBySender(sessions.values(), event.sender);
-  if (!entry) throw Error(t('Janela sem sessão', 'This window has no session'));
+  if (!entry) throw Error(t('This window has no session', 'Janela sem sessão'));
   return entry;
 }
 function assertDevice(serial: unknown): string {
@@ -320,7 +320,7 @@ function assertDevice(serial: unknown): string {
     !devices.some((d) => d.serial === serial && d.state === 'device')
   )
     throw Error(
-      t('Aparelho não está autorizado ou conectado', 'Device is not authorized or connected'),
+      t('Device is not authorized or connected', 'Aparelho não está autorizado ou conectado'),
     );
   return serial;
 }
@@ -370,7 +370,7 @@ async function refresh(): Promise<void> {
       if (wait.ready >= 2 && !sessions.has(serial) && !startOperations.has(serial)) {
         wait.ready = 0;
         wait.tries++;
-        log(t('Aparelho reconectado; retomando ', 'Device reconnected; resuming ') + serial);
+        log(t('Device reconnected; resuming ', 'Aparelho reconectado; retomando ') + serial);
         // Counts as a reconnect: if the link drops again mid-start, it goes back to waiting.
         void start(serial, 1);
       }
@@ -464,8 +464,8 @@ async function startSession(serial: string, attempt = 0, existing?: Entry): Prom
   diagnose('session-start', { id: entry.id, windowId: window.id, attempt });
   // The Android runtime takes seconds to start the engine; show which part is running.
   const startProgress: Record<string, () => string> = {
-    'server-pushed': () => t('Iniciando o motor no celular…', 'Starting the engine on the phone…'),
-    'server-ready': () => t('Abrindo a tela do aparelho…', 'Opening the device screen…'),
+    'server-pushed': () => t('Starting the engine on the phone…', 'Iniciando o motor no celular…'),
+    'server-ready': () => t('Opening the device screen…', 'Abrindo a tela do aparelho…'),
   };
   session.on('diagnostic', (event: string, details: Record<string, unknown>) => {
     diagnose(event, { id: entry.id, windowId: window.id, ...details });
@@ -473,7 +473,7 @@ async function startSession(serial: string, attempt = 0, existing?: Entry): Prom
     if (progress && session.state === 'starting') sendMirror(entry, 'session-status', progress());
   });
   if (blocker === undefined) blocker = powerSaveBlocker.start('prevent-display-sleep');
-  sendMirror(entry, 'session-status', t('Conectando…', 'Connecting…'));
+  sendMirror(entry, 'session-status', t('Connecting…', 'Conectando…'));
   session.on('log', (message: string) => log(serial + ': ' + message, 'warning'));
   session.on('state', () => broadcast());
   // A Companion that refuses (busy, indicator blocked) has said why; that is not a lost link.
@@ -580,34 +580,34 @@ async function startSession(serial: string, attempt = 0, existing?: Entry): Prom
     // start() rejects right after ending as start-failed and startSession shows its reason;
     // the generic text here would only flash before it.
     const reportedByStart = reason === 'start-failed';
-    let message = t('Não foi possível manter o espelhamento.', 'Mirroring could not continue.');
+    let message = t('Mirroring could not continue.', 'Não foi possível manter o espelhamento.');
     if (!window.isDestroyed()) {
       sendMirror(entry, 'audio-state', { state: 'off' });
       const messages: Record<string, string> = {
         'phone-stop': t(
-          'Espelhamento interrompido no aparelho.',
           'Mirroring was stopped on the device.',
+          'Espelhamento interrompido no aparelho.',
         ),
         'companion-lost': t(
-          'A conexão com o aplicativo Android foi interrompida.',
           'The connection to the Android app was interrupted.',
+          'A conexão com o aplicativo Android foi interrompida.',
         ),
-        'user-stop': t('Espelhamento encerrado.', 'Mirroring ended.'),
+        'user-stop': t('Mirroring ended.', 'Espelhamento encerrado.'),
         timeout: t(
-          'O aparelho deixou de responder à conexão.',
           'The device stopped responding to the connection.',
+          'O aparelho deixou de responder à conexão.',
         ),
         'stream-ended': t(
-          'A conexão com o aparelho foi interrompida.',
           'The connection to the device was interrupted.',
+          'A conexão com o aparelho foi interrompida.',
         ),
         'process-exit': t(
-          'O motor Android encerrou inesperadamente.',
           'The Android engine stopped unexpectedly.',
+          'O motor Android encerrou inesperadamente.',
         ),
         'protocol-error': t(
-          'Erro na comunicação com o aparelho.',
           'Communication with the device failed.',
+          'Erro na comunicação com o aparelho.',
         ),
       };
       message = messages[reason] ?? message;
@@ -633,8 +633,8 @@ async function startSession(serial: string, attempt = 0, existing?: Entry): Prom
           return;
         }
         if (devices.some((d) => d.serial === serial && d.state === 'device')) {
-          log(t('Reconectando ', 'Reconnecting ') + serial + ' (' + (attempt + 1) + '/3)');
-          sendMirror(entry, 'session-status', t('Reconectando…', 'Reconnecting…'));
+          log(t('Reconnecting ', 'Reconectando ') + serial + ' (' + (attempt + 1) + '/3)');
+          sendMirror(entry, 'session-status', t('Reconnecting…', 'Reconectando…'));
           await start(serial, attempt + 1, entry);
         } else {
           await finishEntry(serial, entry);
@@ -725,9 +725,9 @@ async function startSession(serial: string, attempt = 0, existing?: Entry): Prom
         }
       }
       log(
-        t('A janela de vídeo falhou (', 'The video window failed (') +
+        t('The video window failed (', 'A janela de vídeo falhou (') +
           details.reason +
-          t('). Recuperando a imagem…', '). Restoring the picture…'),
+          t('). Restoring the picture…', '). Recuperando a imagem…'),
         'warning',
       );
       // A renderer failure must not destroy a healthy Android transport or its window.
@@ -748,8 +748,8 @@ async function startSession(serial: string, attempt = 0, existing?: Entry): Prom
         if (!resume || sessions.get(serial) !== current || current.requestedStop) {
           window.webContents.send('session-status', {
             message: t(
-              'Não foi possível recuperar o vídeo. Tente reconectar.',
               'The video could not be restored. Try reconnecting.',
+              'Não foi possível recuperar o vídeo. Tente reconectar.',
             ),
             retry: true,
           });
@@ -771,8 +771,8 @@ async function startSession(serial: string, attempt = 0, existing?: Entry): Prom
             ? ''
             : {
                 message: t(
-                  'Reconecte para retomar o espelhamento.',
                   'Reconnect to resume mirroring.',
+                  'Reconecte para retomar o espelhamento.',
                 ),
                 retry: true,
               },
@@ -811,7 +811,7 @@ async function startSession(serial: string, attempt = 0, existing?: Entry): Prom
     if (!window.isDestroyed()) sendMirror(entry, 'session-status', '');
     awaitingDevice.delete(serial);
     diagnose('session-ready', { id: entry.id, windowId: window.id });
-    log(t('Espelhando ', 'Mirroring ') + (device?.model ?? serial));
+    log(t('Mirroring ', 'Espelhando ') + (device?.model ?? serial));
     broadcast();
   } catch (e) {
     entry.requestedStop = true;
@@ -886,13 +886,13 @@ function validateAddress(value: unknown): string {
   if (typeof value !== 'string' || !/^([\d]{1,3}\.){3}\d{1,3}:\d{1,5}$/.test(value))
     throw Error(
       t(
-        'Informe IP:porta, por exemplo 192.168.1.10:5555',
         'Enter IP:port, for example 192.168.1.10:5555',
+        'Informe IP:porta, por exemplo 192.168.1.10:5555',
       ),
     );
   const [ip, port] = value.split(':');
   if (ip.split('.').some((n) => Number(n) > 255) || Number(port) < 1 || Number(port) > 65535)
-    throw Error(t('Endereço inválido', 'Invalid address'));
+    throw Error(t('Invalid address', 'Endereço inválido'));
   return value;
 }
 function handlers(): void {
@@ -904,7 +904,7 @@ function handlers(): void {
         action,
       )
     )
-      throw Error(t('Ação de janela inválida', 'Invalid window action'));
+      throw Error(t('Invalid window action', 'Ação de janela inválida'));
     if (window.isDestroyed()) return null;
     if (action !== 'state') diagnose('window-action', { windowId: window.id, action });
     if (action === 'close') {
@@ -961,7 +961,7 @@ function handlers(): void {
     const key = assertDevice(serial);
     if (sessions.has(key))
       throw Error(
-        t('Pare o espelhamento para alterar a qualidade', 'Stop mirroring to change the quality'),
+        t('Stop mirroring to change the quality', 'Pare o espelhamento para alterar a qualidade'),
       );
     settings.quality[key] = quality(value);
     saveSettings();
@@ -969,7 +969,7 @@ function handlers(): void {
   });
   const renameDevice = (key: string, value: unknown) => {
     if (typeof value !== 'string' || value.length > 80)
-      throw Error(t('Nome inválido', 'Invalid name'));
+      throw Error(t('Invalid name', 'Nome inválido'));
     settings.nicknames[key] = value.trim();
     saveSettings();
     const entry = sessions.get(key);
@@ -1013,7 +1013,7 @@ function handlers(): void {
     const entry = sessions.get(key);
     if (!entry) return { reconnecting: false };
     // The engine takes its quality when it starts: reconnect this window to apply it now.
-    log(t('Aplicando a nova qualidade em ', 'Applying the new quality on ') + key);
+    log(t('Applying the new quality on ', 'Aplicando a nova qualidade em ') + key);
     entry.requestedStop = true;
     await entry.session.stop();
     await finishEntry(key, entry);
@@ -1029,7 +1029,7 @@ function handlers(): void {
       !['pt', 'en'].includes(value.language) ||
       (value.theme !== undefined && !THEMES.includes(value.theme))
     )
-      throw Error(t('Preferências inválidas', 'Invalid preferences'));
+      throw Error(t('Invalid preferences', 'Preferências inválidas'));
     settings.alwaysOnTop = value.alwaysOnTop;
     settings.stayAwake = value.stayAwake;
     settings.language = value.language;
@@ -1054,7 +1054,7 @@ function handlers(): void {
   });
   ipcMain.handle('audio', (event, enabled) => {
     if (typeof enabled !== 'boolean')
-      throw Error(t('Estado de áudio inválido', 'Invalid audio state'));
+      throw Error(t('Invalid audio state', 'Estado de áudio inválido'));
     return owner(event).session.setAudio(enabled);
   });
   ipcMain.on('frame-ack', (event, id: number) => {
@@ -1064,22 +1064,22 @@ function handlers(): void {
   });
   ipcMain.handle('record', (event, serial) => {
     const entry = event.sender === panel.webContents ? sessions.get(String(serial)) : owner(event);
-    if (!entry) throw Error(t('Inicie o espelhamento', 'Start mirroring first'));
+    if (!entry) throw Error(t('Start mirroring first', 'Inicie o espelhamento'));
     if (entry.session.recording) {
       const path = entry.session.recording.path;
       entry.session.stopRecording();
-      log(t('Gravação salva: ', 'Recording saved: ') + path);
+      log(t('Recording saved: ', 'Gravação salva: ') + path);
       return null;
     }
     const path = mediaPath('mp4');
     entry.session.startRecording(path);
-    log(t('Gravando: ', 'Recording: ') + path);
+    log(t('Recording: ', 'Gravando: ') + path);
     return path;
   });
   ipcMain.handle('screenshot', async (event, serial) => {
     const entry = event.sender === panel.webContents ? sessions.get(String(serial)) : owner(event);
     if (!entry || entry.window.isDestroyed())
-      throw Error(t('Inicie o espelhamento', 'Start mirroring first'));
+      throw Error(t('Start mirroring first', 'Inicie o espelhamento'));
     sendMirror(entry, 'take-screenshot');
   });
   /** A screenshot from the mirror window: a PNG of reasonable size, nothing else. */
@@ -1090,7 +1090,7 @@ function handlers(): void {
       png.byteLength > 32 * 1024 * 1024 ||
       Buffer.from(png).readUInt32BE(0) !== 0x89504e47
     )
-      throw Error(t('PNG inválido', 'Invalid PNG'));
+      throw Error(t('Invalid PNG', 'PNG inválido'));
     return png;
   };
   ipcMain.handle('copy-png', async (event, png) => {
@@ -1098,7 +1098,7 @@ function handlers(): void {
     const bytes = new Uint8Array(validPng(png));
     // Decoding proves it is a real image before it reaches the system clipboard.
     if (nativeImage.createFromBuffer(Buffer.from(bytes)).isEmpty())
-      throw Error(t('PNG inválido', 'Invalid PNG'));
+      throw Error(t('Invalid PNG', 'PNG inválido'));
     await clipboard.write([
       new ClipboardItem({ 'image/png': new Blob([bytes], { type: 'image/png' }) }),
     ]);
@@ -1108,7 +1108,7 @@ function handlers(): void {
     validPng(png);
     const path = mediaPath('png');
     writeFileSync(path, png, { flag: 'wx' });
-    log(t('Captura salva: ', 'Screenshot saved: ') + path);
+    log(t('Screenshot saved: ', 'Captura salva: ') + path);
     return path;
   });
   ipcMain.handle('paste', async (event) => {
@@ -1143,13 +1143,13 @@ function handlers(): void {
     assertPanel(event);
     const target = validateAddress(address);
     if (typeof code !== 'string' || !/^\d{6}$/.test(code))
-      throw Error(t('O código deve ter 6 dígitos', 'The code must have 6 digits'));
+      throw Error(t('The code must have 6 digits', 'O código deve ter 6 dígitos'));
     const result = await adb.run(['pair', target, code]);
     if (!result.includes('Successfully paired')) throw Error(result);
     log(
       t(
-        'Pareamento concluído. Use a porta de conexão para conectar.',
         'Paired. Use the connection port to connect.',
+        'Pareamento concluído. Use a porta de conexão para conectar.',
       ),
     );
     await refresh();
@@ -1161,8 +1161,8 @@ function handlers(): void {
     if (!ip)
       throw Error(
         t(
-          'Conecte o celular a uma rede Wi-Fi primeiro',
           'Connect the phone to a Wi-Fi network first',
+          'Conecte o celular a uma rede Wi-Fi primeiro',
         ),
       );
     await adb.device(valid, ['tcpip', '5555']);
@@ -1182,13 +1182,13 @@ function handlers(): void {
   ipcMain.handle('mirror-usb-wifi', (event) => useWifi(assertDevice(mirrorWindow(event).serial)));
   const installApk = async (valid: string, parent: BrowserWindow) => {
     const result = await dialog.showOpenDialog(parent, {
-      title: t('Instalar APK no aparelho', 'Install APK on the device'),
+      title: t('Install APK on the device', 'Instalar APK no aparelho'),
       filters: [{ name: 'Android APK', extensions: ['apk'] }],
       properties: ['openFile'],
     });
     if (result.canceled) return;
     const name = await installer.install(valid, result.filePaths[0]);
-    log(t('APK instalado: ', 'APK installed: ') + name);
+    log(t('APK installed: ', 'APK instalado: ') + name);
     return name;
   };
   ipcMain.handle('install-apk', (event, serial) => {
@@ -1200,7 +1200,7 @@ function handlers(): void {
     assertPanel(event);
     const window = mirrorWindows.get(assertDevice(serial));
     if (!window || window.isDestroyed())
-      throw Error(t('Inicie o espelhamento', 'Start mirroring first'));
+      throw Error(t('Start mirroring first', 'Inicie o espelhamento'));
     window.restore();
     window.show();
     window.focus();
@@ -1217,7 +1217,7 @@ function handlers(): void {
     diagnose('file-transfer-start', { windowId: window.id, count: files.length });
     try {
       const names = await fileSender.send(serial, files);
-      log(t('Enviado para Download: ', 'Sent to Download: ') + names.join(', '));
+      log(t('Sent to Download: ', 'Enviado para Download: ') + names.join(', '));
       diagnose('file-transfer-complete', { windowId: window.id, count: names.length });
       return names;
     } catch (error) {
@@ -1230,12 +1230,12 @@ function handlers(): void {
     assertDevice(serial);
     if (typeof path !== 'string' || !path)
       throw Error(
-        t('Arraste um APK salvo neste computador.', 'Drop an APK saved on this computer.'),
+        t('Drop an APK saved on this computer.', 'Arraste um APK salvo neste computador.'),
       );
     diagnose('apk-install-start', { windowId: window.id });
     try {
       const name = await installer.install(serial, path);
-      log(t('APK instalado: ', 'APK installed: ') + name);
+      log(t('APK installed: ', 'APK instalado: ') + name);
       diagnose('apk-install-complete', { windowId: window.id });
       return name;
     } catch (error) {
@@ -1301,8 +1301,8 @@ else {
     if (!existsSync(adb.executable) || !existsSync(join(resources, 'mirrorpanel-server.jar')))
       log(
         t(
-          'Recursos ausentes. Execute npm run android antes de iniciar.',
           'Missing resources. Run npm run android before starting.',
+          'Recursos ausentes. Execute npm run android antes de iniciar.',
         ),
         'error',
       );

@@ -46,12 +46,12 @@ export class Adb {
       // execFile's default message contains the full command, including bootstrap
       // credentials. Keep command arguments and token-bearing am output private.
       const detail = args.includes('shell')
-        ? t('Falha no comando Android', 'Android command failed')
+        ? t('Android command failed', 'Falha no comando Android')
         : failure.stderr?.trim().slice(0, 1000);
       throw Error(
         failure.killed
-          ? t('ADB excedeu o tempo limite', 'ADB timed out')
-          : detail || t('Falha no ADB (', 'ADB failed (') + String(failure.code) + ')',
+          ? t('ADB timed out', 'ADB excedeu o tempo limite')
+          : detail || t('ADB failed (', 'Falha no ADB (') + String(failure.code) + ')',
       );
     }
   }

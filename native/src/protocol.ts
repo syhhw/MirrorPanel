@@ -28,26 +28,26 @@ export class PacketReader {
     while (this.buffer.length - position >= 20) {
       const head = this.buffer.subarray(position);
       if (head.readUInt32BE(0) !== 0x4d505631 || head.readUInt16BE(6) !== 0)
-        throw Error(t('Protocolo de vídeo incompatível', 'Incompatible video protocol'));
+        throw Error(t('Incompatible video protocol', 'Protocolo de vídeo incompatível'));
       const type = head[4],
         flags = head[5],
         length = head.readUInt32BE(8);
       if (![1, 2, 3, 4, 5].includes(type) || flags > 3 || length > MAX_PACKET)
-        throw Error(t('Pacote de vídeo inválido', 'Invalid video packet'));
+        throw Error(t('Invalid video packet', 'Pacote de vídeo inválido'));
       if (head.length < 20 + length) break;
       const pts = Number(head.readBigUInt64BE(12));
-      if (!Number.isSafeInteger(pts)) throw Error(t('Timestamp inválido', 'Invalid timestamp'));
+      if (!Number.isSafeInteger(pts)) throw Error(t('Invalid timestamp', 'Timestamp inválido'));
       result.push({ type, flags, pts, data: Buffer.from(head.subarray(20, 20 + length)) });
       position += 20 + length;
     }
     this.buffer = this.buffer.subarray(position);
     if (this.buffer.length > MAX_PACKET + 20)
-      throw Error(t('Buffer de vídeo excedido', 'Video buffer exceeded'));
+      throw Error(t('Video buffer exceeded', 'Buffer de vídeo excedido'));
     return result;
   }
   end(): void {
     if (this.buffer.length)
-      throw Error(t('Stream terminou com pacote truncado', 'Stream ended with a truncated packet'));
+      throw Error(t('Stream ended with a truncated packet', 'Stream terminou com pacote truncado'));
   }
 }
 
@@ -59,7 +59,7 @@ export function parseInfo(data: Buffer): VideoInfo {
       (n) => Number.isInteger(n) && n > 0 && n <= 8192,
     )
   )
-    throw Error(t('Dimensões de vídeo inválidas', 'Invalid video dimensions'));
+    throw Error(t('Invalid video dimensions', 'Dimensões de vídeo inválidas'));
   return info;
 }
 
@@ -86,7 +86,7 @@ export function avcConfiguration(data: Uint8Array): { codec: string; description
     sps = units.find((n) => (n[0] & 31) === 7),
     pps = units.find((n) => (n[0] & 31) === 8);
   if (!sps || sps.length < 4 || !pps || sps.length > 65535 || pps.length > 65535)
-    throw Error(t('SPS/PPS ausentes', 'Missing SPS/PPS'));
+    throw Error(t('Missing SPS/PPS', 'SPS/PPS ausentes'));
   const description = Buffer.concat([
     Buffer.from([1, sps[1], sps[2], sps[3], 255, 225, sps.length >> 8, sps.length & 255]),
     sps,
@@ -98,7 +98,7 @@ export function avcConfiguration(data: Uint8Array): { codec: string; description
 
 export function lengthPrefixed(data: Uint8Array): Uint8Array {
   const units = nalUnits(data);
-  if (!units.length) throw Error(t('H.264 Annex-B inválido', 'Invalid H.264 Annex-B'));
+  if (!units.length) throw Error(t('Invalid H.264 Annex-B', 'H.264 Annex-B inválido'));
   return Buffer.concat(
     units.flatMap((n) => {
       const size = Buffer.alloc(4);
@@ -126,7 +126,7 @@ export function validText(text: unknown): text is string {
   );
 }
 export function validateControl(value: unknown): Control {
-  if (!value || typeof value !== 'object') throw Error(t('Controle inválido', 'Invalid control'));
+  if (!value || typeof value !== 'object') throw Error(t('Invalid control', 'Controle inválido'));
   const v = value as Record<string, unknown>;
   if (v.type === 'sync' || v.type === 'stop') return { type: v.type };
   if (v.type === 'key' && Number.isInteger(v.code) && Number(v.code) >= 0 && Number(v.code) <= 400)
@@ -153,17 +153,17 @@ export function validateControl(value: unknown): Control {
           !coordinate(p.y) ||
           points.some((q) => q.id === p.id)
         )
-          throw Error(t('Pontos de toque inválidos', 'Invalid touch points'));
+          throw Error(t('Invalid touch points', 'Pontos de toque inválidos'));
         points.push({ id: p.id, x: p.x, y: p.y });
       }
       if (!points.some((p) => p.id === v.id))
-        throw Error(t('Ponto alterado ausente', 'Changed touch point is missing'));
+        throw Error(t('Changed touch point is missing', 'Ponto alterado ausente'));
       return { type: 'touch', action: Number(v.action), id: Number(v.id), pointers: points };
     }
     if (coordinate(v.x) && coordinate(v.y))
       return { type: 'touch', action: Number(v.action), x: v.x, y: v.y };
   }
-  throw Error(t('Controle inválido', 'Invalid control'));
+  throw Error(t('Invalid control', 'Controle inválido'));
 }
 
 export function controlPacket(value: unknown): Buffer {

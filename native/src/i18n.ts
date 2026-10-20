@@ -15,7 +15,7 @@ export function language(): Language {
   return current;
 }
 
-/** Picks the Portuguese or English text for the current language. */
-export function t(pt: string, en: string): string {
+/** Picks the English or Portuguese text for the current language. */
+export function t(en: string, pt: string): string {
   return current === 'en' ? en : pt;
 }

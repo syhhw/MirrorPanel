@@ -25,26 +25,26 @@ export function isLocalPath(path: string): boolean {
 export async function validateDroppedFiles(value: unknown): Promise<DroppedFile[]> {
   if (!Array.isArray(value) || value.length < 1 || value.length > MAX_FILES)
     throw Error(
-      t(`Envie de 1 a ${MAX_FILES} arquivos por vez.`, `Send 1 to ${MAX_FILES} files at a time.`),
+      t(`Send 1 to ${MAX_FILES} files at a time.`, `Envie de 1 a ${MAX_FILES} arquivos por vez.`),
     );
   const files: DroppedFile[] = [];
   for (const path of value) {
     if (typeof path !== 'string' || !path)
       throw Error(
-        t('Arraste arquivos salvos neste computador.', 'Drop files saved on this computer.'),
+        t('Drop files saved on this computer.', 'Arraste arquivos salvos neste computador.'),
       );
     if (!isLocalPath(path))
       throw Error(
         t(
-          'Só arquivos deste computador podem ser enviados.',
           'Only files on this computer can be sent.',
+          'Só arquivos deste computador podem ser enviados.',
         ),
       );
     const info = await stat(path).catch(() => undefined);
     if (!info?.isFile())
-      throw Error(t('Pastas não podem ser enviadas.', 'Folders cannot be sent.'));
+      throw Error(t('Folders cannot be sent.', 'Pastas não podem ser enviadas.'));
     if (info.size > MAX_FILE_BYTES)
-      throw Error(t('Arquivo maior que 4 GB: ', 'File larger than 4 GB: ') + basename(path));
+      throw Error(t('File larger than 4 GB: ', 'Arquivo maior que 4 GB: ') + basename(path));
     files.push({ path, name: basename(path), size: info.size });
   }
   return files;
@@ -78,7 +78,7 @@ export class FileSender {
   async send(serial: string, files: DroppedFile[]): Promise<string[]> {
     if (this.busy.has(serial))
       throw Error(
-        t('Aguarde a transferência atual terminar.', 'Wait for the current transfer to finish.'),
+        t('Wait for the current transfer to finish.', 'Aguarde a transferência atual terminar.'),
       );
     this.busy.add(serial);
     try {

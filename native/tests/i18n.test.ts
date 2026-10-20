@@ -5,9 +5,9 @@ import { validateControl } from '../src/protocol';
 
 test('texts follow the interface language, Portuguese by default', () => {
   assert.equal(language(), 'pt');
-  assert.equal(t('Sim', 'Yes'), 'Sim');
+  assert.equal(t('Yes', 'Sim'), 'Sim');
   setLanguage('en');
-  assert.equal(t('Sim', 'Yes'), 'Yes');
+  assert.equal(t('Yes', 'Sim'), 'Yes');
   setLanguage('pt');
 });
 
