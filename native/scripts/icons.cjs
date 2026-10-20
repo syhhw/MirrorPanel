@@ -30,12 +30,14 @@ function ico(pngs) {
   return Buffer.concat([header, ...pngs.map((png) => png.data)]);
 }
 
-app.whenReady().then(async () => {
-  const window = new BrowserWindow({ show: false });
-  await window.loadURL('data:text/html,<canvas></canvas>');
-  const render = (svg, size) => {
-    const source = 'data:image/svg+xml;base64,' + Buffer.from(svg).toString('base64');
-    return window.webContents.executeJavaScript(`new Promise((resolve, reject) => {
+app
+  .whenReady()
+  .then(async () => {
+    const window = new BrowserWindow({ show: false });
+    await window.loadURL('data:text/html,<canvas></canvas>');
+    const render = (svg, size) => {
+      const source = 'data:image/svg+xml;base64,' + Buffer.from(svg).toString('base64');
+      const drawing = window.webContents.executeJavaScript(`new Promise((resolve, reject) => {
       const image = new Image();
       image.onload = () => {
         const canvas = document.querySelector('canvas');
@@ -48,16 +50,26 @@ app.whenReady().then(async () => {
       image.onerror = () => reject(new Error('SVG did not load'));
       image.src = ${JSON.stringify(source)};
     })`);
-  };
-  const out = path.join(logo, 'png');
-  fs.mkdirSync(out, { recursive: true });
-  const pngs = [];
-  for (const size of sizes) {
-    const data = Buffer.from(await render(size <= 32 ? small : master, size), 'base64');
-    fs.writeFileSync(path.join(out, `mirrorpanel-${size}.png`), data);
-    if (icoSizes.includes(size)) pngs.push({ size, data });
-  }
-  fs.writeFileSync(path.join(logo, 'mirrorpanel.ico'), ico(pngs));
-  console.log(`Icons OK: ${sizes.length} PNGs and mirrorpanel.ico`);
-  app.quit();
-});
+      // A renderer that crashed never answers; fail instead of waiting forever.
+      const timeout = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error(`rendering ${size} px took too long`)), 10_000).unref(),
+      );
+      return Promise.race([drawing, timeout]);
+    };
+    const out = path.join(logo, 'png');
+    fs.mkdirSync(out, { recursive: true });
+    const pngs = [];
+    for (const size of sizes) {
+      const data = Buffer.from(await render(size <= 32 ? small : master, size), 'base64');
+      fs.writeFileSync(path.join(out, `mirrorpanel-${size}.png`), data);
+      if (icoSizes.includes(size)) pngs.push({ size, data });
+    }
+    fs.writeFileSync(path.join(logo, 'mirrorpanel.ico'), ico(pngs));
+    console.log(`Icons OK: ${sizes.length} PNGs and mirrorpanel.ico`);
+    app.quit();
+  })
+  .catch((error) => {
+    // Exit with an error code instead of leaving Electron's error dialog open.
+    console.error('Icons failed:', error.message);
+    app.exit(1);
+  });
