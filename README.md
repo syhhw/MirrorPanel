@@ -1,53 +1,48 @@
 # MirrorPanel
 
-<div align="center">
+**MirrorPanel 2.0 preview 5** espelha e controla Android com motor próprio:
+Electron + WebCodecs no computador e servidor Java no aparelho. Executa sem
+Python nem programas de terceiros; o ADB oficial vem incluído.
 
-[![Baixar MirrorPanel](https://img.shields.io/badge/⬇%20Baixar%20agora-MirrorPanel--Setup.exe-2ea043?style=for-the-badge&logo=windows11&logoColor=white)](https://github.com/syhhw/MirrorPanel/releases/latest/download/MirrorPanel-Setup.exe)
-[![Última versão](https://img.shields.io/github/v/release/syhhw/MirrorPanel?label=vers%C3%A3o&color=1f6feb)](https://github.com/syhhw/MirrorPanel/releases/latest)
-[![Testes](https://github.com/syhhw/MirrorPanel/actions/workflows/tests.yml/badge.svg)](https://github.com/syhhw/MirrorPanel/actions/workflows/tests.yml)
+Abra **Abrir MirrorPanel 2.0.vbs**. O executável fica em
+`native/dist/MirrorPanel-win32-x64/MirrorPanel.exe`; mantenha a pasta inteira.
+Conecte um Android **10+**, autorize a depuração USB e clique no botão circular **Espelhar**.
 
-![Interface do MirrorPanel com aparelhos de demonstração](docs/ui-polish/panel-pt.png)
+Recursos: vídeo H.264, áudio estéreo com autorização no celular, Unicode e
+composição de texto, multitoque com Alt+clique, MP4 com som, PNG, fullscreen,
+janelas por aparelho, qualidade, Wi-Fi e instalação de APK.
 
-</div>
+O ícone de fone ativa áudio. Alt+clique fixa um dedo; arraste para usar o outro.
+Esc cancela contatos ou volta. O Companion mostra orientação e estado; encerrar o espelhamento é feito pelo computador.
 
-Painel para gerenciar o espelhamento e a gravação de vários aparelhos Android ao mesmo tempo, usando [scrcpy](https://github.com/Genymobile/scrcpy) e o ADB por baixo dos panos — sem precisar mexer em linha de comando.
+É uma preview: a [matriz de validação](native/docs/VALIDATION.md) registra testes
+reais e limites. Áudio depende da política do aplicativo Android. H.265,
+clipboard bidirecional, QR, bandeja e atualização automática ainda não existem.
+Rotação e mudança do áudio finalizam a gravação atual.
 
-> **O MirrorPanel não espelha nada sozinho.** Todo o trabalho pesado — captura de tela, decodificação de vídeo, controle do aparelho — é feito pelo [scrcpy](https://github.com/Genymobile/scrcpy), criado por **Romain Vimont ([rom1v](https://github.com/rom1v))** e mantido pela [Genymobile](https://github.com/Genymobile). Este projeto é só uma interface gráfica por cima dele (e do ADB), pra deixar o uso com vários aparelhos mais simples e visual. Sem o scrcpy, o MirrorPanel não existiria — todo o crédito técnico é deles.
+A preview 5 acomoda a proporção depois de soltar a borda, recupera falhas do
+renderer sem fechar a janela, aceita APK por arraste e anima os botões de navegação.
+No celular, fechar a tela de orientação não interrompe o espelho.
+[Detalhes e testes desta revisão](native/docs/PREVIEW5.md).
 
-## O que ele faz
+## Desenvolvimento
 
-- Detecta automaticamente os celulares conectados por USB e lista todos, parados, até você decidir o que espelhar.
-- Espelha a tela de qualquer aparelho com um clique em **Iniciar** — cada um numa janela própria, do tamanho certo (sem esticar nem cortar).
-- Ativa Wi-Fi num aparelho conectado por cabo com um botão. Reconhece que é o mesmo aparelho físico (mesmo depois de tirar o cabo) e nunca abre duas janelas pro mesmo celular.
-- Se o espelhamento cair (cabo com mau contato, scrcpy travou), tenta reconectar sozinho em segundo plano antes de incomodar — só avisa e pergunta se quer tentar de novo se isso realmente falhar.
-- Grava a tela e tira prints, salvando tudo organizado em **Vídeos\MirrorPanel Media**, com um modo leve (bitrate/fps/resolução reduzidos) pra aparelhos mais antigos não travarem durante a gravação.
-- Ajusta qualidade (codec, bitrate, taxa de quadros, áudio) individualmente por aparelho, direto pela interface.
-- Mantém a tela do celular sempre ligada enquanto está espelhando.
-- Interface escura com Segoe UI nativa do Windows, lista rolável e controles organizados por aparelho.
-- Atividade recente com horários alinhados, filtro de avisos/erros, cópia e limpeza. Novos eventos preservam a posição de leitura.
-- Minimiza para a bandeja do Windows; fechar o painel encerra as sessões que ele abriu, preservando sessões externas de scrcpy e o servidor ADB compartilhado.
-- Cada gravação usa um arquivo exclusivo. Parar, desconectar ou reiniciar o espelhamento encerra a gravação; para continuar, inicie uma nova.
-- Verifica atualizações automaticamente ao abrir (e tem um botão pra checar na hora que quiser).
+O código ativo está em [native](native/README.md). Os arquivos Python históricos
+não são iniciados nem incluídos no pacote 2.0. A documentação anterior fica em
+[README 1.x](docs/README-1.x.md); releases públicas e tags anteriores não mudaram.
 
-## Como instalar
+```powershell
+npm run setup
+npm run android
+npm run typecheck
+npm run lint
+npm test
+npm run test:android
+npm start
+npm run package
+```
 
-Baixe o instalador mais recente na aba [Releases](https://github.com/syhhw/MirrorPanel/releases) deste repositório e rode o `MirrorPanel-Setup.exe`. O instalador deixa escolher o idioma (português ou inglês), a pasta de instalação, e se quer atalho na área de trabalho e no Menu Iniciar.
+[Arquitetura](docs/ENGINE.md) · [Protocolo MPV1](native/docs/PROTOCOL.md) · [Build, testes e assinatura](native/README.md).
 
-## Como usar
-
-1. Conecte o celular ao PC por USB, com a depuração USB ativada (Configurações → Opções do desenvolvedor).
-2. Abra o MirrorPanel — os aparelhos detectados aparecem na lista, prontos pra usar.
-3. Clique em **Iniciar** no aparelho que quiser espelhar.
-4. Use os botões ao lado de cada aparelho pra ativar Wi-Fi, gravar, tirar print ou ajustar a qualidade daquele aparelho especificamente.
-
-## Baseado em
-
-Este projeto usa e distribui os seguintes componentes de terceiros:
-
-- [scrcpy](https://github.com/Genymobile/scrcpy) (Genymobile) — Apache License 2.0
-- [Android Debug Bridge (adb)](https://developer.android.com/tools/adb) (Android Open Source Project) — Apache License 2.0
-- A interface usa as fontes Segoe UI e Consolas disponíveis no Windows. Os arquivos históricos de Inter em `assets/fonts` mantêm sua licença SIL Open Font License 1.1 e não são carregados pela interface.
-
-## Licença
-
-Distribuído sob a Apache License 2.0 — veja o arquivo [LICENSE](LICENSE).
+MirrorPanel usa Apache-2.0; Electron/mp4-muxer MIT; avisos ADB/Chromium acompanham
+o portátil.

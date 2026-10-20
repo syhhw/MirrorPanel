@@ -1,12 +1,17 @@
 name: Release
 
-# Dispara so quando uma tag vX.Y.Z (ou vX.Y.Z-N, padrao ja usado neste
+# Dispara so quando uma tag v1.Y.Z (ou v1.Y.Z-N, padrao ja usado neste
 # projeto) e enviada - "git tag v1.3.0 && git push origin v1.3.0" e o unico
 # passo manual que sobra; o resto (build, instalador, release) e tudo aqui.
+#
+# Restrito a v1.*: este workflow empacota o app Python 1.x. Uma tag v2.* aqui
+# publicaria um instalador 1.x como "latest" e o atualizador da 1.3.1 (que
+# compara so os numeros da tag) instalaria isso sozinho em todos os usuarios.
+# O 2.0 precisa de um workflow de release proprio.
 on:
   push:
     tags:
-      - "v*"
+      - "v1.*"
 
 permissions:
   contents: write # gh release create precisa disso pra publicar
