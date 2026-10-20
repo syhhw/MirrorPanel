@@ -5,8 +5,9 @@ without Python or third-party programs. It includes the official ADB for USB/Wi-
 
 ## Usage
 
-Open `dist/MirrorPanel-win32-x64/MirrorPanel.exe` or **Open MirrorPanel.vbs**
-at the project root. Keep the files of the portable folder together.
+Install with `MirrorPanel-Setup-<version>.exe` from the GitHub releases, or run
+`dist/MirrorPanel-win32-x64/MirrorPanel.exe` after `npm run package`. Keep the
+files of that folder together.
 
 1. Android **10 or later**, USB debugging enabled and the computer authorized.
 2. Click the phone drawn in the panel. The app installs its Companion and shows
@@ -82,7 +83,7 @@ on a physical network in this round.
 
 Windows x64, Node >=22.12, Python 3, JDK 17, SDK `platforms;android-35` and
 `build-tools;36.0.0`. Set `JAVA_HOME` and `ANDROID_HOME` if needed.
-These requirements are for development; users of the portable build do not need them.
+These requirements are for development; people who install the app do not need them.
 
 ```powershell
 npm ci
@@ -93,7 +94,14 @@ npm run lint
 npm test
 npm run test:android
 npm run package
+npm run installer
 ```
+
+`npm run package` writes the portable folder to `dist/`. `npm run installer`
+packages into `build/installer`, audits the package and compiles
+`installer/MirrorPanel.iss` with Inno Setup 6 into
+`dist/MirrorPanel-Setup-<version>.exe`. It finds ISCC.exe in the usual install
+folders or in the `ISCC` environment variable.
 
 The build uses a local development key in `build/android`. It is not
 included in the package. For reproducible Companion updates, use the same
@@ -118,11 +126,11 @@ node_modules/.bin/tsx scripts/smoke-lifecycle.ts SERIAL_ROTATION SERIAL_STOP
 The fixture produces text, events and a 440 Hz tone; its data is private to the app.
 `smoke-preview5.cjs` installs the fixture through a Chromium drop event, triggers
 renderer crashes and checks recovery, ripple, resize and controls.
-`smoke-renderer-crash.cjs` is an alias for that suite. `smoke-window-lifecycle.cjs`
+`smoke-window-lifecycle.cjs`
 tests Companion loss and geometry through Electron.setBounds; this does not replace
 dragging the borders with a mouse.
 The lifecycle test temporarily changes the rotation on the first device and stops
-the Companion on the second. The fixture, evidence and keys are not included in the portable build.
+the Companion on the second. The fixture, evidence and keys are not included in the package.
 
 ## Engineering
 
