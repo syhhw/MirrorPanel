@@ -28,4 +28,5 @@ await Promise.all([
 ]);
 for (const file of ['index.html', 'style.css'])
   await copyFile('src/' + file, 'build/desktop/' + file);
+await copyFile('design/logo/png/mirrorpanel-256.png', 'build/desktop/icon.png');
 console.log('Electron build OK');

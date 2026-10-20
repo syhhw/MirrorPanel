@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <!-- Optical size for 16-32 px: larger tile and bolder M. Floor, glare and the seam of
+       light are dropped (a sub-pixel seam blurs into a grey line); the two halves carry it. -->
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1F4452"/>
+      <stop offset="1" stop-color="#0B181E"/>
+    </linearGradient>
+    <linearGradient id="real" x1="0" y1="44" x2="0" y2="212" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#7CEBEC"/>
+      <stop offset="1" stop-color="#22A9B4"/>
+    </linearGradient>
+    <path id="m" d="M38 212V46h50l40 62 40-62h50v166h-46v-86l-30 46h-28l-30-46v86Z"/>
+    <clipPath id="left"><rect width="128" height="256"/></clipPath>
+    <clipPath id="right"><rect x="128" width="128" height="256"/></clipPath>
+  </defs>
+  <rect width="256" height="256" rx="60" fill="url(#tile)"/>
+  <g clip-path="url(#left)">
+    <use href="#m" fill="url(#real)" stroke="url(#real)" stroke-width="12" stroke-linejoin="round"/>
+  </g>
+  <g clip-path="url(#right)">
+    <use href="#m" fill="#DDF8F9" fill-opacity=".8" stroke="#DDF8F9" stroke-opacity=".8" stroke-width="12" stroke-linejoin="round"/>
+  </g>
+</svg>

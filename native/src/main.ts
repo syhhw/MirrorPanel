@@ -204,6 +204,7 @@ function broadcast(): void {
 function secureWindow(options: Electron.BrowserWindowConstructorOptions): BrowserWindow {
   const window = new BrowserWindow({
     backgroundColor: '#f5f6f8',
+    icon: join(__dirname, 'icon.png'),
     ...options,
     frame: false,
     autoHideMenuBar: true,

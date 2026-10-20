@@ -7,6 +7,7 @@
   "main": "build/desktop/main.cjs",
   "scripts": {
     "android": "python scripts/build-android.py",
+    "icons": "electron scripts/icons.cjs",
     "build": "node scripts/build.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src tests",

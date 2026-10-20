@@ -13,6 +13,7 @@ const output = await packager({
   asar: true,
   prune: false,
   extraResource: ['resources'],
+  icon: 'design/logo/mirrorpanel.ico',
   ignore: (file) =>
     file !== '' &&
     !file.startsWith('/build/desktop') &&
