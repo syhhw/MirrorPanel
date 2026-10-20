@@ -57,15 +57,18 @@ const escape = (s: string) =>
     /[&<>"']/g,
     (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!,
   );
+/** Short note at the bottom of the window; errors stay a little longer and get a red mark. */
 function toast(value: unknown): void {
   const el = $('toast');
-  el.textContent = String(value).replace(
-    /^Error: Error invoking remote method '[^']+': Error: /,
-    '',
-  );
+  const text = String(value);
+  const failed = value instanceof Error || /^\w*Error\b/.test(text);
+  el.textContent = text
+    .replace(/^Error: Error invoking remote method '[^']+': /, '')
+    .replace(/^\w*Error: /, '');
+  el.classList.toggle('is-error', failed);
   el.hidden = false;
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => (el.hidden = true), 6000);
+  toastTimer = setTimeout(() => (el.hidden = true), failed ? 6000 : 3500);
 }
 function act(promise: Promise<unknown>): void {
   void promise.catch(toast);
@@ -599,6 +602,7 @@ function mirror(): void {
         <span id="touch-anchor" hidden aria-hidden="true"></span>
         <textarea id="text-input" autocapitalize="off" autocomplete="off" spellcheck="false"></textarea>
         <div id="video-status" class="video-status">
+          <span id="status-spinner" class="spinner" aria-hidden="true"></span>
           <span id="status-message"></span>
           <button id="reconnect" hidden></button>
         </div>
@@ -806,6 +810,17 @@ function mirror(): void {
     failures = 0,
     lastSyncRequest = 0;
   const status = $('video-status');
+  /**
+   * With the picture already on screen a passing status is a small note over it;
+   * before the first frame, or when the user has to act, it covers the video.
+   */
+  const showStatus = (message: string, retry = false) => {
+    $('status-message').textContent = message;
+    status.hidden = !message;
+    status.classList.toggle('is-notice', Boolean(message) && frames > 0 && !retry);
+    $('status-spinner').hidden = retry;
+    $('reconnect').hidden = !retry;
+  };
   let inputReady = false;
   const control = (value: unknown) => (inputReady ? api.control(value) : Promise.resolve());
   const editor = $<HTMLTextAreaElement>('text-input');
@@ -891,10 +906,9 @@ function mirror(): void {
       error: (error) => {
         needsKey = true;
         if (++failures >= 2) acceleration = 'no-preference';
+        console.warn('Video decoder error, recovering on the next keyframe:', error.message);
         if (inputReady) {
-          $('status-message').textContent =
-            t('Falha ao decodificar: ', 'Decoding failed: ') + error.message;
-          status.hidden = false;
+          showStatus(t('Recuperando a imagem…', 'Restoring the picture…'));
           requestSync(true);
         }
       },
@@ -982,9 +996,7 @@ function mirror(): void {
         ? { message: value, retry: false }
         : (value as { message: string; retry: boolean });
     inputReady = !update.message;
-    $('status-message').textContent = update.message;
-    status.hidden = !update.message;
-    $('reconnect').hidden = !update.retry;
+    showStatus(update.message, update.retry);
     if (update.message) cancel();
   });
   const recordingState = (active: unknown) => {

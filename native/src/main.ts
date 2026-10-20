@@ -341,11 +341,18 @@ async function startSession(serial: string, attempt = 0, existing?: Entry): Prom
   };
   sessions.set(serial, entry);
   diagnose('session-start', { id: entry.id, windowId: window.id, attempt });
-  session.on('diagnostic', (event: string, details: Record<string, unknown>) =>
-    diagnose(event, { id: entry.id, windowId: window.id, ...details }),
-  );
+  // The Android runtime takes seconds to start the engine; show which part is running.
+  const startProgress: Record<string, () => string> = {
+    'server-pushed': () => t('Iniciando o motor no celular…', 'Starting the engine on the phone…'),
+    'server-ready': () => t('Abrindo a tela do aparelho…', 'Opening the device screen…'),
+  };
+  session.on('diagnostic', (event: string, details: Record<string, unknown>) => {
+    diagnose(event, { id: entry.id, windowId: window.id, ...details });
+    const progress = event === 'start-step' && startProgress[String(details.step)];
+    if (progress && session.state === 'starting') sendMirror(entry, 'session-status', progress());
+  });
   if (blocker === undefined) blocker = powerSaveBlocker.start('prevent-display-sleep');
-  sendMirror(entry, 'session-status', 'Conectando…');
+  sendMirror(entry, 'session-status', t('Conectando…', 'Connecting…'));
   session.on('log', (message: string) => log(serial + ': ' + message, 'warning'));
   session.on('state', () => broadcast());
   session.on('recording', (path) => {
@@ -490,13 +497,7 @@ async function startSession(serial: string, attempt = 0, existing?: Entry): Prom
         }
         if (devices.some((d) => d.serial === serial && d.state === 'device')) {
           log(t('Reconectando ', 'Reconnecting ') + serial + ' (' + (attempt + 1) + '/3)');
-          sendMirror(
-            entry,
-            'session-status',
-            t('Reconectando… tentativa ', 'Reconnecting… attempt ') +
-              (attempt + 1) +
-              t(' de 3', ' of 3'),
-          );
+          sendMirror(entry, 'session-status', t('Reconectando…', 'Reconnecting…'));
           await start(serial, attempt + 1, entry);
         } else {
           await finishEntry(serial, entry);
