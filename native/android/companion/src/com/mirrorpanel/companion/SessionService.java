@@ -95,7 +95,7 @@ public final class SessionService extends Service {
             PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT
         );
         notification = new Notification.Builder(this, CHANNEL)
-            .setSmallIcon(android.R.drawable.ic_menu_view)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle("MirrorPanel está espelhando esta tela")
             .setContentText("Conectado ao computador. Toque para ver os detalhes.")
             .setOngoing(true)

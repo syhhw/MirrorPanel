@@ -1,0 +1,40 @@
+<!-- MirrorPanel M, scaled into the 66 dp safe zone of a 108 dp adaptive icon. Source: design/logo/mirrorpanel-mark.svg -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" xmlns:aapt="http://schemas.android.com/aapt"
+  android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+  <group android:scaleX="0.34" android:scaleY="0.34" android:translateX="10.48" android:translateY="10.14">
+    <path android:pathData="M44,203.5h168" android:strokeColor="#739FE6E8" android:strokeWidth="1.5" />
+    <group>
+      <clip-path android:pathData="M0,0h128v256h-128z" />
+      <path android:pathData="M54 196V62h38l36 58 36-58h38v134h-36v-72l-30 46h-16l-30-46v72Z" android:strokeLineJoin="round" android:strokeWidth="10">
+        <aapt:attr name="android:fillColor">
+          <gradient android:type="linear" android:startX="0" android:startY="62" android:endX="0" android:endY="196">
+            <item android:offset="0" android:color="#FF74E8EA" />
+            <item android:offset="1" android:color="#FF1A97A3" />
+          </gradient>
+        </aapt:attr>
+        <aapt:attr name="android:strokeColor">
+          <gradient android:type="linear" android:startX="0" android:startY="62" android:endX="0" android:endY="196">
+            <item android:offset="0" android:color="#FF74E8EA" />
+            <item android:offset="1" android:color="#FF1A97A3" />
+          </gradient>
+        </aapt:attr>
+      </path>
+    </group>
+    <group>
+      <clip-path android:pathData="M54,196V62h38l36,58v52h-8l-30,-46v70Z" />
+      <path android:pathData="M40,132L128,70v26L40,158Z" android:fillColor="#4DFFFFFF" />
+    </group>
+    <group>
+      <clip-path android:pathData="M128,0h128v256h-128z" />
+      <path android:pathData="M54 196V62h38l36 58 36-58h38v134h-36v-72l-30 46h-16l-30-46v72Z" android:strokeColor="#8CBFF1F2" android:strokeLineJoin="round" android:strokeWidth="3">
+        <aapt:attr name="android:fillColor">
+          <gradient android:type="linear" android:startX="128" android:startY="0" android:endX="206" android:endY="0">
+            <item android:offset="0" android:color="#CCE3FAFA" />
+            <item android:offset="1" android:color="#3D7BD9DC" />
+          </gradient>
+        </aapt:attr>
+      </path>
+    </group>
+    <path android:pathData="M128,40v168" android:strokeColor="#CCFFFFFF" android:strokeLineCap="round" android:strokeWidth="3" />
+  </group>
+</vector>

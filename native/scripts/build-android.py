@@ -26,13 +26,17 @@ def java_tool(name):
     return JAVA / (name + (".exe" if os.name == "nt" else ""))
 
 
-def compile_dex(kind):
+def compile_dex(kind, generated=None):
     source = ROOT / "android" / kind / "src"
     classes = BUILD / kind / "classes"
     dex = BUILD / kind / "dex"
+    # Start clean so classes of deleted or renamed sources never reach the dex.
+    shutil.rmtree(classes, ignore_errors=True)
     classes.mkdir(parents=True, exist_ok=True)
     dex.mkdir(parents=True, exist_ok=True)
     files = sorted(source.rglob("*.java")) + sorted((ROOT / "android/common/src").rglob("*.java"))
+    if generated:
+        files += sorted(generated.rglob("*.java"))
     run(java_tool("javac"), "-encoding", "UTF-8", "-source", "8", "-target", "8", "-Xlint:all,-options,-deprecation", "-cp", PLATFORM, "-d", classes, *files)
     archive = BUILD / kind / "classes.jar"
     with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as jar:
@@ -49,12 +53,17 @@ def main():
     server = compile_dex("server")
     with zipfile.ZipFile(OUT / "mirrorpanel-server.jar", "w", zipfile.ZIP_DEFLATED) as jar:
         jar.write(server, "classes.dex")
-    companion = compile_dex("companion")
     unsigned = BUILD / "companion-unsigned.apk"
     aligned = BUILD / "companion-aligned.apk"
     compiled = BUILD / "companion-res.zip"
+    generated = BUILD / "companion" / "gen"
+    shutil.rmtree(generated, ignore_errors=True)
+    generated.mkdir(parents=True)
+    # Resources link first so the Java code can use the generated R class.
     run(TOOLS / "aapt2.exe", "compile", "--dir", ROOT / "android/companion/res", "-o", compiled)
-    run(TOOLS / "aapt2.exe", "link", "-o", unsigned, "--manifest", ROOT / "android/companion/AndroidManifest.xml", "-I", PLATFORM, compiled)
+    run(TOOLS / "aapt2.exe", "link", "-o", unsigned, "--manifest", ROOT / "android/companion/AndroidManifest.xml",
+        "-I", PLATFORM, "--java", generated, compiled)
+    companion = compile_dex("companion", generated)
     with zipfile.ZipFile(unsigned, "a", zipfile.ZIP_DEFLATED) as apk:
         apk.write(companion, "classes.dex")
     run(TOOLS / "zipalign.exe", "-f", "4", unsigned, aligned)

@@ -1,0 +1,5 @@
+<!-- Status bar icon: Android draws it as a white silhouette. Bold M from the small optical size. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+  android:width="24dp" android:height="24dp" android:viewportWidth="256" android:viewportHeight="256">
+  <path android:pathData="M38,212V46h50l40,62 40,-62h50v166h-46v-86l-30,46h-28l-30,-46v86Z" android:fillColor="#FFFFFFFF" />
+</vector>

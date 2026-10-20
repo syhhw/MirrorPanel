@@ -1,0 +1,48 @@
+<!-- Full MirrorPanel mark (tile and M) for the Companion screen. Source: design/logo/mirrorpanel-mark.svg -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" xmlns:aapt="http://schemas.android.com/aapt"
+  android:width="88dp" android:height="88dp" android:viewportWidth="256" android:viewportHeight="256">
+  <path android:pathData="M64,8h128a56,56 0,0 1,56 56v128a56,56 0,0 1,-56 56h-128a56,56 0,0 1,-56 -56v-128a56,56 0,0 1,56 -56z">
+    <aapt:attr name="android:fillColor">
+      <gradient android:type="linear" android:startX="8" android:startY="8" android:endX="248" android:endY="248">
+        <item android:offset="0" android:color="#FF1D3E4B" />
+        <item android:offset="0.55" android:color="#FF10232B" />
+        <item android:offset="1" android:color="#FF09141A" />
+      </gradient>
+    </aapt:attr>
+  </path>
+  <path android:pathData="M64,8.75h128a55.25,55.25 0,0 1,55.25 55.25v128a55.25,55.25 0,0 1,-55.25 55.25h-128a55.25,55.25 0,0 1,-55.25 -55.25v-128a55.25,55.25 0,0 1,55.25 -55.25z" android:strokeColor="#17FFFFFF" android:strokeWidth="1.5" />
+    <path android:pathData="M44,203.5h168" android:strokeColor="#739FE6E8" android:strokeWidth="1.5" />
+    <group>
+      <clip-path android:pathData="M0,0h128v256h-128z" />
+      <path android:pathData="M54 196V62h38l36 58 36-58h38v134h-36v-72l-30 46h-16l-30-46v72Z" android:strokeLineJoin="round" android:strokeWidth="10">
+        <aapt:attr name="android:fillColor">
+          <gradient android:type="linear" android:startX="0" android:startY="62" android:endX="0" android:endY="196">
+            <item android:offset="0" android:color="#FF74E8EA" />
+            <item android:offset="1" android:color="#FF1A97A3" />
+          </gradient>
+        </aapt:attr>
+        <aapt:attr name="android:strokeColor">
+          <gradient android:type="linear" android:startX="0" android:startY="62" android:endX="0" android:endY="196">
+            <item android:offset="0" android:color="#FF74E8EA" />
+            <item android:offset="1" android:color="#FF1A97A3" />
+          </gradient>
+        </aapt:attr>
+      </path>
+    </group>
+    <group>
+      <clip-path android:pathData="M54,196V62h38l36,58v52h-8l-30,-46v70Z" />
+      <path android:pathData="M40,132L128,70v26L40,158Z" android:fillColor="#4DFFFFFF" />
+    </group>
+    <group>
+      <clip-path android:pathData="M128,0h128v256h-128z" />
+      <path android:pathData="M54 196V62h38l36 58 36-58h38v134h-36v-72l-30 46h-16l-30-46v72Z" android:strokeColor="#8CBFF1F2" android:strokeLineJoin="round" android:strokeWidth="3">
+        <aapt:attr name="android:fillColor">
+          <gradient android:type="linear" android:startX="128" android:startY="0" android:endX="206" android:endY="0">
+            <item android:offset="0" android:color="#CCE3FAFA" />
+            <item android:offset="1" android:color="#3D7BD9DC" />
+          </gradient>
+        </aapt:attr>
+      </path>
+    </group>
+    <path android:pathData="M128,40v168" android:strokeColor="#CCFFFFFF" android:strokeLineCap="round" android:strokeWidth="3" />
+</vector>
