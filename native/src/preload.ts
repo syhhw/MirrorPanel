@@ -9,11 +9,11 @@ const on = (channel: string, callback: (value: unknown) => void) => {
   return () => ipcRenderer.removeListener(channel, listener);
 };
 contextBridge.exposeInMainWorld('mirrorpanel', {
-  installDroppedApk: (file: File) => {
-    const path = webUtils.getPathForFile(file);
-    if (!path) throw Error('Arraste um APK salvo neste computador.');
-    return ipcRenderer.invoke('install-dropped-apk', path);
-  },
+  // Files that only exist in memory have no path; the main process rejects them in
+  // the interface language.
+  installDroppedApk: (file: File) =>
+    ipcRenderer.invoke('install-dropped-apk', webUtils.getPathForFile(file)),
+  onLanguage: (cb: (v: unknown) => void) => on('language', cb),
   onWindowLayout: (cb: (v: unknown) => void) => on('window-layout', cb),
   windowAction: invoke('window-action'),
   onDeviceSettings: (cb: (v: unknown) => void) => on('open-device-settings', cb),

@@ -3,6 +3,7 @@ import { Gestures } from './gestures';
 import { bindRipple } from './ripple';
 import { html } from './html';
 import { admitFrame } from './video-gate';
+import { setLanguage, t, type Language } from './i18n';
 
 /** Minimum gap between keyframe requests sent from the mirror window. */
 const SYNC_INTERVAL_MS = 1000;
@@ -69,10 +70,25 @@ function toast(value: unknown): void {
 function act(promise: Promise<unknown>): void {
   void promise.catch(toast);
 }
-const tr = (pt: string, en: string) => (state?.settings.language === 'en' ? en : pt);
-function ask(html: string, submit: (data: FormData) => Promise<unknown>, confirm = 'Salvar'): void {
-  $('dialog-content').innerHTML = html;
+/** Sets the language for texts built from now on and for the page itself. */
+function applyLanguage(value: unknown): void {
+  const next: Language = value === 'en' ? 'en' : 'pt';
+  setLanguage(next);
+  document.documentElement.lang = next === 'en' ? 'en' : 'pt-BR';
+}
+/** Icon-only buttons carry their text as tooltip and accessible name. */
+function label(element: HTMLElement, text: string): void {
+  element.title = text;
+  element.setAttribute('aria-label', text);
+}
+function ask(
+  content: string,
+  submit: (data: FormData) => Promise<unknown>,
+  confirm = t('Salvar', 'Save'),
+): void {
+  $('dialog-content').innerHTML = content;
   $('confirm').textContent = confirm;
+  $('cancel').textContent = t('Cancelar', 'Cancel');
   const heading = $('dialog-content').querySelector('h2');
   if (heading) heading.id = 'dialog-title';
   form.onsubmit = (event) => {
@@ -116,8 +132,21 @@ const icon = (name: string) =>
 const iconButton = (id: string, label: string, name = id, extra = '') =>
   `<button type="button" id="${id}" class="icon-button" title="${label}" aria-label="${label}" ${extra}>${icon(name)}</button>`;
 const windowButtons = () =>
-  `<div class="window-buttons">${['minimize', 'maximize', 'close'].map((name, i) => `<button type="button" data-window="${name}" title="${['Minimizar', 'Maximizar / restaurar', 'Fechar'][i]}" aria-label="${['Minimizar', 'Maximizar / restaurar', 'Fechar'][i]}">${icon(name)}</button>`).join('')}</div>`;
+  html`<div class="window-buttons">${['minimize', 'maximize', 'close']
+    .map((name) => `<button type="button" data-window="${name}">${icon(name)}</button>`)
+    .join('')}</div>`;
+function labelWindowButtons(): void {
+  const labels: Record<string, string> = {
+    minimize: t('Minimizar', 'Minimize'),
+    maximize: t('Maximizar / restaurar', 'Maximize / restore'),
+    close: t('Fechar', 'Close'),
+  };
+  document
+    .querySelectorAll<HTMLButtonElement>('[data-window]')
+    .forEach((button) => label(button, labels[button.dataset.window!]));
+}
 function bindWindowButtons(): void {
+  labelWindowButtons();
   document
     .querySelectorAll<HTMLButtonElement>('[data-window]')
     .forEach((button) => (button.onclick = () => act(api.windowAction(button.dataset.window))));
@@ -128,20 +157,20 @@ function bindWindowButtons(): void {
 function showHelp(): void {
   ask(
     html`
-      <h2>${tr('Controlar seu Android', 'Control your Android')}</h2>
+      <h2>${t('Controlar seu Android', 'Control your Android')}</h2>
       <div class="settings-section">
-        <h3>${tr('Mouse e teclado', 'Mouse and keyboard')}</h3>
+        <h3>${t('Mouse e teclado', 'Mouse and keyboard')}</h3>
         <p>
-          Alt + clique ${tr('fixa um dedo. Arraste o segundo ponto para multitoque.', 'anchors one finger. Drag the second point for multitouch.')}<br>
-          Esc · ${tr('Voltar ou soltar os contatos', 'Back or release contacts')}<br>
-          Ctrl + V · ${tr('Colar texto', 'Paste text')}<br>
-          F11 · ${tr('Tela cheia', 'Fullscreen')}
+          Alt + clique ${t('fixa um dedo. Arraste o segundo ponto para multitoque.', 'anchors one finger. Drag the second point for multitouch.')}<br>
+          Esc · ${t('Voltar ou soltar os contatos', 'Back or release contacts')}<br>
+          Ctrl + V · ${t('Colar texto', 'Paste text')}<br>
+          F11 · ${t('Tela cheia', 'Fullscreen')}
         </p>
       </div>
       <div class="settings-section">
-        <h3>${tr('Conexão USB', 'USB connection')}</h3>
+        <h3>${t('Conexão USB', 'USB connection')}</h3>
         <p>
-          ${tr('Ative a depuração USB nas Opções do desenvolvedor e autorize este computador no aparelho. Para áudio, aceite a autorização de captura no Android.', 'Enable USB debugging in Developer options and authorize this computer on your device. For audio, accept Android capture permission.')}
+          ${t('Ative a depuração USB nas Opções do desenvolvedor e autorize este computador no aparelho. Para áudio, aceite a autorização de captura no Android.', 'Enable USB debugging in Developer options and authorize this computer on your device. For audio, accept Android capture permission.')}
         </p>
       </div>
     `,
@@ -153,21 +182,21 @@ function showDeviceSettings(d: DeviceRow): void {
   if (dialog.open) dialog.close();
   ask(
     html`
-      <h2>${tr('Configurações do aparelho', 'Device settings')}</h2>
+      <h2>${t('Configurações do aparelho', 'Device settings')}</h2>
       <div class="settings-section">
-        <h3>${tr('Janela', 'Window')}</h3>
+        <h3>${t('Janela', 'Window')}</h3>
         <label>
-          ${tr('Nome do aparelho', 'Device name')}
+          ${t('Nome do aparelho', 'Device name')}
           <input name="name" maxlength="80" value="${escape(d.name)}">
         </label>
         <small>${escape(d.serial)}</small>
       </div>
       <div class="settings-section">
-        <h3>${tr('Qualidade da imagem', 'Image quality')}</h3>
+        <h3>${t('Qualidade da imagem', 'Image quality')}</h3>
         <fieldset ${d.session ? 'disabled' : ''}>
           <div class="quality-fields">
             <label>
-              ${tr('Resolução máxima', 'Maximum resolution')}
+              ${t('Resolução máxima', 'Maximum resolution')}
               <select name="maxSize">
                 ${[720, 1080, 1280, 1920, 2560, 3840].map((v) => `<option ${v === d.quality.maxSize ? 'selected' : ''}>${v}</option>`).join('')}
               </select>
@@ -185,24 +214,24 @@ function showDeviceSettings(d: DeviceRow): void {
             </label>
           </div>
           <div class="presets">
-            ${[tr('Leve', 'Low'), tr('Equilibrada', 'Balanced'), tr('Alta', 'High')].map((s, i) => `<button type="button" data-preset="${i}">${s}</button>`).join('')}
+            ${[t('Leve', 'Low'), t('Equilibrada', 'Balanced'), t('Alta', 'High')].map((s, i) => `<button type="button" data-preset="${i}">${s}</button>`).join('')}
           </div>
         </fieldset>
         <p class="field-hint">
-          ${d.session ? tr('Pare o espelhamento para alterar a qualidade.', 'Stop mirroring to change quality.') : tr('A qualidade escolhida será usada na próxima conexão.', 'The selected quality applies on the next connection.')}
+          ${d.session ? t('Pare o espelhamento para alterar a qualidade.', 'Stop mirroring to change quality.') : t('A qualidade escolhida será usada na próxima conexão.', 'The selected quality applies on the next connection.')}
         </p>
       </div>
       <div class="settings-section">
-        <h3>${tr('Aparelho', 'Device')}</h3>
+        <h3>${t('Aparelho', 'Device')}</h3>
         <div class="device-settings-actions">
           <button type="button" data-device-tool="usbWifi"
             ${d.serial.includes(':') || d.state !== 'device' ? 'disabled' : ''}>
-            ${icon('wifi')} ${tr('Usar Wi-Fi', 'Use Wi-Fi')}
+            ${icon('wifi')} ${t('Usar Wi-Fi', 'Use Wi-Fi')}
           </button>
           <button type="button" data-device-tool="installApk" ${d.state !== 'device' ? 'disabled' : ''}>
-            ${tr('Instalar APK', 'Install APK')}
+            ${t('Instalar APK', 'Install APK')}
           </button>
-          ${d.session ? `<button type="button" class="danger" data-device-tool="stop">${tr('Parar espelhamento', 'Stop mirroring')}</button>` : ''}
+          ${d.session ? `<button type="button" class="danger" data-device-tool="stop">${t('Parar espelhamento', 'Stop mirroring')}</button>` : ''}
         </div>
       </div>
     `,
@@ -215,7 +244,7 @@ function showDeviceSettings(d: DeviceRow): void {
           bitrate: Number(data.get('bitrate')) * 1000000,
         });
     },
-    tr('Salvar', 'Save'),
+    t('Salvar', 'Save'),
   );
   dialog.querySelectorAll<HTMLButtonElement>('[data-preset]').forEach(
     (button) =>
@@ -244,6 +273,7 @@ function showDeviceSettings(d: DeviceRow): void {
 }
 function renderPanel(next: unknown): void {
   state = next as PanelState;
+  applyLanguage(state.settings.language);
   if (!$('panel')) {
     root.innerHTML = html`
       <section id="panel">
@@ -364,17 +394,17 @@ function renderPanel(next: unknown): void {
     $('wifi').onclick = () =>
       ask(
         html`
-          <h2>${tr('Conectar pela rede', 'Connect over network')}</h2>
+          <h2>${t('Conectar pela rede', 'Connect over network')}</h2>
           <div class="settings-section">
             <p>
-              ${tr('Use o endereço de conexão mostrado em Depuração sem fio no Android. Para o primeiro pareamento, informe o endereço de pareamento e o código.', 'Use the connection address shown in Android Wireless debugging. To pair for the first time, enter the pairing address and code.')}
+              ${t('Use o endereço de conexão mostrado em Depuração sem fio no Android. Para o primeiro pareamento, informe o endereço de pareamento e o código.', 'Use the connection address shown in Android Wireless debugging. To pair for the first time, enter the pairing address and code.')}
             </p>
             <label>
-              IP:${tr('porta', 'port')}
+              IP:${t('porta', 'port')}
               <input required name="address" placeholder="192.168.1.10:5555">
             </label>
             <label>
-              ${tr('Código de pareamento (opcional)', 'Pairing code (optional)')}
+              ${t('Código de pareamento (opcional)', 'Pairing code (optional)')}
               <input name="code" inputmode="numeric" maxlength="6">
             </label>
           </div>
@@ -383,7 +413,7 @@ function renderPanel(next: unknown): void {
           String(data.get('code')).trim()
             ? api.pair(data.get('address'), data.get('code'))
             : api.wifi(data.get('address')),
-        tr('Conectar', 'Connect'),
+        t('Conectar', 'Connect'),
       );
     api.onDeviceSettings((serial: unknown) => {
       const d = state.devices.find((d) => d.serial === serial);
@@ -391,45 +421,47 @@ function renderPanel(next: unknown): void {
     });
   }
   const labels: Record<string, string> = {
-    'devices-title': tr('Aparelhos Android', 'Android devices'),
-    'network-title': tr('Conectar sem cabo', 'Connect wirelessly'),
-    'network-help': tr(
+    'devices-title': t('Aparelhos Android', 'Android devices'),
+    'network-title': t('Conectar sem cabo', 'Connect wirelessly'),
+    'network-help': t(
       'Seu Android também pode ficar ao alcance do mouse pela rede Wi-Fi.',
       'Your Android can also be within mouse reach over Wi-Fi.',
     ),
-    wifi: tr('Conectar pela rede', 'Connect over network'),
-    'network-note': tr(
+    wifi: t('Conectar pela rede', 'Connect over network'),
+    'network-note': t(
       'Mantenha o computador e o aparelho na mesma rede.',
       'Keep your computer and device on the same network.',
     ),
-    'usb-title': tr('Não encontrou seu aparelho?', 'Can’t find your device?'),
-    'usb-help': tr(
+    'usb-title': t('Não encontrou seu aparelho?', 'Can’t find your device?'),
+    'usb-help': t(
       'Conecte por USB, ative a depuração USB e autorize este computador no celular.',
       'Connect over USB, enable USB debugging and authorize this computer on your phone.',
     ),
-    'preferences-title': tr('Configurações', 'Settings'),
-    'preferences-caption': tr('Do seu jeito', 'Make it yours'),
-    'serial-label': tr('Mostrar números de série', 'Show serial numbers'),
-    'top-label': tr('Janelas sempre no topo', 'Always on top'),
-    'awake-label': tr('Manter a tela ligada por USB', 'Keep screen awake over USB'),
-    'language-label': tr('Idioma', 'Language'),
-    media: tr('Abrir capturas e gravações', 'Open screenshots and recordings'),
-    'about-copy': tr(
+    'preferences-title': t('Configurações', 'Settings'),
+    'preferences-caption': t('Do seu jeito', 'Make it yours'),
+    'serial-label': t('Mostrar números de série', 'Show serial numbers'),
+    'top-label': t('Janelas sempre no topo', 'Always on top'),
+    'awake-label': t('Manter a tela ligada por USB', 'Keep screen awake over USB'),
+    'language-label': t('Idioma', 'Language'),
+    media: t('Abrir capturas e gravações', 'Open screenshots and recordings'),
+    'about-copy': t(
       'Controle seu Android, escreva com o teclado e capture o que acontece na tela.',
       'Control your Android, type with your keyboard and capture what happens on screen.',
     ),
-    help: tr('Como usar e atalhos', 'Help and keyboard shortcuts'),
-    'activity-title': tr('Atividade', 'Activity'),
-    filter: issuesOnly ? tr('Mostrar tudo', 'Show all') : tr('Só avisos', 'Warnings only'),
-    copy: tr('Copiar', 'Copy'),
-    clear: tr('Limpar', 'Clear'),
-    'footer-help': tr('Ajuda', 'Help'),
-    'footer-activity': tr('Diagnóstico', 'Diagnostics'),
-    'footer-status': tr('Android · USB e Wi-Fi', 'Android · USB and Wi-Fi'),
+    help: t('Como usar e atalhos', 'Help and keyboard shortcuts'),
+    'activity-title': t('Atividade', 'Activity'),
+    filter: issuesOnly ? t('Mostrar tudo', 'Show all') : t('Só avisos', 'Warnings only'),
+    copy: t('Copiar', 'Copy'),
+    clear: t('Limpar', 'Clear'),
+    'footer-help': t('Ajuda', 'Help'),
+    'footer-activity': t('Diagnóstico', 'Diagnostics'),
+    'footer-status': t('Android · USB e Wi-Fi', 'Android · USB and Wi-Fi'),
   };
   for (const [id, text] of Object.entries(labels)) $(id).textContent = text;
+  labelWindowButtons();
+  label($('refresh'), t('Atualizar aparelhos', 'Refresh devices'));
   $('count').textContent =
-    state.devices.length + ' ' + tr('aparelho(s) detectado(s)', 'device(s) detected');
+    state.devices.length + ' ' + t('aparelho(s) detectado(s)', 'device(s) detected');
   $<HTMLInputElement>('show-serial').checked = state.settings.showSerial;
   $<HTMLInputElement>('always-top').checked = state.settings.alwaysOnTop;
   $<HTMLInputElement>('stay-awake').checked = state.settings.stayAwake;
@@ -445,19 +477,19 @@ function renderPanel(next: unknown): void {
             busy = d.session === 'starting',
             authorized = d.state === 'device';
           const status = d.recording
-            ? tr('Gravando', 'Recording')
+            ? t('Gravando', 'Recording')
             : active
-              ? tr('Espelhando', 'Mirroring')
+              ? t('Espelhando', 'Mirroring')
               : busy
-                ? tr('Conectando…', 'Connecting…')
+                ? t('Conectando…', 'Connecting…')
                 : authorized
                   ? d.serial.includes(':')
                     ? 'Wi-Fi'
                     : d.serial.startsWith('emulator-')
-                      ? tr('Emulador', 'Emulator')
+                      ? t('Emulador', 'Emulator')
                       : 'USB'
                   : d.state === 'unauthorized'
-                    ? tr('Autorize no aparelho', 'Authorize on your device')
+                    ? t('Autorize no aparelho', 'Authorize on your device')
                     : d.state;
           return html`
             <article class="device ${active ? 'device-live' : ''}" data-index="${index}"
@@ -469,20 +501,20 @@ function renderPanel(next: unknown): void {
               </div>
               <div class="device-actions">
                 <button class="round-action" data-action="settings"
-                  title="${tr('Configurações', 'Settings')}"
-                  aria-label="${tr('Configurações', 'Settings')}"
+                  title="${t('Configurações', 'Settings')}"
+                  aria-label="${t('Configurações', 'Settings')}"
                   ${!authorized ? 'disabled' : ''}>
                   ${icon('settings')}
                 </button>
                 <button class="round-action" data-action="usbWifi"
-                  title="${tr('Usar Wi-Fi', 'Use Wi-Fi')}"
-                  aria-label="${tr('Usar Wi-Fi', 'Use Wi-Fi')}"
+                  title="${t('Usar Wi-Fi', 'Use Wi-Fi')}"
+                  aria-label="${t('Usar Wi-Fi', 'Use Wi-Fi')}"
                   ${!authorized || d.serial.includes(':') ? 'disabled' : ''}>
                   ${icon('wifi')}
                 </button>
                 <button class="round-action start-action" data-action="start"
-                  title="${active ? tr('Abrir tela', 'Open screen') : tr('Espelhar', 'Mirror')}"
-                  aria-label="${active ? tr('Abrir tela', 'Open screen') : tr('Espelhar', 'Mirror')}"
+                  title="${active ? t('Abrir tela', 'Open screen') : t('Espelhar', 'Mirror')}"
+                  aria-label="${active ? t('Abrir tela', 'Open screen') : t('Espelhar', 'Mirror')}"
                   ${!authorized || busy ? 'disabled' : ''}>
                   ${busy ? '<span class="spinner"></span>' : icon(active ? 'fullscreen' : 'play')}
                 </button>
@@ -491,7 +523,7 @@ function renderPanel(next: unknown): void {
           `;
         })
         .join('')
-    : `<div class="empty">${icon('phone')}<h3>${tr('Seu Android aparece aqui', 'Your Android will appear here')}</h3><p>${tr('Conecte o aparelho para começar.', 'Connect your device to get started.')}</p></div>`;
+    : `<div class="empty">${icon('phone')}<h3>${t('Seu Android aparece aqui', 'Your Android will appear here')}</h3><p>${t('Conecte o aparelho para começar.', 'Connect your device to get started.')}</p></div>`;
   list.querySelectorAll<HTMLButtonElement>('button[data-action]').forEach((button) => {
     const row = button.closest<HTMLElement>('[data-index]')!,
       d = state.devices[Number(row.dataset.index)];
@@ -511,26 +543,24 @@ function renderPanel(next: unknown): void {
           `<div class="log-line ${escape(l.level)}"><time>${escape(l.time)}</time><span>${escape(l.message)}</span></div>`,
       )
       .join('') ||
-    `<p class="log-empty">${tr('Nenhum evento nesta sessão.', 'No events in this session.')}</p>`;
+    `<p class="log-empty">${t('Nenhum evento nesta sessão.', 'No events in this session.')}</p>`;
   $('activity-summary').textContent = state.logs.length
     ? String(state.logs.length)
-    : tr('Tudo certo', 'All clear');
+    : t('Tudo certo', 'All clear');
 }
 
 function mirror(): void {
   document.body.classList.add('mirror-body');
-  const labels: Record<string, string> = {
-    capture: 'Capturar tela',
-    record: 'Gravar vídeo',
-    audio: 'Ativar áudio',
-    fullscreen: 'Tela cheia (F11)',
-    more: 'Mais controles',
-  };
-  const toolbar = Object.keys(labels)
+  const params = new URLSearchParams(location.search);
+  applyLanguage(params.get('lang'));
+  let deviceName = params.get('name') ?? 'Android',
+    recording = false,
+    audioState = 'off';
+  const toolbar = ['capture', 'record', 'audio', 'fullscreen', 'more']
     .map((id) =>
       iconButton(
         id,
-        labels[id],
+        '',
         id === 'more' ? 'settings' : id,
         id === 'audio'
           ? 'aria-pressed="false"'
@@ -544,7 +574,7 @@ function mirror(): void {
     <section class="mirror">
       <header class="mirror-titlebar">
         <div class="mirror-device title-drag">
-          <button id="device-home" title="Voltar ao painel" aria-label="Voltar ao painel">
+          <button id="device-home">
             <span id="mirror-name"></span>
           </button>
         </div>
@@ -552,38 +582,91 @@ function mirror(): void {
         ${windowButtons()}
       </header>
       <div id="mirror-menu" class="mirror-menu" hidden>
-        <button id="device-settings">${icon('settings')} Configurações do aparelho</button>
-        <button id="paste-text">${icon('paste')} Colar no aparelho <kbd>Ctrl+V</kbd></button>
-        <button id="screen-power">${icon('power')} Ligar / desligar tela</button>
-        <button id="pin-window" aria-pressed="false">${icon('pin')} Sempre no topo</button>
+        <button id="device-settings">${icon('settings')} <span id="device-settings-text"></span></button>
+        <button id="paste-text">${icon('paste')} <span id="paste-text-label"></span> <kbd>Ctrl+V</kbd></button>
+        <button id="screen-power">${icon('power')} <span id="screen-power-text"></span></button>
+        <button id="pin-window" aria-pressed="false">${icon('pin')} <span id="pin-window-text"></span></button>
         <div class="volume-control">
           ${icon('audio')}
-          <label for="volume">Volume no PC</label>
-          <input id="volume" type="range" min="0" max="100" value="100" aria-label="Volume no computador">
+          <label for="volume" id="volume-label"></label>
+          <input id="volume" type="range" min="0" max="100" value="100">
         </div>
-        <button id="mirror-help">${icon('help')} Mouse e atalhos</button>
+        <button id="mirror-help">${icon('help')} <span id="mirror-help-text"></span></button>
       </div>
-      <div id="apk-drop" class="apk-drop" hidden role="status">Solte o APK para instalar neste aparelho</div>
+      <div id="apk-drop" class="apk-drop" hidden role="status"></div>
       <div class="viewport">
-        <canvas id="video" tabindex="0" aria-label="Tela do aparelho: controle com mouse e teclado"></canvas>
+        <canvas id="video" tabindex="0"></canvas>
         <span id="touch-anchor" hidden aria-hidden="true"></span>
-        <textarea id="text-input" aria-label="Digite para enviar texto ao aparelho" autocapitalize="off"
-          autocomplete="off" spellcheck="false"></textarea>
+        <textarea id="text-input" autocapitalize="off" autocomplete="off" spellcheck="false"></textarea>
         <div id="video-status" class="video-status">
-          <span id="status-message">Conectando ao aparelho…</span>
-          <button id="reconnect" hidden>Reconectar</button>
+          <span id="status-message"></span>
+          <button id="reconnect" hidden></button>
         </div>
       </div>
-      <nav class="android-navigation" aria-label="Navegação Android">
-        ${iconButton('back', 'Voltar (Esc)')}${iconButton('home', 'Início')}${iconButton('recent', 'Apps recentes')}
+      <nav class="android-navigation">
+        ${iconButton('back', '')}${iconButton('home', '')}${iconButton('recent', '')}
       </nav>
     </section>
   `;
-  const name = new URLSearchParams(location.search).get('name') ?? 'Android';
-  $('mirror-name').textContent = name;
-  $('device-home').title = name + ' · Voltar ao painel';
+  const recordLabel = () =>
+    recording ? t('Finalizar gravação', 'Stop recording') : t('Gravar vídeo', 'Record video');
+  const audioLabel = () =>
+    audioState === 'started'
+      ? t('Desligar áudio', 'Turn audio off')
+      : audioState === 'starting'
+        ? t('Autorize no celular…', 'Allow it on your phone…')
+        : t('Ativar áudio', 'Turn audio on');
+  /** Every fixed text of the mirror window; runs again when the language changes. */
+  const applyTexts = () => {
+    const back = t('Voltar ao painel', 'Back to panel');
+    $('mirror-name').textContent = deviceName;
+    $('device-home').title = deviceName + ' · ' + back;
+    $('device-home').setAttribute('aria-label', back);
+    label($('capture'), t('Capturar tela', 'Take screenshot'));
+    label($('record'), recordLabel());
+    label($('audio'), audioLabel());
+    label($('fullscreen'), t('Tela cheia (F11)', 'Fullscreen (F11)'));
+    label($('more'), t('Mais controles', 'More controls'));
+    $('device-settings-text').textContent = t('Configurações do aparelho', 'Device settings');
+    $('paste-text-label').textContent = t('Colar no aparelho', 'Paste on device');
+    $('screen-power-text').textContent = t('Ligar / desligar tela', 'Screen on / off');
+    $('pin-window-text').textContent = t('Sempre no topo', 'Always on top');
+    $('volume-label').textContent = t('Volume no PC', 'PC volume');
+    $('volume').setAttribute('aria-label', t('Volume no computador', 'Computer volume'));
+    $('mirror-help-text').textContent = t('Mouse e atalhos', 'Mouse and shortcuts');
+    $('apk-drop').textContent = t(
+      'Solte o APK para instalar neste aparelho',
+      'Drop the APK to install it on this device',
+    );
+    $('video').setAttribute(
+      'aria-label',
+      t(
+        'Tela do aparelho: controle com mouse e teclado',
+        'Device screen: control it with mouse and keyboard',
+      ),
+    );
+    $('text-input').setAttribute(
+      'aria-label',
+      t('Digite para enviar texto ao aparelho', 'Type to send text to the device'),
+    );
+    $('reconnect').textContent = t('Reconectar', 'Reconnect');
+    document
+      .querySelector('.android-navigation')!
+      .setAttribute('aria-label', t('Navegação Android', 'Android navigation'));
+    label($('back'), t('Voltar (Esc)', 'Back (Esc)'));
+    label($('home'), t('Início', 'Home'));
+    label($('recent'), t('Apps recentes', 'Recent apps'));
+    labelWindowButtons();
+  };
+  applyTexts();
+  $('status-message').textContent = t('Conectando ao aparelho…', 'Connecting to the device…');
+  api.onLanguage((value: unknown) => {
+    applyLanguage(value);
+    applyTexts();
+  });
   api.onDeviceName((name: unknown) => {
-    $('mirror-name').textContent = String(name);
+    deviceName = String(name);
+    applyTexts();
   });
   bindWindowButtons();
   document.querySelectorAll<HTMLButtonElement>('.android-navigation button').forEach(bindRipple);
@@ -618,22 +701,24 @@ function mirror(): void {
     hideDrop();
     const files = Array.from(event.dataTransfer?.files ?? []);
     if (installing) {
-      toast('Aguarde a instalação atual terminar.');
+      toast(
+        t('Aguarde a instalação atual terminar.', 'Wait for the current installation to finish.'),
+      );
       return;
     }
     if (files.length !== 1 || !files[0].name.toLowerCase().endsWith('.apk')) {
-      toast('Arraste um único arquivo APK para instalar.');
+      toast(t('Arraste um único arquivo APK para instalar.', 'Drop a single APK file to install.'));
       return;
     }
     installing = true;
     document.body.dataset.apkInstall = 'installing';
-    toast('Instalando ' + files[0].name + '…');
+    toast(t('Instalando ', 'Installing ') + files[0].name + '…');
     clearTimeout(toastTimer);
     void Promise.resolve()
       .then(() => api.installDroppedApk(files[0]))
       .then((name) => {
         document.body.dataset.apkInstall = 'success';
-        toast('Instalado: ' + String(name));
+        toast(t('Instalado: ', 'Installed: ') + String(name));
       })
       .catch((error) => {
         document.body.dataset.apkInstall = 'error';
@@ -740,8 +825,7 @@ function mirror(): void {
     gestures.cancel();
     updateAnchor();
   };
-  const audio = new AudioPlayer((message) => toast('Áudio: ' + message));
-  let audioState = 'off';
+  const audio = new AudioPlayer((message) => toast(t('Áudio: ', 'Audio: ') + message));
   $('audio').onclick = () =>
     act(
       (async () => {
@@ -755,13 +839,7 @@ function mirror(): void {
   api.onAudioState((value: unknown) => {
     const status = value as { state: string; message: string };
     audioState = status.state;
-    $('audio').title =
-      audioState === 'started'
-        ? 'Desligar áudio'
-        : audioState === 'starting'
-          ? 'Autorize no celular…'
-          : 'Ativar áudio';
-    $('audio').setAttribute('aria-label', $('audio').title);
+    label($('audio'), audioLabel());
     $('audio').setAttribute('aria-pressed', String(audioState === 'started'));
     $<HTMLButtonElement>('audio').disabled = audioState === 'starting';
     if (audioState === 'off' || audioState === 'error') audio.reset();
@@ -814,7 +892,8 @@ function mirror(): void {
         needsKey = true;
         if (++failures >= 2) acceleration = 'no-preference';
         if (inputReady) {
-          $('status-message').textContent = 'Falha ao decodificar: ' + error.message;
+          $('status-message').textContent =
+            t('Falha ao decodificar: ', 'Decoding failed: ') + error.message;
           status.hidden = false;
           requestSync(true);
         }
@@ -909,9 +988,9 @@ function mirror(): void {
     if (update.message) cancel();
   });
   const recordingState = (active: unknown) => {
-    $('record').classList.toggle('is-recording', Boolean(active));
-    $('record').title = active ? 'Finalizar gravação' : 'Gravar vídeo';
-    $('record').setAttribute('aria-label', $('record').title);
+    recording = Boolean(active);
+    $('record').classList.toggle('is-recording', recording);
+    label($('record'), recordLabel());
   };
   api.onRecording(recordingState);
   const fullscreen = () =>
@@ -930,7 +1009,7 @@ function mirror(): void {
     );
   const screenshot = () => {
     if (!frames) {
-      toast('Aguarde o primeiro quadro');
+      toast(t('Aguarde o primeiro quadro', 'Wait for the first frame'));
       return;
     }
     canvas.toBlob((blob) => {
@@ -939,7 +1018,7 @@ function mirror(): void {
           blob
             .arrayBuffer()
             .then((buffer) => api.savePng(new Uint8Array(buffer)))
-            .then(() => toast('Captura salva')),
+            .then(() => toast(t('Captura salva', 'Screenshot saved'))),
         );
     }, 'image/png');
   };
