@@ -24,6 +24,7 @@ import {
 import { Diagnostics } from './diagnostics';
 import { ApkInstaller } from './apk-install';
 import { findBySender } from './window-owner';
+import { setLanguage, t } from './i18n';
 
 type Settings = {
   alwaysOnTop: boolean;
@@ -133,6 +134,7 @@ function loadSettings(): void {
       /* First launch has no prior settings. */
     }
   }
+  setLanguage(settings.language);
 }
 function saveSettings(): void {
   mkdirSync(dirname(settingsFile), { recursive: true });
@@ -140,7 +142,7 @@ function saveSettings(): void {
   renameSync(settingsFile + '.tmp', settingsFile);
 }
 function log(message: string, level = 'info'): void {
-  logs.push({ time: new Date().toLocaleTimeString('pt-BR'), message, level });
+  logs.push({ time: new Date().toLocaleTimeString(t('pt-BR', 'en-US')), message, level });
   if (logs.length > 300) logs.shift();
   broadcast();
 }
@@ -218,16 +220,17 @@ function secureWindow(options: Electron.BrowserWindowConstructorOptions): Browse
   return window;
 }
 function assertPanel(event: IpcMainInvokeEvent): void {
-  if (event.sender !== panel.webContents) throw Error('Ação restrita ao painel');
+  if (event.sender !== panel.webContents)
+    throw Error(t('Ação restrita ao painel', 'Only the panel can do this'));
 }
 function mirrorWindow(event: IpcMainInvokeEvent): { serial: string; window: BrowserWindow } {
   for (const [serial, window] of mirrorWindows)
     if (!window.isDestroyed() && window.webContents === event.sender) return { serial, window };
-  throw Error('Janela desconhecida');
+  throw Error(t('Janela desconhecida', 'Unknown window'));
 }
 function owner(event: IpcMainInvokeEvent): Entry {
   const entry = findBySender(sessions.values(), event.sender);
-  if (!entry) throw Error('Janela sem sessão');
+  if (!entry) throw Error(t('Janela sem sessão', 'This window has no session'));
   return entry;
 }
 function assertDevice(serial: unknown): string {
@@ -235,7 +238,9 @@ function assertDevice(serial: unknown): string {
     typeof serial !== 'string' ||
     !devices.some((d) => d.serial === serial && d.state === 'device')
   )
-    throw Error('Aparelho não está autorizado ou conectado');
+    throw Error(
+      t('Aparelho não está autorizado ou conectado', 'Device is not authorized or connected'),
+    );
   return serial;
 }
 async function refresh(): Promise<void> {
@@ -433,17 +438,35 @@ async function startSession(serial: string, attempt = 0, existing?: Entry): Prom
     broadcast();
     entry.frames.clear();
     entry.audioFrames.clear();
-    let message = 'Não foi possível manter o espelhamento.';
+    let message = t('Não foi possível manter o espelhamento.', 'Mirroring could not continue.');
     if (!window.isDestroyed()) {
       sendMirror(entry, 'audio-state', { state: 'off' });
       const messages: Record<string, string> = {
-        'phone-stop': 'Espelhamento interrompido no aparelho.',
-        'companion-lost': 'A conexão com o aplicativo Android foi interrompida.',
-        'user-stop': 'Espelhamento encerrado.',
-        timeout: 'O aparelho deixou de responder à conexão.',
-        'stream-ended': 'A conexão com o aparelho foi interrompida.',
-        'process-exit': 'O motor Android encerrou inesperadamente.',
-        'protocol-error': 'Erro na comunicação com o aparelho.',
+        'phone-stop': t(
+          'Espelhamento interrompido no aparelho.',
+          'Mirroring was stopped on the device.',
+        ),
+        'companion-lost': t(
+          'A conexão com o aplicativo Android foi interrompida.',
+          'The connection to the Android app was interrupted.',
+        ),
+        'user-stop': t('Espelhamento encerrado.', 'Mirroring ended.'),
+        timeout: t(
+          'O aparelho deixou de responder à conexão.',
+          'The device stopped responding to the connection.',
+        ),
+        'stream-ended': t(
+          'A conexão com o aparelho foi interrompida.',
+          'The connection to the device was interrupted.',
+        ),
+        'process-exit': t(
+          'O motor Android encerrou inesperadamente.',
+          'The Android engine stopped unexpectedly.',
+        ),
+        'protocol-error': t(
+          'Erro na comunicação com o aparelho.',
+          'Communication with the device failed.',
+        ),
       };
       message = messages[reason] ?? message;
       sendMirror(entry, 'session-status', message);
@@ -466,13 +489,22 @@ async function startSession(serial: string, attempt = 0, existing?: Entry): Prom
           return;
         }
         if (devices.some((d) => d.serial === serial && d.state === 'device')) {
-          log('Reconectando ' + serial + ' (' + (attempt + 1) + '/3)');
-          sendMirror(entry, 'session-status', 'Reconectando… tentativa ' + (attempt + 1) + ' de 3');
+          log(t('Reconectando ', 'Reconnecting ') + serial + ' (' + (attempt + 1) + '/3)');
+          sendMirror(
+            entry,
+            'session-status',
+            t('Reconectando… tentativa ', 'Reconnecting… attempt ') +
+              (attempt + 1) +
+              t(' de 3', ' of 3'),
+          );
           await start(serial, attempt + 1, entry);
         } else {
           await finishEntry(serial, entry);
           sendMirror(entry, 'session-status', {
-            message: 'Aparelho desconectado. Conecte-o e tente novamente.',
+            message: t(
+              'Aparelho desconectado. Conecte-o e tente novamente.',
+              'Device disconnected. Connect it and try again.',
+            ),
             retry: true,
           });
         }
@@ -558,7 +590,12 @@ async function startSession(serial: string, attempt = 0, existing?: Entry): Prom
           /* A disconnected session is already cleaning up. */
         }
       }
-      log('A janela de vídeo falhou (' + details.reason + '). Recuperando a imagem…', 'warning');
+      log(
+        t('A janela de vídeo falhou (', 'The video window failed (') +
+          details.reason +
+          t('). Recuperando a imagem…', '). Restoring the picture…'),
+        'warning',
+      );
       // A renderer failure must not destroy a healthy Android transport or its window.
       const resume =
         current && current.window === window && !current.requestedStop && ++rendererRecoveries <= 3;
@@ -571,16 +608,15 @@ async function startSession(serial: string, attempt = 0, existing?: Entry): Prom
         }
         if (window.isDestroyed()) return;
         await window.loadFile(join(__dirname, 'index.html'), {
-          query: {
-            view: 'mirror',
-            serial,
-            name: settings.nicknames[serial] || device?.model || serial,
-          },
+          query: mirrorQuery(serial, device),
         });
         if (window.isDestroyed()) return;
         if (!resume || sessions.get(serial) !== current || current.requestedStop) {
           window.webContents.send('session-status', {
-            message: 'Não foi possível recuperar o vídeo. Tente reconectar.',
+            message: t(
+              'Não foi possível recuperar o vídeo. Tente reconectar.',
+              'The video could not be restored. Try reconnecting.',
+            ),
             retry: true,
           });
           return;
@@ -599,7 +635,13 @@ async function startSession(serial: string, attempt = 0, existing?: Entry): Prom
           'session-status',
           current.session.state === 'mirroring'
             ? ''
-            : { message: 'Reconecte para retomar o espelhamento.', retry: true },
+            : {
+                message: t(
+                  'Reconecte para retomar o espelhamento.',
+                  'Reconnect to resume mirroring.',
+                ),
+                retry: true,
+              },
         );
         current.session.control({ type: 'sync' });
         if (current.session.audioState === 'started')
@@ -615,13 +657,7 @@ async function startSession(serial: string, attempt = 0, existing?: Entry): Prom
   }
   try {
     if (!existing)
-      await window.loadFile(join(__dirname, 'index.html'), {
-        query: {
-          view: 'mirror',
-          serial,
-          name: settings.nicknames[serial] || device?.model || serial,
-        },
-      });
+      await window.loadFile(join(__dirname, 'index.html'), { query: mirrorQuery(serial, device) });
     sendMirror(entry, 'window-layout', {
       contained: window.isMaximized() || window.isFullScreen(),
     });
@@ -642,7 +678,7 @@ async function startSession(serial: string, attempt = 0, existing?: Entry): Prom
     if (entry.requestedStop) return;
     if (!window.isDestroyed()) sendMirror(entry, 'session-status', '');
     diagnose('session-ready', { id: entry.id, windowId: window.id });
-    log('Espelhando ' + (device?.model ?? serial) + ' com motor próprio.');
+    log(t('Espelhando ', 'Mirroring ') + (device?.model ?? serial));
     broadcast();
   } catch (e) {
     entry.requestedStop = true;
@@ -677,6 +713,14 @@ async function finishEntry(serial: string, entry: Entry): Promise<void> {
   })();
   return entry.finishPromise;
 }
+function mirrorQuery(serial: string, device?: Device): Record<string, string> {
+  return {
+    view: 'mirror',
+    serial,
+    name: settings.nicknames[serial] || device?.model || serial,
+    lang: settings.language,
+  };
+}
 function sendMirror(entry: Entry, channel: string, ...args: unknown[]): void {
   if (entry.rendererGone || entry.window.isDestroyed()) return;
   const contents = entry.window.webContents;
@@ -705,10 +749,15 @@ function mediaPath(extension: string): string {
 }
 function validateAddress(value: unknown): string {
   if (typeof value !== 'string' || !/^([\d]{1,3}\.){3}\d{1,3}:\d{1,5}$/.test(value))
-    throw Error('Informe IP:porta, por exemplo 192.168.1.10:5555');
+    throw Error(
+      t(
+        'Informe IP:porta, por exemplo 192.168.1.10:5555',
+        'Enter IP:port, for example 192.168.1.10:5555',
+      ),
+    );
   const [ip, port] = value.split(':');
   if (ip.split('.').some((n) => Number(n) > 255) || Number(port) < 1 || Number(port) > 65535)
-    throw Error('Endereço inválido');
+    throw Error(t('Endereço inválido', 'Invalid address'));
   return value;
 }
 function handlers(): void {
@@ -727,7 +776,7 @@ function handlers(): void {
         'reconnect',
       ].includes(action)
     )
-      throw Error('Ação de janela inválida');
+      throw Error(t('Ação de janela inválida', 'Invalid window action'));
     if (window.isDestroyed()) return null;
     if (action !== 'state') diagnose('window-action', { windowId: window.id, action });
     if (action === 'close') {
@@ -783,7 +832,10 @@ function handlers(): void {
   ipcMain.handle('quality', (event, serial, value) => {
     assertPanel(event);
     const key = assertDevice(serial);
-    if (sessions.has(key)) throw Error('Pare o espelhamento para alterar a qualidade');
+    if (sessions.has(key))
+      throw Error(
+        t('Pare o espelhamento para alterar a qualidade', 'Stop mirroring to change the quality'),
+      );
     settings.quality[key] = quality(value);
     saveSettings();
     broadcast();
@@ -791,7 +843,8 @@ function handlers(): void {
   ipcMain.handle('rename', (event, serial, value) => {
     assertPanel(event);
     const key = assertDevice(serial);
-    if (typeof value !== 'string' || value.length > 80) throw Error('Nome inválido');
+    if (typeof value !== 'string' || value.length > 80)
+      throw Error(t('Nome inválido', 'Invalid name'));
     settings.nicknames[key] = value.trim();
     saveSettings();
     const entry = sessions.get(key);
@@ -810,14 +863,18 @@ function handlers(): void {
       typeof value.stayAwake !== 'boolean' ||
       !['pt', 'en'].includes(value.language)
     )
-      throw Error('Preferências inválidas');
+      throw Error(t('Preferências inválidas', 'Invalid preferences'));
     settings.alwaysOnTop = value.alwaysOnTop;
     settings.stayAwake = value.stayAwake;
     settings.language = value.language;
+    setLanguage(settings.language);
     if (typeof value.showSerial === 'boolean') settings.showSerial = value.showSerial;
     saveSettings();
-    for (const window of mirrorWindows.values())
-      if (!window.isDestroyed()) window.setAlwaysOnTop(settings.alwaysOnTop);
+    for (const window of mirrorWindows.values()) {
+      if (window.isDestroyed()) continue;
+      window.setAlwaysOnTop(settings.alwaysOnTop);
+      if (!window.webContents.isCrashed()) window.webContents.send('language', settings.language);
+    }
     broadcast();
   });
   ipcMain.handle('control', (event, value) => {
@@ -826,7 +883,8 @@ function handlers(): void {
     return control.type === 'text' ? session.text(control.text) : session.control(control);
   });
   ipcMain.handle('audio', (event, enabled) => {
-    if (typeof enabled !== 'boolean') throw Error('Estado de áudio inválido');
+    if (typeof enabled !== 'boolean')
+      throw Error(t('Estado de áudio inválido', 'Invalid audio state'));
     return owner(event).session.setAudio(enabled);
   });
   ipcMain.on('frame-ack', (event, id: number) => {
@@ -836,21 +894,22 @@ function handlers(): void {
   });
   ipcMain.handle('record', (event, serial) => {
     const entry = event.sender === panel.webContents ? sessions.get(String(serial)) : owner(event);
-    if (!entry) throw Error('Inicie o espelhamento');
+    if (!entry) throw Error(t('Inicie o espelhamento', 'Start mirroring first'));
     if (entry.session.recording) {
       const path = entry.session.recording.path;
       entry.session.stopRecording();
-      log('Gravação salva: ' + path);
+      log(t('Gravação salva: ', 'Recording saved: ') + path);
       return null;
     }
     const path = mediaPath('mp4');
     entry.session.startRecording(path);
-    log('Gravando: ' + path);
+    log(t('Gravando: ', 'Recording: ') + path);
     return path;
   });
   ipcMain.handle('screenshot', async (event, serial) => {
     const entry = event.sender === panel.webContents ? sessions.get(String(serial)) : owner(event);
-    if (!entry || entry.window.isDestroyed()) throw Error('Inicie o espelhamento');
+    if (!entry || entry.window.isDestroyed())
+      throw Error(t('Inicie o espelhamento', 'Start mirroring first'));
     sendMirror(entry, 'take-screenshot');
   });
   ipcMain.handle('save-png', (event, png) => {
@@ -860,10 +919,10 @@ function handlers(): void {
       png.byteLength > 32 * 1024 * 1024 ||
       Buffer.from(png).readUInt32BE(0) !== 0x89504e47
     )
-      throw Error('PNG inválido');
+      throw Error(t('PNG inválido', 'Invalid PNG'));
     const path = mediaPath('png');
     writeFileSync(path, png, { flag: 'wx' });
-    log('Captura salva: ' + path);
+    log(t('Captura salva: ', 'Screenshot saved: ') + path);
     return path;
   });
   ipcMain.handle('paste', async (event) => {
@@ -897,10 +956,16 @@ function handlers(): void {
   ipcMain.handle('pair', async (event, address, code) => {
     assertPanel(event);
     const target = validateAddress(address);
-    if (typeof code !== 'string' || !/^\d{6}$/.test(code)) throw Error('Código deve ter 6 dígitos');
+    if (typeof code !== 'string' || !/^\d{6}$/.test(code))
+      throw Error(t('O código deve ter 6 dígitos', 'The code must have 6 digits'));
     const result = await adb.run(['pair', target, code]);
     if (!result.includes('Successfully paired')) throw Error(result);
-    log('Pareamento concluído. Use a porta de conexão para conectar.');
+    log(
+      t(
+        'Pareamento concluído. Use a porta de conexão para conectar.',
+        'Paired. Use the connection port to connect.',
+      ),
+    );
     await refresh();
   });
   ipcMain.handle('usb-wifi', async (event, serial) => {
@@ -908,7 +973,13 @@ function handlers(): void {
     const valid = assertDevice(serial);
     const route = await adb.shell(valid, ['ip', 'route']);
     const ip = route.match(/\bsrc (\d+\.\d+\.\d+\.\d+)/)?.[1];
-    if (!ip) throw Error('Conecte o celular a uma rede Wi-Fi primeiro');
+    if (!ip)
+      throw Error(
+        t(
+          'Conecte o celular a uma rede Wi-Fi primeiro',
+          'Connect the phone to a Wi-Fi network first',
+        ),
+      );
     await adb.device(valid, ['tcpip', '5555']);
     await pause(1200);
     const target = validateAddress(ip + ':5555');
@@ -923,21 +994,25 @@ function handlers(): void {
     assertPanel(event);
     const valid = assertDevice(serial);
     const result = await dialog.showOpenDialog(panel, {
-      title: 'Instalar APK no aparelho',
+      title: t('Instalar APK no aparelho', 'Install APK on the device'),
       filters: [{ name: 'Android APK', extensions: ['apk'] }],
       properties: ['openFile'],
     });
     if (result.canceled) return;
     const name = await installer.install(valid, result.filePaths[0]);
-    log('APK instalado: ' + name);
+    log(t('APK instalado: ', 'APK installed: ') + name);
   });
   ipcMain.handle('install-dropped-apk', async (event, path: unknown) => {
     const { serial, window } = mirrorWindow(event);
     assertDevice(serial);
+    if (typeof path !== 'string' || !path)
+      throw Error(
+        t('Arraste um APK salvo neste computador.', 'Drop an APK saved on this computer.'),
+      );
     diagnose('apk-install-start', { windowId: window.id });
     try {
       const name = await installer.install(serial, path);
-      log('APK instalado: ' + name);
+      log(t('APK instalado: ', 'APK installed: ') + name);
       diagnose('apk-install-complete', { windowId: window.id });
       return name;
     } catch (error) {
@@ -993,7 +1068,13 @@ else {
     });
     await panel.loadFile(join(__dirname, 'index.html'));
     if (!existsSync(adb.executable) || !existsSync(join(resources, 'mirrorpanel-server.jar')))
-      log('Recursos ausentes. Execute npm run android antes de iniciar.', 'error');
+      log(
+        t(
+          'Recursos ausentes. Execute npm run android antes de iniciar.',
+          'Missing resources. Run npm run android before starting.',
+        ),
+        'error',
+      );
     await refresh();
     pollTimer = setInterval(() => void refresh(), 3000);
     for (const address of settings.wifi) void adb.run(['connect', address], 6000).catch(() => {});

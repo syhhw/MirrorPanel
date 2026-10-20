@@ -1,5 +1,6 @@
 import { execFile, spawn, ChildProcessWithoutNullStreams } from 'node:child_process';
 import { promisify } from 'node:util';
+import { t } from './i18n';
 const execute = promisify(execFile);
 export interface Device {
   serial: string;
@@ -45,12 +46,12 @@ export class Adb {
       // execFile's default message contains the full command, including bootstrap
       // credentials. Keep command arguments and token-bearing am output private.
       const detail = args.includes('shell')
-        ? 'Falha no comando Android'
+        ? t('Falha no comando Android', 'Android command failed')
         : failure.stderr?.trim().slice(0, 1000);
       throw Error(
         failure.killed
-          ? 'ADB excedeu o tempo limite'
-          : detail || 'Falha no ADB (' + String(failure.code) + ')',
+          ? t('ADB excedeu o tempo limite', 'ADB timed out')
+          : detail || t('Falha no ADB (', 'ADB failed (') + String(failure.code) + ')',
       );
     }
   }
