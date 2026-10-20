@@ -59,7 +59,7 @@ final class PlaybackAudio {
                 AudioFormat.CHANNEL_IN_STEREO,
                 AudioFormat.ENCODING_PCM_16BIT
             );
-            if (minimum <= 0) throw new IllegalStateException("Formato de áudio indisponível");
+            if (minimum <= 0) throw new IllegalStateException("Audio format unavailable");
             AudioPlaybackCaptureConfiguration capture = new AudioPlaybackCaptureConfiguration.Builder(projection)
                 .addMatchingUsage(AudioAttributes.USAGE_MEDIA)
                 .addMatchingUsage(AudioAttributes.USAGE_GAME)
@@ -73,7 +73,7 @@ final class PlaybackAudio {
             recorder = audio;
             if (stopped) return;
             if (audio.getState() != AudioRecord.STATE_INITIALIZED) throw new IllegalStateException(
-                "Captura de áudio indisponível"
+                "Audio capture unavailable"
             );
             codec = MediaCodec.createEncoderByType("audio/mp4a-latm");
             MediaFormat encoded = MediaFormat.createAudioFormat("audio/mp4a-latm", 48000, 2);
@@ -84,7 +84,7 @@ final class PlaybackAudio {
             codec.start();
             codecStarted = true;
             audio.startRecording();
-            sink.state("started", "Áudio de mídia • 48 kHz estéreo");
+            sink.state("started", "Media audio • 48 kHz stereo");
             long frames = 0,
                 base = -1;
             byte[] pcm = new byte[4096];
@@ -123,7 +123,7 @@ final class PlaybackAudio {
                 int input = codec.dequeueInputBuffer(10000);
                 if (input < 0) continue;
                 ByteBuffer buffer = codec.getInputBuffer(input);
-                if (buffer == null) throw new IllegalStateException("Buffer AAC indisponível");
+                if (buffer == null) throw new IllegalStateException("AAC buffer unavailable");
                 int count = audio.read(
                     pcm,
                     0,
@@ -131,7 +131,7 @@ final class PlaybackAudio {
                     AudioRecord.READ_BLOCKING
                 );
                 if (stopped) break;
-                if (count <= 0 || count % 4 != 0) throw new IllegalStateException("Leitura de áudio falhou: " + count);
+                if (count <= 0 || count % 4 != 0) throw new IllegalStateException("Audio read failed: " + count);
                 if (base < 0) {
                     base =
                         audio.getTimestamp(stamp, AudioTimestamp.TIMEBASE_MONOTONIC) == AudioRecord.SUCCESS
@@ -144,7 +144,7 @@ final class PlaybackAudio {
                 frames += count / 4;
             }
         } catch (Exception error) {
-            if (!stopped) sink.state("error", "Não foi possível capturar áudio: " + error.getClass().getSimpleName());
+            if (!stopped) sink.state("error", "Could not capture audio: " + error.getClass().getSimpleName());
         } finally {
             stopped = true;
             recorder = null;
@@ -162,7 +162,7 @@ final class PlaybackAudio {
             }
             projection.unregisterCallback(callback);
             projection.stop();
-            sink.state("off", "Áudio desligado");
+            sink.state("off", "Audio off");
         }
     }
 }

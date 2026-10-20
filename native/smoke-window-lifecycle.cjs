@@ -148,7 +148,8 @@ setTimeout(async () => {
     try {
       await adb('shell', 'uiautomator', 'dump', uiFile);
       const xml = await adb('shell', 'cat', uiFile);
-      assert.ok(xml.includes('Seu Android está no computador'));
+      // The Companion screen follows the phone's language.
+      assert.ok(/Your Android is on the computer|Seu Android está no computador/.test(xml));
       assert.ok(!xml.includes('PARAR ESPELHAMENTO'));
     } finally {
       await adb('shell', 'rm', '-f', uiFile);

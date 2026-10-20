@@ -59,7 +59,7 @@ public final class SessionService extends Service {
 
     static void audioDeclined() {
         SessionService service = active;
-        if (service != null) service.status("audio", "off", "Captura de áudio não autorizada");
+        if (service != null) service.status("audio", "off", "Audio capture not authorized");
     }
 
     static boolean validToken(String candidate) {
@@ -70,7 +70,11 @@ public final class SessionService extends Service {
     static boolean indicatorAllowed(Context context) {
         NotificationManager manager = context.getSystemService(NotificationManager.class);
         manager.createNotificationChannel(
-            new NotificationChannel(CHANNEL, "Espelhamento", NotificationManager.IMPORTANCE_LOW)
+            new NotificationChannel(
+                CHANNEL,
+                context.getString(R.string.notification_channel),
+                NotificationManager.IMPORTANCE_LOW
+            )
         );
         return (
             manager.areNotificationsEnabled() &&
@@ -96,8 +100,8 @@ public final class SessionService extends Service {
         );
         notification = new Notification.Builder(this, CHANNEL)
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle("MirrorPanel está espelhando esta tela")
-            .setContentText("Conectado ao computador. Toque para ver os detalhes.")
+            .setContentTitle(getString(R.string.notification_title))
+            .setContentText(getString(R.string.notification_text))
             .setOngoing(true)
             .setContentIntent(action)
             .build();
@@ -228,7 +232,7 @@ public final class SessionService extends Service {
                         .put("kind", "text")
                         .put("id", command.getInt("id"))
                         .put("ok", ok)
-                        .put("message", ok ? "" : "Selecione um campo de texto no aparelho.")
+                        .put("message", ok ? "" : "Select a text field on the device.")
                 );
             } else if (type.equals("ime-restore")) MirrorInput.previous = command.getString("previous");
             else if (type.equals("audio-stop")) stopAudio();
@@ -297,7 +301,7 @@ public final class SessionService extends Service {
             );
             audio.start();
         } catch (Exception error) {
-            status("audio", "error", "Captura de áudio indisponível: " + error.getClass().getSimpleName());
+            status("audio", "error", "Audio capture unavailable: " + error.getClass().getSimpleName());
             foreground(false);
         }
     }
@@ -309,7 +313,7 @@ public final class SessionService extends Service {
             audio = null;
         }
         foreground(false);
-        status("audio", "off", "Áudio desligado");
+        status("audio", "off", "Audio off");
     }
 
     @Override

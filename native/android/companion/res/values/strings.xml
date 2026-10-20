@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Phone screen and notification texts. values-pt holds the Portuguese translation; Android picks one by the phone's language. -->
+<resources>
+  <string name="status_ready">Ready to connect</string>
+  <string name="status_connected">Connected to the computer</string>
+  <string name="heading_idle">Open MirrorPanel on the computer</string>
+  <string name="description_idle">Connect this phone over USB and choose it in the MirrorPanel panel on the computer.</string>
+  <string name="steps_title">How to connect</string>
+  <string name="step_debugging">Turn on USB debugging in Developer options.</string>
+  <string name="step_cable">Connect the cable and allow the computer when Android asks.</string>
+  <string name="step_choose">In MirrorPanel on the computer, choose this phone.</string>
+  <string name="footer">The window, keyboard, audio and screenshots are controlled from the computer. You can close this screen and keep using the phone.</string>
+  <string name="heading_indicator_blocked">Turn on the connection indicator</string>
+  <string name="description_indicator_blocked">Allow MirrorPanel notifications in the Android settings, then connect again from the computer.</string>
+  <string name="heading_mirroring">Your Android is on the computer</string>
+  <string name="description_mirroring">Keep using your apps. To adjust the window, record or stop mirroring, use MirrorPanel on the computer.</string>
+  <string name="notification_channel">Mirroring</string>
+  <string name="notification_title">MirrorPanel is mirroring this screen</string>
+  <string name="notification_text">Connected to the computer. Tap for details.</string>
+</resources>

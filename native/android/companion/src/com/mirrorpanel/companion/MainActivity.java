@@ -75,27 +75,27 @@ public final class MainActivity extends Activity {
         brand.addView(name);
         layout.addView(brand);
 
-        status = text("Pronto para conectar", 13, FOG, false);
+        status = text(getString(R.string.status_ready), 13, FOG, false);
         status.setPadding(dp(12), dp(6), dp(14), dp(6));
         status.setCompoundDrawablePadding(dp(8));
         LinearLayout.LayoutParams chip = new LinearLayout.LayoutParams(-2, -2);
         chip.topMargin = dp(28);
         layout.addView(status, chip);
 
-        heading = text("Abra o MirrorPanel no computador", 26, FROST, true);
+        heading = text(getString(R.string.heading_idle), 26, FROST, true);
         layout.addView(heading, margins(dp(16)));
-        description = text("Conecte este aparelho por USB e escolha Espelhar no painel do computador.", 16, FOG, false);
+        description = text(getString(R.string.description_idle), 16, FOG, false);
         layout.addView(description, margins(dp(10)));
 
         LinearLayout list = new LinearLayout(this);
         list.setOrientation(LinearLayout.VERTICAL);
         list.setBackground(rounded(SURFACE, dp(18)));
         list.setPadding(dp(20), dp(18), dp(20), dp(20));
-        list.addView(text("Como conectar", 15, FROST, true));
+        list.addView(text(getString(R.string.steps_title), 15, FROST, true));
         String[] lines = {
-            "Ative a depuração USB nas opções do desenvolvedor.",
-            "Conecte o cabo e autorize o computador quando o Android perguntar.",
-            "No MirrorPanel do computador, escolha este aparelho.",
+            getString(R.string.step_debugging),
+            getString(R.string.step_cable),
+            getString(R.string.step_choose),
         };
         for (int index = 0; index < lines.length; index++) {
             LinearLayout row = new LinearLayout(this);
@@ -111,12 +111,7 @@ public final class MainActivity extends Activity {
         steps = list;
         layout.addView(list, margins(dp(28)));
 
-        TextView footer = text(
-            "A janela, o teclado, o áudio e as capturas são controlados pelo computador. Você pode fechar esta tela e continuar usando o celular.",
-            13,
-            FOG,
-            false
-        );
+        TextView footer = text(getString(R.string.footer), 13, FOG, false);
         layout.addView(footer, margins(dp(24)));
 
         ScrollView scroll = new ScrollView(this);
@@ -127,10 +122,8 @@ public final class MainActivity extends Activity {
         showState(false);
         // Sessions start in ConnectActivity; this screen only explains why one could not.
         if (getIntent().getBooleanExtra(EXTRA_INDICATOR_BLOCKED, false)) {
-            heading.setText("Ative o indicador de conexão");
-            description.setText(
-                "Permita as notificações do MirrorPanel nas configurações do Android e conecte de novo pelo computador."
-            );
+            heading.setText(R.string.heading_indicator_blocked);
+            description.setText(R.string.description_indicator_blocked);
         }
     }
 
@@ -139,16 +132,14 @@ public final class MainActivity extends Activity {
         super.onResume();
         if (SessionService.isRunning()) {
             showState(true);
-            heading.setText("Seu Android está no computador");
-            description.setText(
-                "Continue usando seus aplicativos. Para ajustar a janela, gravar ou encerrar o espelhamento, use o MirrorPanel no computador."
-            );
+            heading.setText(R.string.heading_mirroring);
+            description.setText(R.string.description_mirroring);
         }
     }
 
     /** A small status pill: grey dot while waiting, glass dot once the desktop is connected. */
     private void showState(boolean connected) {
-        status.setText(connected ? "Conectado ao computador" : "Pronto para conectar");
+        status.setText(connected ? R.string.status_connected : R.string.status_ready);
         status.setTextColor(connected ? FROST : FOG);
         status.setBackground(rounded(SURFACE, dp(999)));
         GradientDrawable dot = rounded(connected ? GLASS : FOG, dp(4));

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Portuguese translation of values/strings.xml. -->
+<resources>
+  <string name="status_ready">Pronto para conectar</string>
+  <string name="status_connected">Conectado ao computador</string>
+  <string name="heading_idle">Abra o MirrorPanel no computador</string>
+  <string name="description_idle">Conecte este aparelho por USB e escolha-o no painel do MirrorPanel no computador.</string>
+  <string name="steps_title">Como conectar</string>
+  <string name="step_debugging">Ative a depuração USB nas opções do desenvolvedor.</string>
+  <string name="step_cable">Conecte o cabo e autorize o computador quando o Android perguntar.</string>
+  <string name="step_choose">No MirrorPanel do computador, escolha este aparelho.</string>
+  <string name="footer">A janela, o teclado, o áudio e as capturas são controlados pelo computador. Você pode fechar esta tela e continuar usando o celular.</string>
+  <string name="heading_indicator_blocked">Ative o indicador de conexão</string>
+  <string name="description_indicator_blocked">Permita as notificações do MirrorPanel nas configurações do Android e conecte de novo pelo computador.</string>
+  <string name="heading_mirroring">Seu Android está no computador</string>
+  <string name="description_mirroring">Continue usando seus aplicativos. Para ajustar a janela, gravar ou encerrar o espelhamento, use o MirrorPanel no computador.</string>
+  <string name="notification_channel">Espelhamento</string>
+  <string name="notification_title">MirrorPanel está espelhando esta tela</string>
+  <string name="notification_text">Conectado ao computador. Toque para ver os detalhes.</string>
+</resources>
