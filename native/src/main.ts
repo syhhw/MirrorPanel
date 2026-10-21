@@ -15,7 +15,7 @@ import {
 import { join, dirname } from 'node:path';
 import { existsSync, readFileSync, writeFileSync, mkdirSync, renameSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
-import { Adb, Device } from './adb';
+import { Adb, Device, wifiAddress } from './adb';
 import { MirrorSession, Quality, DEFAULT_QUALITY, quality, failureText } from './session';
 import { Packet, validateControl } from './protocol';
 import {
@@ -1159,8 +1159,7 @@ function handlers(): void {
   });
   /** Switches a USB device to ADB over Wi-Fi on the network it is on, and connects to it. */
   const useWifi = async (valid: string) => {
-    const route = await adb.shell(valid, ['ip', 'route']);
-    const ip = route.match(/\bsrc (\d+\.\d+\.\d+\.\d+)/)?.[1];
+    const ip = wifiAddress(await adb.shell(valid, ['ip', 'route']));
     if (!ip)
       throw Error(
         t(
@@ -1173,7 +1172,7 @@ function handlers(): void {
     const target = validateAddress(ip + ':5555');
     const result = await adb.run(['connect', target]);
     if (!result.includes('connected')) throw Error(result);
-    settings.wifi.push(target);
+    if (!settings.wifi.includes(target)) settings.wifi.push(target);
     saveSettings();
     log(result);
     await refresh();

@@ -8,6 +8,18 @@ export interface Device {
   model: string;
   physicalId?: string;
 }
+/**
+ * The phone's Wi-Fi address from `ip route`. A phone with mobile data on can also
+ * list its carrier interface, so a wlan route wins over the first address found.
+ */
+export function wifiAddress(routes: string): string | undefined {
+  const address = (line?: string) => line?.match(/\bsrc (\d+\.\d+\.\d+\.\d+)/)?.[1];
+  const lines = routes.split(/\r?\n/);
+  return (
+    address(lines.find((line) => /\bdev wlan\d+\b/.test(line) && address(line))) ??
+    address(lines.find((line) => address(line)))
+  );
+}
 export function parseDevices(text: string): Device[] {
   return text
     .split(/\r?\n/)
