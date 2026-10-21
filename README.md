@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![Download MirrorPanel](https://img.shields.io/badge/Download-MirrorPanel--Setup.exe-2ea043?style=for-the-badge&logo=windows11&logoColor=white)](https://github.com/syhhw/MirrorPanel/releases/download/v2.0.0-preview.5/MirrorPanel-Setup-2.0.0-preview.5.exe)
+[![Download MirrorPanel](https://img.shields.io/badge/Download-MirrorPanel--Setup.exe-2ea043?style=for-the-badge&logo=windows11&logoColor=white)](https://github.com/syhhw/MirrorPanel/releases/download/v2.0.0-preview.6/MirrorPanel-Setup-2.0.0-preview.6.exe)
 [![Version](https://img.shields.io/github/v/release/syhhw/MirrorPanel?include_prereleases&label=version&color=1f6feb)](https://github.com/syhhw/MirrorPanel/releases)
 [![Tests](https://github.com/syhhw/MirrorPanel/actions/workflows/native-tests.yml/badge.svg)](https://github.com/syhhw/MirrorPanel/actions/workflows/native-tests.yml)
 
@@ -21,12 +21,12 @@ MirrorPanel has its own engine: Electron and WebCodecs on the PC, a small Java
 server and the MirrorPanel Companion app on the phone. The official ADB is
 included, so there is nothing else to install.
 
-> This is a preview (2.0.0-preview.5). [MirrorPanel 1.3.1](https://github.com/syhhw/MirrorPanel/releases/tag/v1.3.1)
+> This is a preview (2.0.0-preview.6). [MirrorPanel 1.3.1](https://github.com/syhhw/MirrorPanel/releases/tag/v1.3.1)
 > is still the latest stable release.
 
 ## Install
 
-1. Download `MirrorPanel-Setup-2.0.0-preview.5.exe` from
+1. Download `MirrorPanel-Setup-2.0.0-preview.6.exe` from
    [Releases](https://github.com/syhhw/MirrorPanel/releases) and run it. It installs
    for the current user and does not need administrator rights.
 2. The installer is not code-signed yet. If Windows SmartScreen stops it, choose
@@ -70,6 +70,8 @@ To connect without a cable, use **Connect over the network** in the panel.
 - Quality presets, nicknames, always on top, and keeping the phone screen on over USB
 - English and Portuguese interface, light and dark themes; the Companion follows
   the phone's language
+- Updates: when a newer version is out, an Update button appears in the panel and
+  installs it with one click
 
 ## Requirements and limits
 
@@ -77,8 +79,7 @@ To connect without a cable, use **Connect over the network** in the panel.
 - Audio depends on each app's policy: calls, protected content and the microphone
   are not captured.
 - Rotating the phone or turning audio on or off ends the current recording.
-- Not available yet: H.265, two-way clipboard, QR pairing, tray mode and automatic
-  updates.
+- Not available yet: H.265, two-way clipboard, QR pairing and tray mode.
 
 ## Build from source
 
