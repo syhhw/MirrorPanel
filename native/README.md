@@ -1,4 +1,4 @@
-# MirrorPanel — preview 5
+# MirrorPanel app
 
 Electron + TypeScript + WebCodecs, with its own Android engine. The package runs
 without Python or third-party programs. It includes the official ADB for USB/Wi-Fi transport.
@@ -23,14 +23,14 @@ files of that folder together.
 
 Right click/Esc: Back; middle click/Home: Home; End: recents;
 F11: fullscreen; Ctrl+V: paste. The bar offers PNG and MP4 recording.
-Closing the video window or using Stop in the computer's panel ends the session.
+Closing the mirror window ends the session.
 The Android app shows guidance and the connection status; closing that screen
 or dismissing the notification does not end mirroring.
 Use the gear for quality, device name and additional controls.
-In preview 3, the window has a single top bar, video fitted to the device's
+The window has a single top bar, video fitted to the device's
 aspect ratio and bottom navigation. Heartbeats keep the connection alive on static screens;
 a real lack of response is still detected by the watchdog.
-In preview 5, dragging the borders is free; after 500 ms without movement, the window
+Dragging the borders is free; after 500 ms without movement, the window
 fits the video by its larger dimension, keeping the aspect ratio. Reduce the height in
 portrait to shrink the mirror; narrowing only from the side makes the width return.
 Maximize and fullscreen center the video. The navigation buttons animate
@@ -39,10 +39,10 @@ Drag local files onto the mirror window: a single APK is installed
 on that device; other files (up to 20 at a time, 4 GB each) go to the phone's
 Download folder without overwriting existing names. Network folders are refused.
 The window controls keep working even without a session. Losing the
-Companion is recoverable; after repeated failures, Reconnect tries again
+Companion is recoverable; after repeated failures, Try again reconnects
 in the same window. Reconnecting does not restore a window you minimized.
 Renderer crashes try to recover the image in the same window and transport,
-cancelling pending contacts. After three recoveries, the window offers Reconnect
+cancelling pending contacts. After three recoveries, the window offers Try again
 and keeps Close/Minimize. Audio has to be turned on again after such a crash.
 The local diagnostics log is at `%APPDATA%/MirrorPanel/diagnostics/lifecycle.jsonl`;
 it records the close origin, state and counters, without typed text or clipboard contents.

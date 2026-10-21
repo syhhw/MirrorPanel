@@ -1,4 +1,4 @@
-# MPV1 — preview 4
+# MPV1 protocol
 
 MirrorPanel's original protocol. The desktop and server generate an abstract socket
 `mp_<128 bits hex>` and two random 256-bit tokens. Startup passes

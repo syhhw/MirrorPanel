@@ -1,6 +1,6 @@
 # MirrorPanel — architecture
 
-Electron + TypeScript + WebCodecs, its own Android engine. Preview 4, 19/10/2026.
+Electron + TypeScript + WebCodecs, its own Android engine.
 
 ```text
 Electron panel → Session manager → official ADB → app_process (UID shell)
@@ -44,7 +44,7 @@ A session owns one process, one forward and one temporary JAR. It never uses
 kill-server or kill by name. Cleanup waits for late ADB operations, restores
 IME/stay-awake and ends only the resources it owns. A renderer crash cancels pending contacts and reloads the image in the same
 window, keeping the Android transport; queues meant for the old renderer are
-discarded. There are three automatic recoveries; after that, Reconnect is still
+discarded. There are three automatic recoveries; after that, Try again is still
 available and the window controls stay usable. Destroying the window
 ends the session. Concurrent starts for the same device are serialized. Closing the Android guidance screen does not end the mirror. Unexpected disconnections get up to
 three reconnection attempts. Switching USB→Wi-Fi may require a new Start.
@@ -53,7 +53,7 @@ The Companion's authenticated heartbeat is forwarded to the PC as an MPV1 status
 The 15 s watchdog measures absence of communication, not absence of new frames.
 So a static screen stays connected without disabling failure detection.
 
-Windows use their own frame, a 38 px top bar and a 48 px bottom navigation
+Windows use their own frame, a 44 px top bar and a 48 px bottom navigation
 bar. Native dragging is free; after 500 ms without a resize, the video and the window
 are fitted by the larger dimension, with a 3 px tolerance and the monitor's bounds.
 Maximize/fullscreen use contained, centered video; the state is resent when
@@ -73,7 +73,7 @@ H.265, two-way clipboard, QR, tray and updater are not implemented yet.
 No third-party code or resource takes part in the engine besides the official ADB
 and Electron. Chromium keeps its internal ffmpeg.dll component.
 
-## APK, interaction and diagnostics (preview 5)
+## APK, interaction and diagnostics
 
 The preload turns a real File into a path through webUtils.getPathForFile. Main
 validates a local APK/ZIP file, its size and the owning window; the installer uses
