@@ -59,6 +59,11 @@ session, select your usual keyboard in Settings → Languages & input.
 - USB, Wi-Fi connection by IP, pairing by code, enabling TCP/IP over USB.
 - APK install from a file picker or by dragging onto the window, and local logs.
 - File transfer by drag and drop to Download, with safe names and no overwriting.
+- Updates: the installed app checks the GitHub releases 15 s after start and every
+  12 hours. A newer version shows an Update button on the home screen; it downloads
+  the setup, checks its size and the SHA-256 GitHub publishes, installs it silently
+  and reopens the app. It refuses while a mirror window is open. A preview build is
+  offered previews and stable releases; a stable build only stable ones.
 
 Files are saved in `Videos/MirrorPanel Media`. The app only removes its own
 processes, forwards and temporary JARs; it does not stop the shared ADB server.
@@ -76,7 +81,7 @@ Unicode is preserved; the available glyphs depend on the app and the phone's fon
 
 Rotation, an audio change or ending the session finishes the current recording. Start
 another file after the change. There is no H.265, two-way clipboard, QR,
-tray or automatic update in this preview. Wi-Fi has not yet been validated
+or tray mode in this preview. Wi-Fi has not yet been validated
 on a physical network in this round.
 
 ## Build and verify
@@ -149,6 +154,11 @@ the Companion on the second. The fixture, evidence and keys are not included in 
    ```
 
 5. Update the download link in the root README.
+
+The updater only installs an asset named exactly `MirrorPanel-Setup-<version>.exe`
+that GitHub lists with a SHA-256 digest, so keep that name. To test it, point
+`MIRRORPANEL_UPDATE_URL` at a local server that answers like the releases API
+(only `http://127.0.0.1:` addresses are accepted).
 
 ## Engineering
 

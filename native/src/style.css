@@ -254,6 +254,9 @@ dialog footer button:active {
   background: var(--hover);
   color: var(--text);
 }
+.text-button.is-update {
+  color: var(--live);
+}
 .text-button.is-warning {
   color: var(--warn);
   font-variant-numeric: tabular-nums;
@@ -826,6 +829,10 @@ fieldset {
 }
 .home-foot #wifi {
   margin-right: auto;
+}
+.home-foot .text-button,
+.text-button.is-update {
+  white-space: nowrap;
 }
 
 /* Preferences: a plain list, left-aligned, in the same window. */

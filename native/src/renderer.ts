@@ -24,6 +24,8 @@ interface PanelState {
   /** The app's version, such as 2.0.0-preview.5. */
   version: string;
   logs: { time: string; message: string; level: string }[];
+  /** A newer release, and the download progress (0 to 1) once installing. */
+  update: { version: string; progress: number | null } | null;
   settings: {
     alwaysOnTop: boolean;
     stayAwake: boolean;
@@ -395,6 +397,7 @@ function buildPanel(): void {
       <main class="home" id="home">
         <div id="shelf" class="shelf"></div>
         <p class="home-hint" id="home-hint"></p>
+        <button id="update" class="text-button is-update" hidden>${icon('download')}<span id="update-label"></span></button>
       </main>
       <section class="preferences" id="preferences" aria-labelledby="preferences-title" hidden>
         <header class="view-head">
@@ -461,6 +464,7 @@ function buildPanel(): void {
   panelSettings = settingsSheet();
   $('open-preferences').onclick = () => showView(view === 'home' ? 'preferences' : 'home');
   $('back').onclick = () => showView('home');
+  $('update').onclick = () => act(api.installUpdate());
   $('issues').onclick = () => {
     showView('preferences');
     $('activity').scrollIntoView({ block: 'start' });
@@ -624,6 +628,12 @@ function renderActivity(): void {
   $('issues').hidden = !issues;
 }
 
+/** The name is just MirrorPanel; a version reads like one: "2.0.0 (preview 5)". */
+function versionText(version: string): string {
+  const [number, preview] = version.split('-preview.');
+  return number + (preview ? t(' (preview ', ' (prévia ') + preview + ')' : '');
+}
+
 function renderPanel(next: unknown): void {
   state = next as PanelState;
   applyLanguage(state.settings.language);
@@ -656,12 +666,19 @@ function renderPanel(next: unknown): void {
   $('home-hint').hidden = !idle;
   labelWindowButtons();
   labelSettingsSheet();
-  // The name is just MirrorPanel; the version reads like one: "2.0.0 (preview 5)".
-  const [number, preview] = state.version.split('-preview.');
   $('about').textContent =
-    t('MirrorPanel, version ', 'MirrorPanel, versão ') +
-    number +
-    (preview ? t(' (preview ', ' (prévia ') + preview + ')' : '');
+    t('MirrorPanel, version ', 'MirrorPanel, versão ') + versionText(state.version);
+  const update = state.update;
+  $('update').hidden = !update;
+  if (update) {
+    $('update-label').textContent =
+      update.progress === null
+        ? t('Update to ', 'Atualizar para ') + versionText(update.version)
+        : t('Downloading update… ', 'Baixando atualização… ') +
+          Math.round(update.progress * 100) +
+          '%';
+    $<HTMLButtonElement>('update').disabled = update.progress !== null;
+  }
   label($('open-preferences'), t('Preferences', 'Preferências'));
   label($('back'), t('Back', 'Voltar'));
   $<HTMLInputElement>('show-serial').checked = state.settings.showSerial;

@@ -10,10 +10,20 @@ import {
   powerSaveBlocker,
   screen,
   nativeTheme,
+  net,
   IpcMainInvokeEvent,
 } from 'electron';
+import { spawn } from 'node:child_process';
 import { join, dirname } from 'node:path';
-import { existsSync, readFileSync, writeFileSync, mkdirSync, renameSync } from 'node:fs';
+import {
+  existsSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+  mkdirSync,
+  renameSync,
+} from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import { Adb, Device, wifiAddress } from './adb';
 import { MirrorSession, Quality, DEFAULT_QUALITY, quality, failureText } from './session';
@@ -32,6 +42,7 @@ import { FileSender, validateDroppedFiles } from './file-transfer';
 import { findBySender } from './window-owner';
 import { revealPanel } from './single-instance';
 import { setLanguage, t } from './i18n';
+import { downloadUpdate, pickUpdate, type Update } from './updater';
 
 /** Appearance: follow Windows, or force light or dark. Applied through nativeTheme. */
 type Theme = 'system' | 'light' | 'dark';
@@ -144,6 +155,19 @@ const identity = new Map<string, string>();
 const productModels = new Map<string, string>();
 let blocker: number | undefined;
 let pollTimer: ReturnType<typeof setInterval>;
+let updateTimer: ReturnType<typeof setInterval>;
+/** The release the update check found, and how much of it is downloaded once installing. */
+let update: Update | undefined;
+let updateProgress: number | null = null;
+// Tests point the update check at a local server; nothing else can redirect it.
+const updateTest = process.env.MIRRORPANEL_UPDATE_URL?.startsWith('http://127.0.0.1:')
+  ? process.env.MIRRORPANEL_UPDATE_URL
+  : undefined;
+const RELEASES =
+  updateTest ?? 'https://api.github.com/repos/syhhw/MirrorPanel/releases?per_page=20';
+const DOWNLOADS = updateTest
+  ? new URL(updateTest).origin + '/'
+  : 'https://github.com/syhhw/MirrorPanel/releases/download/';
 const pause = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 function loadSettings(): void {
@@ -244,6 +268,7 @@ function snapshot(): unknown {
     })),
     logs,
     version: app.getVersion(),
+    update: update ? { version: update.version, progress: updateProgress } : null,
     settings: {
       alwaysOnTop: settings.alwaysOnTop,
       stayAwake: settings.stayAwake,
@@ -255,6 +280,26 @@ function snapshot(): unknown {
 }
 function broadcast(): void {
   if (panel && !panel.isDestroyed()) panel.webContents.send('state', snapshot());
+}
+/** Asks GitHub for a newer release. Failures (offline, rate limit) only reach diagnostics. */
+async function checkForUpdate(): Promise<void> {
+  try {
+    const response = await net.fetch(RELEASES, {
+      headers: {
+        Accept: 'application/vnd.github+json',
+        'User-Agent': 'MirrorPanel/' + app.getVersion(),
+      },
+    });
+    if (!response.ok) throw Error('HTTP ' + response.status);
+    const found = pickUpdate(app.getVersion(), await response.json(), DOWNLOADS);
+    diagnose('update-check', { found: found?.version ?? null });
+    if (found && updateProgress === null && found.version !== update?.version) {
+      update = found;
+      broadcast();
+    }
+  } catch (e) {
+    diagnose('update-check-failed', { message: failureText(e) });
+  }
 }
 /** The panel's canvas colour (style.css --bg), painted natively before the page loads. */
 const panelBackground = () => (nativeTheme.shouldUseDarkColors ? '#1B1E1F' : '#F3F4F4');
@@ -1132,6 +1177,46 @@ function handlers(): void {
     logs.length = 0;
     broadcast();
   });
+  ipcMain.handle('install-update', async (event) => {
+    assertPanel(event);
+    if (!update || updateProgress !== null) return;
+    if (sessions.size || BrowserWindow.getAllWindows().some((w) => w !== panel))
+      throw Error(
+        t(
+          'Close the mirror windows before updating.',
+          'Feche as janelas de espelho antes de atualizar.',
+        ),
+      );
+    const target = update;
+    const path = join(app.getPath('temp'), `MirrorPanel-Setup-${target.version}.exe`);
+    let shown = 0;
+    updateProgress = 0;
+    broadcast();
+    try {
+      await downloadUpdate(
+        target,
+        path,
+        (url) => net.fetch(url),
+        (fraction) => {
+          updateProgress = fraction;
+          if (fraction - shown < 0.02 && fraction < 1) return;
+          shown = fraction;
+          broadcast();
+        },
+      );
+    } catch (e) {
+      updateProgress = null;
+      broadcast();
+      throw e;
+    }
+    diagnose('update-install', { version: target.version });
+    // The setup asks nothing, installs per user like the first time and reopens the app.
+    spawn(path, ['/SILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/CURRENTUSER'], {
+      detached: true,
+      stdio: 'ignore',
+    }).unref();
+    app.quit();
+  });
   ipcMain.handle('wifi', async (event, address) => {
     assertPanel(event);
     const target = validateAddress(address);
@@ -1310,6 +1395,19 @@ else {
       );
     await refresh();
     pollTimer = setInterval(() => void refresh(), 3000);
+    // The installed app looks for updates shortly after start and twice a day.
+    if (app.isPackaged || updateTest) {
+      // Setups downloaded by earlier updates; one still running stays until the next start.
+      for (const name of readdirSync(app.getPath('temp')))
+        if (/^MirrorPanel-Setup-.+\.exe$/.test(name))
+          try {
+            rmSync(join(app.getPath('temp'), name), { force: true });
+          } catch {
+            /* In use by a setup that has not exited yet. */
+          }
+      setTimeout(() => void checkForUpdate(), 15000);
+      updateTimer = setInterval(() => void checkForUpdate(), 12 * 60 * 60 * 1000);
+    }
     for (const address of settings.wifi) void adb.run(['connect', address], 6000).catch(() => {});
     panel.on('closed', () => {
       diagnose('panel-closed');
@@ -1324,6 +1422,7 @@ else {
     quitting = true;
     clearInterval(pollTimer);
     clearInterval(healthTimer);
+    clearInterval(updateTimer);
     diagnose('app-before-quit');
     // Exit only after flushing recordings and cleaning owned resources. Calling
     // quit again from a cancelled before-quit could leave a windowless process.
