@@ -2,16 +2,11 @@
 // is running), audits it and compiles installer/MirrorPanel.iss with Inno Setup 6.
 // The installer lands in dist/. Extra ISCC defines can follow on the command line.
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { fileVersion, version } from './version.mjs';
 
 const stage = 'build/installer';
-const version = JSON.parse(readFileSync('package.json', 'utf8')).version;
-// Windows file versions are four numbers: 2.0.0-preview.5 becomes 2.0.0.5.
-const fileVersion = [...version.matchAll(/\d+/g), [0], [0], [0], [0]]
-  .slice(0, 4)
-  .map((m) => m[0])
-  .join('.');
 
 function iscc() {
   const candidates = [

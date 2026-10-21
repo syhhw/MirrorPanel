@@ -1,4 +1,4 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.mirrorpanel.companion" android:versionCode="5" android:versionName="2.0.0-preview.5">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.mirrorpanel.companion">
   <uses-sdk android:minSdkVersion="29" android:targetSdkVersion="35" />
   <uses-permission android:name="android.permission.INTERNET" />
   <uses-permission android:name="android.permission.RECORD_AUDIO" />

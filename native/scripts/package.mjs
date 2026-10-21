@@ -1,5 +1,6 @@
 import { packager } from '@electron/packager';
 import { existsSync } from 'node:fs';
+import { fileVersion, version } from './version.mjs';
 // Output folder: dist by default; the installer build passes its own.
 const out = process.argv[2] ?? 'dist';
 for (const resource of ['mirrorpanel-server.jar', 'mirrorpanel-companion.apk', 'adb/adb.exe'])
@@ -22,8 +23,8 @@ const output = await packager({
     file !== '/build' &&
     !['/package.json', '/LICENSE'].includes(file),
   appCopyright: 'MirrorPanel contributors',
-  appVersion: '2.0.0-preview.5',
-  buildVersion: '2.0.0.5',
+  appVersion: version,
+  buildVersion: fileVersion,
   win32metadata: {
     CompanyName: 'MirrorPanel',
     FileDescription: 'MirrorPanel — original Android mirroring engine',

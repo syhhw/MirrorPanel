@@ -4,7 +4,9 @@ No Gradle or network download is used. Development signing key
 stays in build/; set MIRRORPANEL_KEYSTORE and signing environment for releases.
 """
 import filecmp
+import json
 import os
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -17,6 +19,17 @@ TOOLS = SDK / "build-tools/36.0.0"
 JAVA = Path(os.environ.get("JAVA_HOME", r"C:\Program Files\Eclipse Adoptium\jdk-17.0.19.10-hotspot")) / "bin"
 BUILD = ROOT / "build/android"
 OUT = ROOT / "resources"
+# The version is set only in package.json; the Companion gets it at link time.
+VERSION = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))["version"]
+
+
+def version_code(version):
+    """2.0.0-preview.5 -> 2000005 and 2.0.0 -> 2000099, so every release is higher."""
+    match = re.fullmatch(r"(\d+)\.(\d+)\.(\d+)(?:-preview\.(\d+))?", version)
+    if not match or int(match[4] or 0) > 98:
+        raise SystemExit("Unsupported version in package.json: " + version)
+    major, minor, patch, preview = match.groups()
+    return int(major) * 1_000_000 + int(minor) * 10_000 + int(patch) * 100 + int(preview or 99)
 
 
 def run(*args):
@@ -63,7 +76,8 @@ def main():
     # Resources link first so the Java code can use the generated R class.
     run(TOOLS / "aapt2.exe", "compile", "--dir", ROOT / "android/companion/res", "-o", compiled)
     run(TOOLS / "aapt2.exe", "link", "-o", unsigned, "--manifest", ROOT / "android/companion/AndroidManifest.xml",
-        "-I", PLATFORM, "--java", generated, compiled)
+        "-I", PLATFORM, "--java", generated, "--version-code", version_code(VERSION),
+        "--version-name", VERSION, compiled)
     companion = compile_dex("companion", generated)
     with zipfile.ZipFile(unsigned, "a", zipfile.ZIP_DEFLATED) as apk:
         apk.write(companion, "classes.dex")

@@ -132,6 +132,24 @@ dragging the borders with a mouse.
 The lifecycle test temporarily changes the rotation on the first device and stops
 the Companion on the second. The fixture, evidence and keys are not included in the package.
 
+## Release
+
+1. Set the new version in `package.json`, for example `2.0.0-preview.6`. The app,
+   the installer and the Companion's versionName and versionCode all read it from
+   there (2.0.0-preview.6 becomes versionCode 2000006; 2.0.0 becomes 2000099).
+2. Run `npm run android` with the release key: the development keystore in
+   `build/android` or the one set through `MIRRORPANEL_KEYSTORE`. Every release must
+   use the same key, or phones with the Companion installed refuse the update.
+3. Run the checks, then `npm run installer`, and install the result on a test machine.
+4. Commit and push, then publish. Previews go out as pre-releases, because the 1.3.1
+   updater installs whatever release GitHub marks as latest:
+
+   ```powershell
+   gh release create v<version> dist/MirrorPanel-Setup-<version>.exe --prerelease --latest=false
+   ```
+
+5. Update the download link in the root README.
+
 ## Engineering
 
 `docs/PROTOCOL.md` describes the MPV1 protocol. MirrorPanel uses its own code and interface.
